@@ -13,6 +13,11 @@
 
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg-dark); color: var(--text-main); padding: 15px; margin: 0; overflow-x: hidden; }
 
+        /* Tela de Carregamento (Some quando o script carregar) */
+        #loading { text-align: center; color: var(--accent-gold); margin-top: 50px; font-weight: bold; font-size: 18px; animation: pulse 1.5s infinite;}
+        @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+        .app-container { display: none; } /* Escondido até o JS funcionar */
+
         .screen { display: none; animation: fadeIn 0.3s ease; }
         .screen.active { display: block; }
 
@@ -58,66 +63,73 @@
 </head>
 <body>
 
-    <div id="screen-list" class="screen active">
-        <h3 class="section-title" style="text-align: center; margin-top: 5px;">Grimório da Mesa</h3>
-        <button class="btn-new" onclick="createNewCharacter()">+ Criar Personagem</button>
-        <div id="character-folders"></div>
+    <div id="loading">
+        📖 Carregando Grimório...<br>
+        <small style="font-size: 12px; color: #666;">Aguardando o script.js</small>
     </div>
 
-    <div id="screen-sheet" class="screen">
-        <div class="top-bar">
-            <button class="btn-ctrl" onclick="backToList()" style="width: auto; padding: 0 10px;">← Voltar</button>
-            <button class="btn-ctrl" onclick="deleteCharacter()" style="width: auto; padding: 0 10px; background: #5a1a1a;">Apagar Ficha</button>
+    <div class="app-container" id="app">
+        <div id="screen-list" class="screen active">
+            <h3 class="section-title" style="text-align: center; margin-top: 5px;">Grimório da Mesa</h3>
+            <button class="btn-new" onclick="createNewCharacter()">+ Criar Personagem</button>
+            <div id="character-folders"></div>
         </div>
 
-        <div class="tabs">
-            <button class="tab-btn active" onclick="openTab('personagem', event)">Personagem</button>
-            <button class="tab-btn" onclick="openTab('pericias', event)">Perícias</button>
-        </div>
+        <div id="screen-sheet" class="screen">
+            <div class="top-bar">
+                <button class="btn-ctrl" onclick="backToList()" style="width: auto; padding: 0 10px;">← Voltar</button>
+                <button class="btn-ctrl" onclick="deleteCharacter()" style="width: auto; padding: 0 10px; background: #5a1a1a;">Apagar Ficha</button>
+            </div>
 
-        <div id="personagem" class="tab-content active">
-            <div style="display: flex; gap: 15px; margin-bottom: 20px;">
-                <label for="photo-upload" class="photo-slot" id="photo-preview"><span id="photo-text">📷<br>Importar</span></label>
-                <input type="file" id="photo-upload" accept="image/*" style="display: none;">
-                <div style="flex: 1;">
-                    <div class="form-group"><label>Nome</label><input type="text" id="char-name"></div>
-                    <div style="display: flex; gap: 10px;">
-                        <div class="form-group" style="flex: 1;"><label>Idade</label><input type="number" id="char-age"></div>
-                        <div class="form-group" style="flex: 1;"><label>Raça</label><input type="text" id="char-race" value="Humano"></div>
+            <div class="tabs">
+                <button class="tab-btn active" onclick="openTab('personagem', event)">Personagem</button>
+                <button class="tab-btn" onclick="openTab('pericias', event)">Perícias</button>
+            </div>
+
+            <div id="personagem" class="tab-content active">
+                <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+                    <label for="photo-upload" class="photo-slot" id="photo-preview"><span id="photo-text">📷<br>Importar</span></label>
+                    <input type="file" id="photo-upload" accept="image/*" style="display: none;">
+                    <div style="flex: 1;">
+                        <div class="form-group"><label>Nome</label><input type="text" id="char-name"></div>
+                        <div style="display: flex; gap: 10px;">
+                            <div class="form-group" style="flex: 1;"><label>Idade</label><input type="number" id="char-age"></div>
+                            <div class="form-group" style="flex: 1;"><label>Raça</label><input type="text" id="char-race" value="Humano"></div>
+                        </div>
                     </div>
                 </div>
+
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label>📁 Pasta / Categoria</label>
+                    <select id="char-category" onchange="saveData()">
+                        <option value="Jogadores">Jogadores</option>
+                        <option value="NPCs">NPCs</option>
+                        <option value="Monstros">Monstros</option>
+                    </select>
+                </div>
+
+                <h4 class="section-title">Atributos</h4>
+                <div class="attr-box"><span>Força <svg class="d20-icon" width="16" height="16" fill="none" stroke="#d4af37" viewBox="0 0 24 24"><polygon points="12 2 2 12 12 22 22 12 12 2"></polygon><line x1="12" y1="2" x2="12" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line></svg></span><input type="number" id="attr-forca" class="attr-input" value="1"></div>
+                <div class="attr-box"><span>Magia <svg class="d20-icon" width="16" height="16" fill="none" stroke="#d4af37" viewBox="0 0 24 24"><polygon points="12 2 2 12 12 22 22 12 12 2"></polygon><line x1="12" y1="2" x2="12" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line></svg></span><input type="number" id="attr-magia" class="attr-input" value="1"></div>
+                <div class="attr-box"><span>Agilidade <svg class="d20-icon" width="16" height="16" fill="none" stroke="#d4af37" viewBox="0 0 24 24"><polygon points="12 2 2 12 12 22 22 12 12 2"></polygon><line x1="12" y1="2" x2="12" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line></svg></span><input type="number" id="attr-agilidade" class="attr-input" value="1"></div>
+                <div class="attr-box"><span>Sorte <svg class="d20-icon" width="16" height="16" fill="none" stroke="#d4af37" viewBox="0 0 24 24"><polygon points="12 2 2 12 12 22 22 12 12 2"></polygon><line x1="12" y1="2" x2="12" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line></svg></span><input type="number" id="attr-sorte" class="attr-input" value="1"></div>
+
+                <h4 class="section-title">📖 Grimório</h4>
+                <div class="form-group"><input type="text" id="grimoire-name" placeholder="Nome do Grimório"></div>
+                <div class="form-group"><label>🔮 Mana Zone</label><input type="text" id="mana-zone"></div>
+                <div class="form-group"><label>Habilidade 1</label><input type="text" id="hab-1"></div>
+                <div class="form-group"><label>Habilidade 2</label><input type="text" id="hab-2"></div>
+                <div class="form-group"><label>Habilidade 3</label><input type="text" id="hab-3"></div>
+                <div class="form-group"><label>Habilidade 4</label><input type="text" id="hab-4"></div>
             </div>
 
-            <div class="form-group" style="margin-bottom: 20px;">
-                <label>📁 Pasta / Categoria</label>
-                <select id="char-category" onchange="saveData()">
-                    <option value="Jogadores">Jogadores</option>
-                    <option value="NPCs">NPCs</option>
-                    <option value="Monstros">Monstros</option>
-                </select>
-            </div>
-
-            <h4 class="section-title">Atributos</h4>
-            <div class="attr-box"><span>Força <svg class="d20-icon" width="16" height="16" fill="none" stroke="#d4af37" viewBox="0 0 24 24"><polygon points="12 2 2 12 12 22 22 12 12 2"></polygon><line x1="12" y1="2" x2="12" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line></svg></span><input type="number" id="attr-forca" class="attr-input" value="1"></div>
-            <div class="attr-box"><span>Magia <svg class="d20-icon" width="16" height="16" fill="none" stroke="#d4af37" viewBox="0 0 24 24"><polygon points="12 2 2 12 12 22 22 12 12 2"></polygon><line x1="12" y1="2" x2="12" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line></svg></span><input type="number" id="attr-magia" class="attr-input" value="1"></div>
-            <div class="attr-box"><span>Agilidade <svg class="d20-icon" width="16" height="16" fill="none" stroke="#d4af37" viewBox="0 0 24 24"><polygon points="12 2 2 12 12 22 22 12 12 2"></polygon><line x1="12" y1="2" x2="12" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line></svg></span><input type="number" id="attr-agilidade" class="attr-input" value="1"></div>
-            <div class="attr-box"><span>Sorte <svg class="d20-icon" width="16" height="16" fill="none" stroke="#d4af37" viewBox="0 0 24 24"><polygon points="12 2 2 12 12 22 22 12 12 2"></polygon><line x1="12" y1="2" x2="12" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line></svg></span><input type="number" id="attr-sorte" class="attr-input" value="1"></div>
-
-            <h4 class="section-title">📖 Grimório</h4>
-            <div class="form-group"><input type="text" id="grimoire-name" placeholder="Nome do Grimório"></div>
-            <div class="form-group"><label>🔮 Mana Zone</label><input type="text" id="mana-zone"></div>
-            <div class="form-group"><label>Habilidade 1</label><input type="text" id="hab-1"></div>
-            <div class="form-group"><label>Habilidade 2</label><input type="text" id="hab-2"></div>
-            <div class="form-group"><label>Habilidade 3</label><input type="text" id="hab-3"></div>
-            <div class="form-group"><label>Habilidade 4</label><input type="text" id="hab-4"></div>
+            <div id="pericias" class="tab-content"><div id="skills-container"></div></div>
         </div>
 
-        <div id="pericias" class="tab-content"><div id="skills-container"></div></div>
+        <div id="toast" class="toast"></div>
     </div>
 
-    <div id="toast" class="toast"></div>
-
     <script src="https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@2/lib/index.js"></script>
-    <script src="script.js?v=7"></script>
+    <script src="script.js?v=9"></script>
 </body>
 </html>
