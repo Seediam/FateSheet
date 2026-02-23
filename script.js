@@ -10,6 +10,7 @@ let characters = {};
 let currentCharId = null;
 let playerSkills = {}; 
 let currentPhoto = "";
+let folderState = { "Jogadores": true, "NPCs": true, "Monstros": true }; // Controle de abrir/fechar pastas
 
 window.onload = function() {
     const loading = document.getElementById('loading');
@@ -24,18 +25,22 @@ window.onload = function() {
 window.openTab = function(tabName, event) {
     document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-    const targetTab = document.getElementById(tabName);
-    if(targetTab) targetTab.classList.add('active');
+    document.getElementById(tabName).classList.add('active');
     if(event) event.currentTarget.classList.add('active');
 }
 
-// CORREÇÃO DO BUG DE SALVAMENTO: Agora ele espera salvar antes de fechar!
 window.backToList = function() {
     window.saveData().then(() => {
         document.getElementById('screen-sheet').classList.remove('active');
         document.getElementById('screen-list').classList.add('active');
-        window.renderCharacterList(); // Força a tela a desenhar os personagens salvos
+        window.renderCharacterList();
     });
+}
+
+// SISTEMA DE PASTAS RETRÁTEIS
+window.toggleFolder = function(folderName) {
+    folderState[folderName] = !folderState[folderName];
+    window.renderCharacterList();
 }
 
 window.renderCharacterList = function() {
@@ -49,18 +54,27 @@ window.renderCharacterList = function() {
         let char = characters[id];
         let cat = char.category || "Jogadores";
         if (!categories[cat]) categories[cat] = [];
-        categories[cat].push({ id: id, name: char.name || "Sem Nome", owner: char.ownerName || "?" });
+        categories[cat].push({ id: id, name: char.name || "Sem Nome" }); // Removido o nome do dono
     }
 
     let hasAny = false;
     for (let cat in categories) {
         if (categories[cat].length > 0) {
             hasAny = true;
-            let html = `<div class="folder-title">📁 ${cat}</div><div class="char-list">`;
+            let isOpen = folderState[cat];
+            let arrow = isOpen ? '▼' : '►';
+            let displayStyle = isOpen ? 'flex' : 'none';
+
+            let html = `
+                <div class="folder-header" onclick="toggleFolder('${cat}')">
+                    <span class="chevron">${arrow}</span> 📁 ${cat}
+                </div>
+                <div class="folder-content" style="display: ${displayStyle};">
+            `;
+            
             categories[cat].forEach(char => {
                 html += `<div class="char-list-item" onclick="openCharacter('${char.id}')">
                             <span>${char.name}</span>
-                            <span style="font-size: 10px; color: #666; font-weight: normal;">por ${char.owner}</span>
                          </div>`;
             });
             html += `</div>`;
@@ -69,30 +83,27 @@ window.renderCharacterList = function() {
     }
 
     if(!hasAny) {
-        container.innerHTML = '<div style="text-align:center; color:#666; margin-top: 20px;">Nenhum personagem na mesa ainda.</div>';
+        container.innerHTML = '<div style="text-align:center; color:#666; margin-top: 20px;">O Servidor da Mesa está vazio.</div>';
     }
-}
-
-window.saveDataLocalOnly = function() {
-    try { localStorage.setItem('fate_system_chars_v10', JSON.stringify(characters)); } catch(e){}
 }
 
 window.createNewCharacter = function() {
     const newId = 'char_' + Date.now();
     characters[newId] = { name: "Novo Personagem", category: "Jogadores", skills: {}, photo: "" };
-    window.saveDataLocalOnly();
     window.openCharacter(newId);
 }
 
 window.deleteCharacter = function() {
-    if(confirm("Deseja mesmo apagar esta ficha da mesa?")) {
+    if(confirm("Deseja APAGAR ESTA FICHA DO SERVIDOR? Ela sumirá para todos.")) {
         delete characters[currentCharId];
-        window.saveDataLocalOnly();
         
         if (typeof OBR !== 'undefined' && OBR.isReady) {
             OBR.room.setMetadata({ [`fate_char_${currentCharId}`]: undefined }).catch(e => console.log(e));
         }
-        window.backToList();
+        
+        document.getElementById('screen-sheet').classList.remove('active');
+        document.getElementById('screen-list').classList.add('active');
+        window.renderCharacterList();
     }
 }
 
@@ -130,16 +141,13 @@ window.openCharacter = function(id) {
     document.getElementById('screen-sheet').classList.add('active');
 }
 
+// SALVA GLOBALMENTE NA NUVEM DA MESA
 window.saveData = async function() {
     if (!currentCharId) return; 
-
-    let playerName = "Mesa";
-    if (typeof OBR !== 'undefined' && OBR.isReady) playerName = await OBR.player.getName();
 
     const sheetData = {
         name: document.getElementById('char-name')?.value || "Sem Nome",
         category: document.getElementById('char-category')?.value || "Jogadores",
-        ownerName: playerName,
         age: document.getElementById('char-age')?.value || "",
         race: document.getElementById('char-race')?.value || "",
         forca: document.getElementById('attr-forca')?.value || 1,
@@ -157,7 +165,6 @@ window.saveData = async function() {
     };
 
     characters[currentCharId] = sheetData;
-    window.saveDataLocalOnly();
     
     if (typeof OBR !== 'undefined' && OBR.isReady) {
         try {
@@ -197,7 +204,7 @@ window.updateSkill = function(skillName, change, event) {
     window.saveData();
 }
 
-// NOVA FUNÇÃO DE ROLAGEM: Usa o Modal no centro da tela!
+// ------ A ROLAGEM QUE ACIONA A JANELA CENTRAL ------
 window.rollSkill = function(skillName, attrName) {
     const attrInputId = `attr-${attrName.toLowerCase()}`;
     const el = document.getElementById(attrInputId);
@@ -219,8 +226,10 @@ window.rollSkill = function(skillName, attrName) {
         results: results
     };
 
+    // Abre para você
     abrirModalCentral(rollData);
 
+    // Manda abrir para os outros
     if (typeof OBR !== 'undefined' && OBR.isReady) {
         OBR.broadcast.sendMessage("fate-system-rolls", rollData);
     }
@@ -228,13 +237,13 @@ window.rollSkill = function(skillName, attrName) {
 
 function abrirModalCentral(data) {
     if (typeof OBR !== 'undefined' && OBR.isReady) {
-        // Envia os dados pelo link do HTML
         const dataUrl = encodeURIComponent(JSON.stringify(data));
+        // IMPORTANTE: Este é o caminho do GitHub Pages que você está usando
         OBR.modal.open({
             id: "fate-roll-modal",
-            url: `/FateSheet/resultado.html?data=${dataUrl}`, // <-- ATENÇÃO AQUI!
+            url: `/FateSheet/resultado.html?data=${dataUrl}`, 
             width: 400,
-            height: 200
+            height: 250
         });
     }
 }
@@ -262,7 +271,6 @@ document.getElementById('photo-upload').addEventListener('change', function(e) {
         reader.onload = function(event) {
             currentPhoto = event.target.result;
             window.setPhotoPreview(currentPhoto);
-            window.saveData();
         };
         reader.readAsDataURL(file);
     }
@@ -287,22 +295,17 @@ function processRoomData(metadata) {
 }
 
 function initExtension() {
-    try {
-        const saved = localStorage.getItem('fate_system_chars_v10');
-        if (saved) characters = JSON.parse(saved);
-    } catch(e) {}
-
-    window.renderCharacterList();
-
     if (typeof OBR !== 'undefined') {
         OBR.onReady(async () => {
             try {
+                // Lê o banco de dados principal da sala
                 const initialMeta = await OBR.room.getMetadata();
                 processRoomData(initialMeta);
 
+                // Ouve quando qualquer pessoa criar/editar/apagar um personagem
                 OBR.room.onMetadataChange((metadata) => processRoomData(metadata));
                 
-                // Abre o modal quando outra pessoa jogar
+                // Ouve as rolagens na mesa e abre o HTML central
                 OBR.broadcast.onMessage("fate-system-rolls", (event) => {
                     abrirModalCentral(event.data);
                 });
