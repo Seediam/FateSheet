@@ -10,9 +10,7 @@ let characters = {};
 let currentCharId = null;
 let playerSkills = {}; 
 let currentPhoto = "";
-let toastTimer = null;
 
-// Remove a tela de carregamento assim que o JS carregar
 window.onload = function() {
     const loading = document.getElementById('loading');
     const app = document.getElementById('app');
@@ -31,10 +29,13 @@ window.openTab = function(tabName, event) {
     if(event) event.currentTarget.classList.add('active');
 }
 
+// CORREÇÃO DO BUG DE SALVAMENTO: Agora ele espera salvar antes de fechar!
 window.backToList = function() {
-    window.saveData();
-    document.getElementById('screen-sheet').classList.remove('active');
-    document.getElementById('screen-list').classList.add('active');
+    window.saveData().then(() => {
+        document.getElementById('screen-sheet').classList.remove('active');
+        document.getElementById('screen-list').classList.add('active');
+        window.renderCharacterList(); // Força a tela a desenhar os personagens salvos
+    });
 }
 
 window.renderCharacterList = function() {
@@ -72,24 +73,26 @@ window.renderCharacterList = function() {
     }
 }
 
-// O SEGREDO DO BUG RESOLVIDO: Ele SÓ cria a tela agora, NÃO FORÇA SALVAMENTO
+window.saveDataLocalOnly = function() {
+    try { localStorage.setItem('fate_system_chars_v10', JSON.stringify(characters)); } catch(e){}
+}
+
 window.createNewCharacter = function() {
     const newId = 'char_' + Date.now();
     characters[newId] = { name: "Novo Personagem", category: "Jogadores", skills: {}, photo: "" };
+    window.saveDataLocalOnly();
     window.openCharacter(newId);
 }
 
 window.deleteCharacter = function() {
     if(confirm("Deseja mesmo apagar esta ficha da mesa?")) {
         delete characters[currentCharId];
-        try { localStorage.setItem('fate_system_chars_v8', JSON.stringify(characters)); } catch(e){}
+        window.saveDataLocalOnly();
         
         if (typeof OBR !== 'undefined' && OBR.isReady) {
             OBR.room.setMetadata({ [`fate_char_${currentCharId}`]: undefined }).catch(e => console.log(e));
         }
-        
         window.backToList();
-        window.renderCharacterList();
     }
 }
 
@@ -130,10 +133,8 @@ window.openCharacter = function(id) {
 window.saveData = async function() {
     if (!currentCharId) return; 
 
-    let playerName = "Jogador Local";
-    if (typeof OBR !== 'undefined' && OBR.isReady) {
-        playerName = await OBR.player.getName();
-    }
+    let playerName = "Mesa";
+    if (typeof OBR !== 'undefined' && OBR.isReady) playerName = await OBR.player.getName();
 
     const sheetData = {
         name: document.getElementById('char-name')?.value || "Sem Nome",
@@ -156,18 +157,12 @@ window.saveData = async function() {
     };
 
     characters[currentCharId] = sheetData;
+    window.saveDataLocalOnly();
     
-    try { localStorage.setItem('fate_system_chars_v8', JSON.stringify(characters)); } catch(e){}
-    
-    // SISTEMA BLINDADO: Tenta salvar na Sala, se falhar por permissão, salva no Jogador.
     if (typeof OBR !== 'undefined' && OBR.isReady) {
         try {
             await OBR.room.setMetadata({ [`fate_char_${currentCharId}`]: sheetData });
-        } catch(e) { 
-            let pMeta = {};
-            pMeta[`fate_char_${currentCharId}`] = sheetData;
-            await OBR.player.setMetadata(pMeta);
-        }
+        } catch(e) {}
     }
 }
 
@@ -202,17 +197,7 @@ window.updateSkill = function(skillName, change, event) {
     window.saveData();
 }
 
-window.showCenterToast = function(msg) {
-    const toast = document.getElementById("toast");
-    if(!toast) return;
-    toast.innerText = msg;
-    toast.classList.add("show");
-    
-    if(toastTimer) clearTimeout(toastTimer);
-    toast.onclick = () => toast.classList.remove("show");
-    toastTimer = setTimeout(() => { toast.classList.remove("show"); }, 4500);
-}
-
+// NOVA FUNÇÃO DE ROLAGEM: Usa o Modal no centro da tela!
 window.rollSkill = function(skillName, attrName) {
     const attrInputId = `attr-${attrName.toLowerCase()}`;
     const el = document.getElementById(attrInputId);
@@ -227,12 +212,30 @@ window.rollSkill = function(skillName, attrName) {
     const charEl = document.getElementById('char-name');
     const charName = (charEl && charEl.value !== '') ? charEl.value : 'Desconhecido';
     
-    const message = `🎲 ${charName}\n rolou ${skillName} (${attrName})\n [ ${results.join(' | ')} ]`;
-    
-    window.showCenterToast(message);
+    const rollData = {
+        charName: charName,
+        skillName: skillName,
+        attrName: attrName,
+        results: results
+    };
+
+    abrirModalCentral(rollData);
 
     if (typeof OBR !== 'undefined' && OBR.isReady) {
-        OBR.broadcast.sendMessage("fate-system-rolls", message);
+        OBR.broadcast.sendMessage("fate-system-rolls", rollData);
+    }
+}
+
+function abrirModalCentral(data) {
+    if (typeof OBR !== 'undefined' && OBR.isReady) {
+        // Envia os dados pelo link do HTML
+        const dataUrl = encodeURIComponent(JSON.stringify(data));
+        OBR.modal.open({
+            id: "fate-roll-modal",
+            url: `/FateSheet/resultado.html?data=${dataUrl}`, // <-- ATENÇÃO AQUI!
+            width: 400,
+            height: 200
+        });
     }
 }
 
@@ -265,12 +268,8 @@ document.getElementById('photo-upload').addEventListener('change', function(e) {
     }
 });
 
-// Auto-save suave
-document.addEventListener('input', () => {
-    if(currentCharId) window.saveData();
-});
+document.addEventListener('input', () => { if(currentCharId) window.saveData(); });
 
-// Junta todos os personagens (da Sala e dos Jogadores)
 function processRoomData(metadata) {
     let mudouAlgo = false;
     for (let key in metadata) {
@@ -289,7 +288,7 @@ function processRoomData(metadata) {
 
 function initExtension() {
     try {
-        const saved = localStorage.getItem('fate_system_chars_v8');
+        const saved = localStorage.getItem('fate_system_chars_v10');
         if (saved) characters = JSON.parse(saved);
     } catch(e) {}
 
@@ -298,27 +297,16 @@ function initExtension() {
     if (typeof OBR !== 'undefined') {
         OBR.onReady(async () => {
             try {
-                // 1. Puxa dados globais da Sala
-                const roomMeta = await OBR.room.getMetadata();
-                processRoomData(roomMeta);
+                const initialMeta = await OBR.room.getMetadata();
+                processRoomData(initialMeta);
 
-                // 2. Puxa dados da mochila dos jogadores que não tem permissão na Sala
-                const players = await OBR.party.getPlayers();
-                players.forEach(p => processRoomData(p.metadata));
-
-                // 3. Fica escutando atualizações
                 OBR.room.onMetadataChange((metadata) => processRoomData(metadata));
-                OBR.party.onChange((updatedPlayers) => {
-                    updatedPlayers.forEach(p => processRoomData(p.metadata));
-                });
                 
-                // Rolagens de dados
+                // Abre o modal quando outra pessoa jogar
                 OBR.broadcast.onMessage("fate-system-rolls", (event) => {
-                    window.showCenterToast(event.data);
+                    abrirModalCentral(event.data);
                 });
-            } catch(e) {
-                console.error("Erro na integração OBR:", e);
-            }
+            } catch(e) {}
         });
     }
 }
