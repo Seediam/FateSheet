@@ -8,65 +8,66 @@
 </head>
 <body>
 
-    <div id="gm-panel" class="gm-panel">
-        <label>👑 Visão do Mestre</label>
-        <select id="gm-player-select">
-            <option value="local">Sua própria ficha</option>
-        </select>
+    <div id="screen-list" class="screen active">
+        <h3 class="section-title" style="text-align: center; margin-top: 5px;">Meus Personagens</h3>
+        <div id="character-list" class="char-list">
+            </div>
+        <button class="btn-new" onclick="createNewCharacter()">+ Novo Personagem</button>
+
+        <div id="gm-area" style="display: none; margin-top: 30px; border-top: 1px dashed #d4af37; padding-top: 15px;">
+            <h3 style="color: #ff4444; text-align: center; margin: 0 0 15px 0;">👑 Fichas da Mesa</h3>
+            <div id="gm-character-list" class="char-list">
+                </div>
+        </div>
     </div>
 
-    <div class="tabs">
-        <button class="tab-btn active" onclick="openTab('personagem', event)">Personagem</button>
-        <button class="tab-btn" onclick="openTab('pericias', event)">Perícias</button>
-    </div>
+    <div id="screen-sheet" class="screen">
+        
+        <div class="top-bar">
+            <button class="btn-ctrl" onclick="backToList()" style="width: auto; padding: 0 10px;">← Voltar</button>
+            <button class="btn-ctrl" onclick="deleteCharacter()" style="width: auto; padding: 0 10px; background: #5a1a1a;">Apagar</button>
+        </div>
 
-    <div id="personagem" class="tab-content active">
-        <div style="display: flex; gap: 15px; margin-bottom: 20px;">
-            <label for="photo-upload" class="photo-slot" id="photo-preview">
-                <span id="photo-text">📷<br>Importar</span>
-            </label>
-            <input type="file" id="photo-upload" accept="image/*" style="display: none;">
-            
-            <div style="flex: 1;">
-                <div class="form-group"><label>Nome</label><input type="text" id="char-name"></div>
-                <div style="display: flex; gap: 10px;">
-                    <div class="form-group"><label>Idade</label><input type="number" id="char-age"></div>
-                    <div class="form-group"><label>Raça</label><input type="text" id="char-race" value="Humano" readonly></div>
+        <div class="tabs">
+            <button class="tab-btn active" onclick="openTab('personagem', event)">Personagem</button>
+            <button class="tab-btn" onclick="openTab('pericias', event)">Perícias</button>
+        </div>
+
+        <div id="personagem" class="tab-content active">
+            <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+                <label for="photo-upload" class="photo-slot" id="photo-preview">
+                    <span id="photo-text">📷<br>Importar</span>
+                </label>
+                <input type="file" id="photo-upload" accept="image/*" style="display: none;">
+                
+                <div style="flex: 1;">
+                    <div class="form-group"><label>Nome</label><input type="text" id="char-name"></div>
+                    <div style="display: flex; gap: 10px;">
+                        <div class="form-group"><label>Idade</label><input type="number" id="char-age"></div>
+                        <div class="form-group"><label>Raça</label><input type="text" id="char-race" value="Humano" readonly></div>
+                    </div>
                 </div>
             </div>
+
+            <h4 class="section-title">Atributos</h4>
+            <div class="attr-box"><span>Força <svg class="d20-icon" fill="none" stroke="#d4af37" viewBox="0 0 24 24"><polygon points="12 2 2 12 12 22 22 12 12 2"></polygon><line x1="12" y1="2" x2="12" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="12" y1="2" x2="6" y2="17"></line><line x1="12" y1="2" x2="18" y2="17"></line></svg></span><input type="number" id="attr-forca" class="attr-input" value="1"></div>
+            <div class="attr-box"><span>Magia <svg class="d20-icon" fill="none" stroke="#d4af37" viewBox="0 0 24 24"><polygon points="12 2 2 12 12 22 22 12 12 2"></polygon><line x1="12" y1="2" x2="12" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="12" y1="2" x2="6" y2="17"></line><line x1="12" y1="2" x2="18" y2="17"></line></svg></span><input type="number" id="attr-magia" class="attr-input" value="1"></div>
+            <div class="attr-box"><span>Agilidade <svg class="d20-icon" fill="none" stroke="#d4af37" viewBox="0 0 24 24"><polygon points="12 2 2 12 12 22 22 12 12 2"></polygon><line x1="12" y1="2" x2="12" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="12" y1="2" x2="6" y2="17"></line><line x1="12" y1="2" x2="18" y2="17"></line></svg></span><input type="number" id="attr-agilidade" class="attr-input" value="1"></div>
+            <div class="attr-box"><span>Sorte <svg class="d20-icon" fill="none" stroke="#d4af37" viewBox="0 0 24 24"><polygon points="12 2 2 12 12 22 22 12 12 2"></polygon><line x1="12" y1="2" x2="12" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="12" y1="2" x2="6" y2="17"></line><line x1="12" y1="2" x2="18" y2="17"></line></svg></span><input type="number" id="attr-sorte" class="attr-input" value="1"></div>
+
+            <h4 class="section-title">📖 Grimório</h4>
+            <div class="form-group"><input type="text" id="grimoire-name" placeholder="Nome do Grimório"></div>
+            <div class="form-group"><label>🔮 Mana Zone</label><input type="text" id="mana-zone"></div>
+            
+            <div class="form-group"><label>Habilidade 1 (Desc | Custo | Alcance)</label><input type="text" id="hab-1"></div>
+            <div class="form-group"><label>Habilidade 2</label><input type="text" id="hab-2"></div>
+            <div class="form-group"><label>Habilidade 3</label><input type="text" id="hab-3"></div>
+            <div class="form-group"><label>Habilidade 4</label><input type="text" id="hab-4"></div>
         </div>
 
-        <h4 class="section-title">Atributos</h4>
-        
-        <div class="attr-box">
-            <span>Força <svg class="d20-icon" fill="none" stroke="#d4af37" viewBox="0 0 24 24"><polygon points="12 2 2 12 12 22 22 12 12 2"></polygon><line x1="12" y1="2" x2="12" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="12" y1="2" x2="6" y2="17"></line><line x1="12" y1="2" x2="18" y2="17"></line></svg></span>
-            <input type="number" id="attr-forca" class="attr-input" value="1">
+        <div id="pericias" class="tab-content">
+            <div id="skills-container"></div>
         </div>
-        <div class="attr-box">
-            <span>Magia <svg class="d20-icon" fill="none" stroke="#d4af37" viewBox="0 0 24 24"><polygon points="12 2 2 12 12 22 22 12 12 2"></polygon><line x1="12" y1="2" x2="12" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="12" y1="2" x2="6" y2="17"></line><line x1="12" y1="2" x2="18" y2="17"></line></svg></span>
-            <input type="number" id="attr-magia" class="attr-input" value="1">
-        </div>
-        <div class="attr-box">
-            <span>Agilidade <svg class="d20-icon" fill="none" stroke="#d4af37" viewBox="0 0 24 24"><polygon points="12 2 2 12 12 22 22 12 12 2"></polygon><line x1="12" y1="2" x2="12" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="12" y1="2" x2="6" y2="17"></line><line x1="12" y1="2" x2="18" y2="17"></line></svg></span>
-            <input type="number" id="attr-agilidade" class="attr-input" value="1">
-        </div>
-        <div class="attr-box">
-            <span>Sorte <svg class="d20-icon" fill="none" stroke="#d4af37" viewBox="0 0 24 24"><polygon points="12 2 2 12 12 22 22 12 12 2"></polygon><line x1="12" y1="2" x2="12" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line><line x1="12" y1="2" x2="6" y2="17"></line><line x1="12" y1="2" x2="18" y2="17"></line></svg></span>
-            <input type="number" id="attr-sorte" class="attr-input" value="1">
-        </div>
-
-        <h4 class="section-title">📖 Grimório</h4>
-        <div class="form-group"><input type="text" id="grimoire-name" placeholder="Nome do Grimório"></div>
-        <div class="form-group"><label>🔮 Mana Zone</label><input type="text" id="mana-zone"></div>
-        
-        <div class="form-group"><label>Habilidade 1 (Desc | Custo | Alcance)</label><input type="text" id="hab-1"></div>
-        <div class="form-group"><label>Habilidade 2</label><input type="text" id="hab-2"></div>
-        <div class="form-group"><label>Habilidade 3</label><input type="text" id="hab-3"></div>
-        <div class="form-group"><label>Habilidade 4</label><input type="text" id="hab-4"></div>
-    </div>
-
-    <div id="pericias" class="tab-content">
-        <div id="skills-container"></div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@2/lib/index.js"></script>
