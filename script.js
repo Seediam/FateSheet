@@ -12,7 +12,17 @@ let playerSkills = {};
 let currentPhoto = "";
 let toastTimer = null;
 
-// Funções expostas para o HTML poder enxergar
+// Remove a tela de carregamento assim que o JS carregar
+window.onload = function() {
+    const loading = document.getElementById('loading');
+    const app = document.getElementById('app');
+    if(loading && app) {
+        loading.style.display = 'none';
+        app.style.display = 'block';
+    }
+    initExtension();
+};
+
 window.openTab = function(tabName, event) {
     document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -62,24 +72,17 @@ window.renderCharacterList = function() {
     }
 }
 
-// A FUNÇÃO QUE FALTAVA NA VERSÃO ANTERIOR E CAUSAVA O BUG!
-window.saveDataLocalOnly = function() {
-    try {
-        localStorage.setItem('fate_system_chars_v7', JSON.stringify(characters));
-    } catch(e) { console.error("Erro ao salvar localmente:", e); }
-}
-
+// O SEGREDO DO BUG RESOLVIDO: Ele SÓ cria a tela agora, NÃO FORÇA SALVAMENTO
 window.createNewCharacter = function() {
     const newId = 'char_' + Date.now();
     characters[newId] = { name: "Novo Personagem", category: "Jogadores", skills: {}, photo: "" };
-    window.saveDataLocalOnly(); // Salva a estrutura básica antes de abrir
-    window.openCharacter(newId); // Agora abre com segurança
+    window.openCharacter(newId);
 }
 
 window.deleteCharacter = function() {
-    if(confirm("Deseja mesmo apagar esta ficha da mesa? Todos perderão o acesso a ela.")) {
+    if(confirm("Deseja mesmo apagar esta ficha da mesa?")) {
         delete characters[currentCharId];
-        window.saveDataLocalOnly();
+        try { localStorage.setItem('fate_system_chars_v8', JSON.stringify(characters)); } catch(e){}
         
         if (typeof OBR !== 'undefined' && OBR.isReady) {
             OBR.room.setMetadata({ [`fate_char_${currentCharId}`]: undefined }).catch(e => console.log(e));
@@ -90,7 +93,6 @@ window.deleteCharacter = function() {
     }
 }
 
-// Função segura para inserir valores no HTML
 function safeSetVal(id, value) {
     const el = document.getElementById(id);
     if(el) el.value = value;
@@ -128,7 +130,7 @@ window.openCharacter = function(id) {
 window.saveData = async function() {
     if (!currentCharId) return; 
 
-    let playerName = "Mesa";
+    let playerName = "Jogador Local";
     if (typeof OBR !== 'undefined' && OBR.isReady) {
         playerName = await OBR.player.getName();
     }
@@ -150,17 +152,22 @@ window.saveData = async function() {
         hab3: document.getElementById('hab-3')?.value || "",
         hab4: document.getElementById('hab-4')?.value || "",
         skills: playerSkills,
-        photo: "" // Não salva na nuvem para não travar
+        photo: "" 
     };
 
     characters[currentCharId] = sheetData;
-    window.saveDataLocalOnly();
     
-    // Manda pra mesa global
+    try { localStorage.setItem('fate_system_chars_v8', JSON.stringify(characters)); } catch(e){}
+    
+    // SISTEMA BLINDADO: Tenta salvar na Sala, se falhar por permissão, salva no Jogador.
     if (typeof OBR !== 'undefined' && OBR.isReady) {
         try {
             await OBR.room.setMetadata({ [`fate_char_${currentCharId}`]: sheetData });
-        } catch(e) { console.log("Aviso: GM precisa permitir salvar na mesa."); }
+        } catch(e) { 
+            let pMeta = {};
+            pMeta[`fate_char_${currentCharId}`] = sheetData;
+            await OBR.player.setMetadata(pMeta);
+        }
     }
 }
 
@@ -258,12 +265,12 @@ document.getElementById('photo-upload').addEventListener('change', function(e) {
     }
 });
 
-// Auto-save ao digitar
+// Auto-save suave
 document.addEventListener('input', () => {
     if(currentCharId) window.saveData();
 });
 
-// Lógica de Rede (Nuvem da Mesa)
+// Junta todos os personagens (da Sala e dos Jogadores)
 function processRoomData(metadata) {
     let mudouAlgo = false;
     for (let key in metadata) {
@@ -280,10 +287,9 @@ function processRoomData(metadata) {
     if (mudouAlgo) window.renderCharacterList();
 }
 
-// Inicialização Principal
 function initExtension() {
     try {
-        const saved = localStorage.getItem('fate_system_chars_v7');
+        const saved = localStorage.getItem('fate_system_chars_v8');
         if (saved) characters = JSON.parse(saved);
     } catch(e) {}
 
@@ -292,16 +298,21 @@ function initExtension() {
     if (typeof OBR !== 'undefined') {
         OBR.onReady(async () => {
             try {
-                // Sincroniza com a nuvem da sala
-                const initialMeta = await OBR.room.getMetadata();
-                processRoomData(initialMeta);
+                // 1. Puxa dados globais da Sala
+                const roomMeta = await OBR.room.getMetadata();
+                processRoomData(roomMeta);
 
-                // Fica ouvindo alterações de outras pessoas
-                OBR.room.onMetadataChange((metadata) => {
-                    processRoomData(metadata);
+                // 2. Puxa dados da mochila dos jogadores que não tem permissão na Sala
+                const players = await OBR.party.getPlayers();
+                players.forEach(p => processRoomData(p.metadata));
+
+                // 3. Fica escutando atualizações
+                OBR.room.onMetadataChange((metadata) => processRoomData(metadata));
+                OBR.party.onChange((updatedPlayers) => {
+                    updatedPlayers.forEach(p => processRoomData(p.metadata));
                 });
                 
-                // Ouve os dados rolando
+                // Rolagens de dados
                 OBR.broadcast.onMessage("fate-system-rolls", (event) => {
                     window.showCenterToast(event.data);
                 });
@@ -311,6 +322,3 @@ function initExtension() {
         });
     }
 }
-
-// Inicia assim que a tela carregar
-document.addEventListener('DOMContentLoaded', initExtension);
