@@ -1,0 +1,13 @@
+{
+  "name": "Fate Sheet",
+  "version": "1.0.0",
+  "manifest_version": 1,
+  "description": "Ficha dinâmica e interativa para o sistema Fate.",
+  "action": {
+    "title": "Fate:Ficha",
+    "icon": "/FateSheet/icon-sheet.svg",
+    "popover": "/FateSheet/index.html",
+    "width": 450,
+    "height": 650
+  }
+}
