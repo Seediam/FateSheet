@@ -28,7 +28,7 @@ function backToList() {
 
 function loadAllCharacters() {
     try {
-        const saved = localStorage.getItem('fate_system_chars_v4');
+        const saved = localStorage.getItem('fate_system_chars_v5');
         if (saved) characters = JSON.parse(saved);
     } catch(e) {}
     renderCharacterList();
@@ -55,7 +55,7 @@ function deleteCharacter() {
     if(confirm("Deseja mesmo apagar esta ficha?")) {
         delete characters[currentCharId];
         saveDataLocalOnly();
-        syncWithOwlbear(); // Atualiza a rede para avisar o GM que sumiu
+        syncWithOwlbear(); 
         backToList();
     }
 }
@@ -86,14 +86,14 @@ function openCharacter(id) {
     document.getElementById('screen-sheet').classList.add('active');
 }
 
-// O SEGREDO ESTÁ AQUI: Salva na metadata do JOGADOR
+// Salvando direto no perfil do Jogador para o GM ler!
 async function syncWithOwlbear() {
     if (typeof OBR !== 'undefined' && OBR.isReady) {
         let syncChars = {};
         for(let id in characters) {
             if(id !== "temp_gm_view") {
                 syncChars[id] = { ...characters[id] };
-                delete syncChars[id].photo; // Tira foto pra não travar o servidor
+                delete syncChars[id].photo; // Foto é pesada pra rede, removemos do sync
             }
         }
         await OBR.player.setMetadata({ "fatesystem/sheets": syncChars });
@@ -103,7 +103,7 @@ async function syncWithOwlbear() {
 function saveDataLocalOnly() {
     let temp = characters["temp_gm_view"];
     delete characters["temp_gm_view"];
-    localStorage.setItem('fate_system_chars_v4', JSON.stringify(characters));
+    localStorage.setItem('fate_system_chars_v5', JSON.stringify(characters));
     if(temp) characters["temp_gm_view"] = temp;
 }
 
@@ -128,7 +128,7 @@ function saveData() {
     };
 
     saveDataLocalOnly();
-    syncWithOwlbear(); // Envia para o GM
+    syncWithOwlbear(); 
 }
 
 function renderSkills() {
@@ -221,11 +221,11 @@ function setPhotoPreview(base64Str) {
 document.addEventListener('input', saveData);
 document.addEventListener('DOMContentLoaded', loadAllCharacters);
 
-// AQUI O GM ESCUTA TODOS OS JOGADORES DA SALA
+// A REDE DO OWLBEAR RODEO
 if (typeof OBR !== 'undefined') {
     OBR.onReady(async () => {
         localPlayerName = await OBR.player.getName();
-        syncWithOwlbear(); // Manda os dados ao entrar na sala
+        syncWithOwlbear(); 
         
         OBR.broadcast.onMessage("fate-system-rolls", (event) => {
             OBR.notification.show(event.data);
@@ -235,11 +235,11 @@ if (typeof OBR !== 'undefined') {
         if (role === "GM") {
             document.getElementById("gm-area").style.display = "block";
             
-            // Puxa as fichas de quem já está na sala
+            // Puxa as fichas de quem já está online na sala
             const players = await OBR.party.getPlayers();
             updateGMList(players);
 
-            // Atualiza quando jogadores entram, saem ou salvam
+            // Escuta se alguém entrar, sair ou mexer na ficha
             OBR.party.onChange((updatedPlayers) => { updateGMList(updatedPlayers); });
         }
     });
@@ -258,14 +258,14 @@ function updateGMList(players) {
             for (let charId in sheets) {
                 hasSheets = true;
                 let charName = sheets[charId].name || "Sem Nome";
-                let playerName = player.name || "Desconhecido";
+                let playerName = player.name || "Jogador";
                 
                 gmList.innerHTML += `<div class="char-list-item gm-item" onclick="openGMCharacter('${player.id}', '${charId}')">👑 ${charName} <span style="font-size:10px; color:#888;">(${playerName})</span></div>`;
             }
         }
     });
     
-    if (!hasSheets) gmList.innerHTML = '<span style="color:#666; font-size: 12px;">Nenhuma ficha dos jogadores online encontrada.</span>';
+    if (!hasSheets) gmList.innerHTML = '<span style="color:#666; font-size: 12px;">Nenhuma ficha online. Peça para os jogadores abrirem a ficha deles.</span>';
 }
 
 async function openGMCharacter(playerId, charId) {
