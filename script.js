@@ -11,7 +11,6 @@ let currentCharId = null;
 let playerSkills = {}; 
 let currentPhoto = "";
 
-// ------ NAVEGAÇÃO ENTRE TELAS ------
 function openTab(tabName, event) {
     document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
@@ -26,12 +25,11 @@ function backToList() {
     renderCharacterList();
 }
 
-// ------ GERENCIAMENTO DE MÚLTIPLAS FICHAS ------
 function loadAllCharacters() {
     try {
         const saved = localStorage.getItem('fate_system_chars_v2');
         if (saved) characters = JSON.parse(saved);
-    } catch(e) { console.error("Erro ao carregar fichas", e); }
+    } catch(e) {}
     renderCharacterList();
 }
 
@@ -39,6 +37,7 @@ function renderCharacterList() {
     const list = document.getElementById('character-list');
     list.innerHTML = '';
     for (let id in characters) {
+        if(id === "temp_gm_view") continue; // Esconde a visualização temporária do GM
         let name = characters[id].name || "Desconhecido";
         list.innerHTML += `<div class="char-list-item" onclick="openCharacter('${id}')">${name}</div>`;
     }
@@ -54,21 +53,15 @@ function createNewCharacter() {
 function deleteCharacter() {
     if(confirm("Deseja mesmo apagar esta ficha?")) {
         delete characters[currentCharId];
-        
-        // Remove da sala também (para o GM)
-        if (typeof OBR !== 'undefined' && OBR.isAvailable) {
-            OBR.room.setMetadata({ [`fatesystem/sheet-${currentCharId}`]: undefined });
-        }
-        
+        syncWithOwlbear(); // Atualiza a rede
         backToList();
     }
 }
 
 function openCharacter(id) {
     currentCharId = id;
-    const charData = characters[id];
+    const charData = characters[id] || {};
     
-    // Preenche a tela com os dados
     document.getElementById('char-name').value = charData.name || '';
     document.getElementById('char-age').value = charData.age || '';
     document.getElementById('attr-forca').value = charData.forca || 1;
@@ -87,18 +80,37 @@ function openCharacter(id) {
     setPhotoPreview(currentPhoto);
     renderSkills();
 
-    // Troca a tela
     document.getElementById('screen-list').classList.remove('active');
     document.getElementById('screen-sheet').classList.add('active');
 }
 
-// ------ SALVAMENTO E SINCRONIZAÇÃO (OWLEAR) ------
+function getSyncableCharacters() {
+    let syncChars = {};
+    for(let id in characters) {
+        if(id === "temp_gm_view") continue;
+        syncChars[id] = { ...characters[id] };
+        delete syncChars[id].photo; // Tira foto pra não pesar a rede
+    }
+    return syncChars;
+}
+
+function syncWithOwlbear() {
+    if (typeof OBR !== 'undefined' && OBR.isReady) {
+        // Agora salva no JOGADOR, permitindo que todos enviem pro GM!
+        OBR.player.setMetadata({ "fate-system-sheets": getSyncableCharacters() });
+    }
+}
+
 function saveDataLocalOnly() {
+    // Tira a temp view antes de salvar local
+    let temp = characters["temp_gm_view"];
+    delete characters["temp_gm_view"];
     localStorage.setItem('fate_system_chars_v2', JSON.stringify(characters));
+    if(temp) characters["temp_gm_view"] = temp;
 }
 
 function saveData() {
-    if (!currentCharId) return;
+    if (!currentCharId || currentCharId === "temp_gm_view") return; // GM não salva por cima do jogador
 
     const sheetData = {
         name: document.getElementById('char-name').value,
@@ -117,21 +129,11 @@ function saveData() {
         photo: currentPhoto
     };
 
-    // 1. Salva no navegador do próprio jogador
     characters[currentCharId] = sheetData;
     saveDataLocalOnly();
-
-    // 2. Envia para a Nuvem do Owlbear para o GM ler (Removemos a foto para não dar erro de memória na sala)
-    if (typeof OBR !== 'undefined' && OBR.isAvailable) {
-        const syncData = { ...sheetData };
-        delete syncData.photo; 
-        OBR.room.setMetadata({
-            [`fatesystem/sheet-${currentCharId}`]: syncData
-        });
-    }
+    syncWithOwlbear();
 }
 
-// ------ LÓGICA DAS PERÍCIAS ------
 function renderSkills() {
     const container = document.getElementById('skills-container');
     if(!container) return;
@@ -157,10 +159,23 @@ function renderSkills() {
 
 function updateSkill(skillName, change, event) {
     event.stopPropagation(); 
+    if (currentCharId === "temp_gm_view") return; // GM não altera a ficha base por aqui
     playerSkills[skillName] += change;
     if (playerSkills[skillName] < 0) playerSkills[skillName] = 0;
     renderSkills();
     saveData();
+}
+
+function showLocalToast(msg) {
+    const toast = document.getElementById("toast");
+    toast.innerText = msg;
+    toast.classList.add("show");
+    
+    // Some ao clicar
+    toast.onclick = () => toast.classList.remove("show");
+
+    // Some sozinho em 4 segundos
+    setTimeout(() => { toast.classList.remove("show"); }, 4000);
 }
 
 function rollSkill(skillName, attrName) {
@@ -176,17 +191,15 @@ function rollSkill(skillName, attrName) {
     const charName = document.getElementById('char-name').value || 'Desconhecido';
     const message = `🎲 ${charName} rolou ${skillName} (${attrName}): [ ${results.join(' | ')} ]`;
     
-    if (typeof OBR !== 'undefined' && OBR.isAvailable) {
-        // Envia a mensagem para a rede (Aparece para todos)
+    // Mostra o Popup Bonito pra quem rolou
+    showLocalToast(message);
+
+    // Envia o Broadcast para os OUTROS na sala
+    if (typeof OBR !== 'undefined' && OBR.isReady) {
         OBR.broadcast.sendMessage("fate-system-rolls", message);
-        // Mostra na sua tela também
-        OBR.notification.show(message);
-    } else {
-        alert(message);
     }
 }
 
-// ------ EVENTOS DE IMAGEM E DIGITAÇÃO ------
 document.getElementById('photo-upload').addEventListener('change', function(e) {
     const file = e.target.files[0];
     if (file) {
@@ -217,10 +230,14 @@ function setPhotoPreview(base64Str) {
 document.addEventListener('input', saveData);
 document.addEventListener('DOMContentLoaded', loadAllCharacters);
 
-// ------ INICIALIZAÇÃO DO OWLBEAR (BROADCAST & GM) ------
+// ------ OWLBEAR GM E BROADCAST ------
 if (typeof OBR !== 'undefined') {
     OBR.onReady(async () => {
-        // Escuta as rolagens dos outros jogadores
+        
+        // Envia as fichas locais para a rede assim que abrir
+        syncWithOwlbear();
+
+        // Escuta as rolagens dos outros jogadores e usa o Toast nativo do Owlbear para eles
         OBR.broadcast.onMessage("fate-system-rolls", (event) => {
             OBR.notification.show(event.data);
         });
@@ -230,40 +247,50 @@ if (typeof OBR !== 'undefined') {
         if (role === "GM") {
             document.getElementById("gm-area").style.display = "block";
             
-            // Sempre que alguém salvar uma ficha, atualiza a lista do GM
-            OBR.room.onMetadataChange((metadata) => { updateGMList(metadata); });
-            const initialMeta = await OBR.room.getMetadata();
-            updateGMList(initialMeta);
+            // Puxa as fichas de quem já está na sala
+            const players = await OBR.party.getPlayers();
+            updateGMList(players);
+
+            // Atualiza a lista automaticamente quando os jogadores alterarem as fichas
+            OBR.party.onChange((updatedPlayers) => { updateGMList(updatedPlayers); });
         }
     });
 }
 
-function updateGMList(metadata) {
+function updateGMList(players) {
     const gmList = document.getElementById('gm-character-list');
     if(!gmList) return;
     gmList.innerHTML = '';
     
     let hasSheets = false;
-    for (let key in metadata) {
-        if (key.startsWith('fatesystem/sheet-') && metadata[key]) {
-            hasSheets = true;
-            let charData = metadata[key];
-            let name = charData.name || "Sem Nome";
-            // Cria o botão para o GM abrir a ficha do jogador
-            gmList.innerHTML += `<div class="char-list-item gm-item" onclick="openGMCharacter('${key}')">👑 ${name}</div>`;
+    
+    // Varre todos os jogadores da sala
+    players.forEach(player => {
+        const playerSheets = player.metadata["fate-system-sheets"];
+        if (playerSheets) {
+            for (let charId in playerSheets) {
+                hasSheets = true;
+                let charName = playerSheets[charId].name || "Sem Nome";
+                let playerName = player.name || "Jogador";
+                
+                // Botão para abrir a ficha (mostra nome do Char e do Jogador dono)
+                gmList.innerHTML += `<div class="char-list-item gm-item" onclick="openGMCharacter('${player.id}', '${charId}')">👑 ${charName} <span style="font-size:10px; color:#888;">(${playerName})</span></div>`;
+            }
         }
-    }
-    if (!hasSheets) gmList.innerHTML = '<span style="color:#666; font-size: 12px;">Nenhuma ficha sincronizada na sala ainda.</span>';
+    });
+    
+    if (!hasSheets) gmList.innerHTML = '<span style="color:#666; font-size: 12px;">Aguardando jogadores sincronizarem...</span>';
 }
 
-function openGMCharacter(metadataKey) {
-    OBR.room.getMetadata().then(meta => {
-        let charData = meta[metadataKey];
-        if (charData) {
-            const tempId = metadataKey.replace('fatesystem/sheet-', '');
-            // Carrega temporariamente a ficha do jogador na memória local do GM
-            characters[tempId] = charData; 
-            openCharacter(tempId);
+function openGMCharacter(playerId, charId) {
+    OBR.party.getPlayers().then(players => {
+        const targetPlayer = players.find(p => p.id === playerId);
+        if (targetPlayer && targetPlayer.metadata["fate-system-sheets"]) {
+            const charData = targetPlayer.metadata["fate-system-sheets"][charId];
+            if (charData) {
+                characters["temp_gm_view"] = charData; // Salva numa ID temporária
+                openCharacter("temp_gm_view");
+            }
         }
     });
 }
