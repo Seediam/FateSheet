@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body { 
+            margin: 0; 
+            background: rgba(20, 20, 25, 0.98); 
+            color: #fff; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            height: 100vh; 
+            font-family: 'Segoe UI', Tahoma, sans-serif; 
+            border: 2px solid #d4af37; 
+            border-radius: 8px; 
+            overflow: hidden; 
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.8); 
+        }
+        .content { text-align: center; width: 100%; padding: 20px; }
+        .title { font-size: 16px; color: #8a8a9e; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px;}
+        .highlight { color: #d4af37; font-weight: bold; font-size: 18px;}
+        .roll { font-size: 32px; font-weight: bold; background: #111; padding: 15px 30px; border-radius: 6px; border: 1px dashed #d4af37; display: inline-block; color: #fff; text-shadow: 0 0 10px rgba(212, 175, 55, 0.5);}
+        .btn-close { margin-top: 20px; background: transparent; color: #8a8a9e; border: 1px solid #444; padding: 8px 20px; cursor: pointer; border-radius: 4px; transition: 0.2s; font-weight: bold;}
+        .btn-close:hover { background: #d4af37; color: #000; border-color: #d4af37; }
+    </style>
+</head>
+<body>
+    <div class="content">
+        <div class="title" id="title">Carregando...</div>
+        <div class="roll" id="roll">...</div>
+        <br>
+        <button class="btn-close" onclick="fecharModal()">Fechar [X]</button>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@2/lib/index.js"></script>
+    <script>
+        // Lê os dados que o script principal mandou pelo link
+        const params = new URLSearchParams(window.location.search);
+        const dataStr = params.get('data');
+        
+        if (dataStr) {
+            const data = JSON.parse(decodeURIComponent(dataStr));
+            document.getElementById('title').innerHTML = `<span class="highlight">${data.charName}</span> rolou ${data.skillName} <span style="font-size:12px;">(${data.attrName})</span>`;
+            document.getElementById('roll').innerText = `[ ${data.results.join(' | ')} ]`;
+        }
+
+        function fecharModal() {
+            if (OBR.isReady) OBR.modal.close('fate-roll-modal');
+        }
+
+        // A janela fecha sozinha depois de 5 segundos para não atrapalhar o jogo
+        setTimeout(fecharModal, 5000);
+    </script>
+</body>
+</html>
