@@ -10,29 +10,29 @@ let characters = {};
 let currentCharId = null;
 let playerSkills = {}; 
 let currentPhoto = "";
-let toastTimer = null; // Variável para consertar o bug do clique duplo
+let toastTimer = null;
 
-function openTab(tabName, event) {
+// Expondo as funções globalmente para o HTML enxergar
+window.openTab = function(tabName, event) {
     document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     document.getElementById(tabName).classList.add('active');
     if(event) event.currentTarget.classList.add('active');
 }
 
-function backToList() {
-    saveData();
+window.backToList = function() {
+    window.saveData();
     document.getElementById('screen-sheet').classList.remove('active');
     document.getElementById('screen-list').classList.add('active');
 }
 
-// ------ GERADOR DE PASTAS ------
-function renderCharacterList() {
+window.renderCharacterList = function() {
     const container = document.getElementById('character-folders');
+    if(!container) return;
     container.innerHTML = '';
 
     const categories = { "Jogadores": [], "NPCs": [], "Monstros": [] };
 
-    // Organiza as fichas nas pastas
     for (let id in characters) {
         let char = characters[id];
         let cat = char.category || "Jogadores";
@@ -40,9 +40,10 @@ function renderCharacterList() {
         categories[cat].push({ id: id, name: char.name || "Sem Nome", owner: char.ownerName || "?" });
     }
 
-    // Desenha as pastas na tela
+    let hasAny = false;
     for (let cat in categories) {
         if (categories[cat].length > 0) {
+            hasAny = true;
             let html = `<div class="folder-title">📁 ${cat}</div><div class="char-list">`;
             categories[cat].forEach(char => {
                 html += `<div class="char-list-item" onclick="openCharacter('${char.id}')">
@@ -55,31 +56,29 @@ function renderCharacterList() {
         }
     }
 
-    if(Object.keys(characters).length === 0) {
+    if(!hasAny) {
         container.innerHTML = '<div style="text-align:center; color:#666; margin-top: 20px;">Nenhum personagem na mesa ainda.</div>';
     }
 }
 
-function createNewCharacter() {
+window.createNewCharacter = function() {
     const newId = 'char_' + Date.now();
     characters[newId] = { name: "Novo Personagem", category: "Jogadores", skills: {}, photo: "" };
-    openCharacter(newId);
+    window.openCharacter(newId);
 }
 
-function deleteCharacter() {
+window.deleteCharacter = function() {
     if(confirm("Deseja mesmo apagar esta ficha da mesa? Todos perderão o acesso a ela.")) {
         delete characters[currentCharId];
-        
-        // Apaga da Nuvem da Sala Global
         if (typeof OBR !== 'undefined' && OBR.isReady) {
             OBR.room.setMetadata({ [`fate_char_${currentCharId}`]: undefined });
         }
-        
-        backToList();
+        window.backToList();
+        window.renderCharacterList();
     }
 }
 
-function openCharacter(id) {
+window.openCharacter = function(id) {
     currentCharId = id;
     const charData = characters[id] || {};
     
@@ -100,15 +99,14 @@ function openCharacter(id) {
     
     playerSkills = charData.skills || {};
     currentPhoto = charData.photo || '';
-    setPhotoPreview(currentPhoto);
-    renderSkills();
+    window.setPhotoPreview(currentPhoto);
+    window.renderSkills();
 
     document.getElementById('screen-list').classList.remove('active');
     document.getElementById('screen-sheet').classList.add('active');
 }
 
-// ------ SALVAMENTO GLOBAL NA SALA ------
-async function saveData() {
+window.saveData = async function() {
     if (!currentCharId) return; 
 
     let playerName = "Mesa";
@@ -131,18 +129,17 @@ async function saveData() {
         hab3: document.getElementById('hab-3').value,
         hab4: document.getElementById('hab-4').value,
         skills: playerSkills,
-        photo: "" // Imagem bloqueada de ir pra nuvem pra não pesar o server
+        photo: "" 
     };
 
     characters[currentCharId] = sheetData;
     
-    // Envia o personagem específico para o banco de dados da SALA
     if (typeof OBR !== 'undefined' && OBR.isReady) {
         await OBR.room.setMetadata({ [`fate_char_${currentCharId}`]: sheetData });
     }
 }
 
-function renderSkills() {
+window.renderSkills = function() {
     const container = document.getElementById('skills-container');
     if(!container) return;
     container.innerHTML = '';
@@ -165,31 +162,26 @@ function renderSkills() {
     });
 }
 
-function updateSkill(skillName, change, event) {
+window.updateSkill = function(skillName, change, event) {
     event.stopPropagation(); 
     playerSkills[skillName] += change;
     if (playerSkills[skillName] < 0) playerSkills[skillName] = 0;
-    renderSkills();
-    saveData();
+    window.renderSkills();
+    window.saveData();
 }
 
-// ------ A NOTIFICAÇÃO CENTRAL (Com timer corrigido) ------
-function showCenterToast(msg) {
+window.showCenterToast = function(msg) {
     const toast = document.getElementById("toast");
+    if(!toast) return;
     toast.innerText = msg;
     toast.classList.add("show");
     
-    // Limpa o timer antigo se o jogador clicar rápido duas vezes
     if(toastTimer) clearTimeout(toastTimer);
-    
     toast.onclick = () => toast.classList.remove("show");
-    
-    toastTimer = setTimeout(() => { 
-        toast.classList.remove("show"); 
-    }, 4500);
+    toastTimer = setTimeout(() => { toast.classList.remove("show"); }, 4500);
 }
 
-function rollSkill(skillName, attrName) {
+window.rollSkill = function(skillName, attrName) {
     const attrInputId = `attr-${attrName.toLowerCase()}`;
     let diceCount = parseInt(document.getElementById(attrInputId).value) || 1;
     if(diceCount < 1) diceCount = 1;
@@ -202,30 +194,18 @@ function rollSkill(skillName, attrName) {
     const charName = document.getElementById('char-name').value || 'Desconhecido';
     const message = `🎲 ${charName}\n rolou ${skillName} (${attrName})\n [ ${results.join(' | ')} ]`;
     
-    // Mostra pra você
-    showCenterToast(message);
+    window.showCenterToast(message);
 
-    // Manda pros outros executarem a mesma notificação central na tela deles
     if (typeof OBR !== 'undefined' && OBR.isReady) {
         OBR.broadcast.sendMessage("fate-system-rolls", message);
     }
 }
 
-document.getElementById('photo-upload').addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            currentPhoto = event.target.result;
-            setPhotoPreview(currentPhoto);
-        };
-        reader.readAsDataURL(file);
-    }
-});
-
-function setPhotoPreview(base64Str) {
+window.setPhotoPreview = function(base64Str) {
     const preview = document.getElementById('photo-preview');
     const text = document.getElementById('photo-text');
+    if(!preview || !text) return;
+
     if (base64Str) {
         preview.style.backgroundImage = `url("${base64Str}")`;
         preview.style.border = 'none';
@@ -237,27 +217,55 @@ function setPhotoPreview(base64Str) {
     }
 }
 
-document.addEventListener('input', saveData);
+document.getElementById('photo-upload').addEventListener('change', function(e) {
+    const file = e.target.files[0];
+    if (file) {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+            currentPhoto = event.target.result;
+            window.setPhotoPreview(currentPhoto);
+        };
+        reader.readAsDataURL(file);
+    }
+});
 
-// ------ O CÉREBRO DA SALA: SINCRONIZAÇÃO EM TEMPO REAL ------
+document.addEventListener('input', window.saveData);
+
 function processRoomData(metadata) {
     let mudouAlgo = false;
     for (let key in metadata) {
         if (key.startsWith('fate_char_')) {
             const id = key.replace('fate_char_', '');
-            
-            // Se o metadado for apagado, apagamos daqui
             if (metadata[key] === undefined || metadata[key] === null) {
                 if(characters[id]) { delete characters[id]; mudouAlgo = true; }
             } else {
-                // Atualiza ou adiciona o personagem
                 characters[id] = metadata[key];
                 mudouAlgo = true;
             }
         }
     }
-    if (mudouAlgo) renderCharacterList();
+    if (mudouAlgo) window.renderCharacterList();
 }
 
 if (typeof OBR !== 'undefined') {
-    OBR.onReady(
+    OBR.onReady(async () => {
+        try {
+            const initialMeta = await OBR.room.getMetadata();
+            processRoomData(initialMeta);
+            window.renderCharacterList();
+
+            OBR.room.onMetadataChange((metadata) => {
+                processRoomData(metadata);
+            });
+            
+            OBR.broadcast.onMessage("fate-system-rolls", (event) => {
+                window.showCenterToast(event.data);
+            });
+        } catch(e) {
+            console.error("Erro ao iniciar a extensão do Owlbear: ", e);
+        }
+    });
+} else {
+    // Para rodar localmente caso o OBR não carregue
+    window.renderCharacterList();
+}
