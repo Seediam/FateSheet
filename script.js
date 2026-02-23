@@ -28,7 +28,7 @@ function backToList() {
 
 function loadAllCharacters() {
     try {
-        const saved = localStorage.getItem('fate_system_chars_v3');
+        const saved = localStorage.getItem('fate_system_chars_v4');
         if (saved) characters = JSON.parse(saved);
     } catch(e) {}
     renderCharacterList();
@@ -54,10 +54,8 @@ function createNewCharacter() {
 function deleteCharacter() {
     if(confirm("Deseja mesmo apagar esta ficha?")) {
         delete characters[currentCharId];
-        if (typeof OBR !== 'undefined' && OBR.isReady) {
-            OBR.room.setMetadata({ [`fatesystem/sheet-${currentCharId}`]: undefined });
-        }
         saveDataLocalOnly();
+        syncWithOwlbear(); // Atualiza a rede para avisar o GM que sumiu
         backToList();
     }
 }
@@ -88,30 +86,31 @@ function openCharacter(id) {
     document.getElementById('screen-sheet').classList.add('active');
 }
 
+// O SEGREDO ESTÁ AQUI: Salva na metadata do JOGADOR
 async function syncWithOwlbear() {
-    if (typeof OBR !== 'undefined' && OBR.isReady && currentCharId && currentCharId !== "temp_gm_view") {
-        const syncData = {
-            ...characters[currentCharId],
-            ownerName: localPlayerName, 
-            photo: "" 
-        };
-        await OBR.room.setMetadata({
-            [`fatesystem/sheet-${currentCharId}`]: syncData
-        });
+    if (typeof OBR !== 'undefined' && OBR.isReady) {
+        let syncChars = {};
+        for(let id in characters) {
+            if(id !== "temp_gm_view") {
+                syncChars[id] = { ...characters[id] };
+                delete syncChars[id].photo; // Tira foto pra não travar o servidor
+            }
+        }
+        await OBR.player.setMetadata({ "fatesystem/sheets": syncChars });
     }
 }
 
 function saveDataLocalOnly() {
     let temp = characters["temp_gm_view"];
     delete characters["temp_gm_view"];
-    localStorage.setItem('fate_system_chars_v3', JSON.stringify(characters));
+    localStorage.setItem('fate_system_chars_v4', JSON.stringify(characters));
     if(temp) characters["temp_gm_view"] = temp;
 }
 
 function saveData() {
     if (!currentCharId || currentCharId === "temp_gm_view") return; 
 
-    const sheetData = {
+    characters[currentCharId] = {
         name: document.getElementById('char-name').value,
         age: document.getElementById('char-age').value,
         forca: document.getElementById('attr-forca').value,
@@ -128,9 +127,8 @@ function saveData() {
         photo: currentPhoto
     };
 
-    characters[currentCharId] = sheetData;
     saveDataLocalOnly();
-    syncWithOwlbear();
+    syncWithOwlbear(); // Envia para o GM
 }
 
 function renderSkills() {
@@ -223,9 +221,11 @@ function setPhotoPreview(base64Str) {
 document.addEventListener('input', saveData);
 document.addEventListener('DOMContentLoaded', loadAllCharacters);
 
+// AQUI O GM ESCUTA TODOS OS JOGADORES DA SALA
 if (typeof OBR !== 'undefined') {
     OBR.onReady(async () => {
         localPlayerName = await OBR.player.getName();
+        syncWithOwlbear(); // Manda os dados ao entrar na sala
         
         OBR.broadcast.onMessage("fate-system-rolls", (event) => {
             OBR.notification.show(event.data);
@@ -235,37 +235,47 @@ if (typeof OBR !== 'undefined') {
         if (role === "GM") {
             document.getElementById("gm-area").style.display = "block";
             
-            OBR.room.onMetadataChange((metadata) => updateGMList(metadata));
-            const initialMeta = await OBR.room.getMetadata();
-            updateGMList(initialMeta);
+            // Puxa as fichas de quem já está na sala
+            const players = await OBR.party.getPlayers();
+            updateGMList(players);
+
+            // Atualiza quando jogadores entram, saem ou salvam
+            OBR.party.onChange((updatedPlayers) => { updateGMList(updatedPlayers); });
         }
     });
 }
 
-function updateGMList(metadata) {
+function updateGMList(players) {
     const gmList = document.getElementById('gm-character-list');
     if(!gmList) return;
     gmList.innerHTML = '';
     
     let hasSheets = false;
-    for (let key in metadata) {
-        if (key.startsWith('fatesystem/sheet-') && metadata[key]) {
-            hasSheets = true;
-            let charData = metadata[key];
-            let charName = charData.name || "Sem Nome";
-            let playerName = charData.ownerName || "Desconhecido";
-            
-            gmList.innerHTML += `<div class="char-list-item gm-item" onclick="openGMCharacter('${key}')">👑 ${charName} <span style="font-size:10px; color:#888;">(${playerName})</span></div>`;
+    
+    players.forEach(player => {
+        if (player.metadata && player.metadata["fatesystem/sheets"]) {
+            const sheets = player.metadata["fatesystem/sheets"];
+            for (let charId in sheets) {
+                hasSheets = true;
+                let charName = sheets[charId].name || "Sem Nome";
+                let playerName = player.name || "Desconhecido";
+                
+                gmList.innerHTML += `<div class="char-list-item gm-item" onclick="openGMCharacter('${player.id}', '${charId}')">👑 ${charName} <span style="font-size:10px; color:#888;">(${playerName})</span></div>`;
+            }
         }
-    }
-    if (!hasSheets) gmList.innerHTML = '<span style="color:#666; font-size: 12px;">Nenhuma ficha sincronizada.</span>';
+    });
+    
+    if (!hasSheets) gmList.innerHTML = '<span style="color:#666; font-size: 12px;">Nenhuma ficha dos jogadores online encontrada.</span>';
 }
 
-async function openGMCharacter(metadataKey) {
-    const meta = await OBR.room.getMetadata();
-    const charData = meta[metadataKey];
-    if (charData) {
-        characters["temp_gm_view"] = charData; 
-        openCharacter("temp_gm_view");
+async function openGMCharacter(playerId, charId) {
+    const players = await OBR.party.getPlayers();
+    const player = players.find(p => p.id === playerId);
+    if (player && player.metadata["fatesystem/sheets"]) {
+        const charData = player.metadata["fatesystem/sheets"][charId];
+        if (charData) {
+            characters["temp_gm_view"] = charData; 
+            openCharacter("temp_gm_view");
+        }
     }
 }
