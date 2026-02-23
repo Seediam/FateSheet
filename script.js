@@ -12,11 +12,12 @@ let playerSkills = {};
 let currentPhoto = "";
 let toastTimer = null;
 
-// Expondo as funções globalmente para o HTML enxergar
+// Funções expostas para o HTML poder enxergar
 window.openTab = function(tabName, event) {
     document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-    document.getElementById(tabName).classList.add('active');
+    const targetTab = document.getElementById(tabName);
+    if(targetTab) targetTab.classList.add('active');
     if(event) event.currentTarget.classList.add('active');
 }
 
@@ -61,44 +62,62 @@ window.renderCharacterList = function() {
     }
 }
 
+// A FUNÇÃO QUE FALTAVA NA VERSÃO ANTERIOR E CAUSAVA O BUG!
+window.saveDataLocalOnly = function() {
+    try {
+        localStorage.setItem('fate_system_chars_v7', JSON.stringify(characters));
+    } catch(e) { console.error("Erro ao salvar localmente:", e); }
+}
+
 window.createNewCharacter = function() {
     const newId = 'char_' + Date.now();
     characters[newId] = { name: "Novo Personagem", category: "Jogadores", skills: {}, photo: "" };
-    window.openCharacter(newId);
+    window.saveDataLocalOnly(); // Salva a estrutura básica antes de abrir
+    window.openCharacter(newId); // Agora abre com segurança
 }
 
 window.deleteCharacter = function() {
     if(confirm("Deseja mesmo apagar esta ficha da mesa? Todos perderão o acesso a ela.")) {
         delete characters[currentCharId];
+        window.saveDataLocalOnly();
+        
         if (typeof OBR !== 'undefined' && OBR.isReady) {
-            OBR.room.setMetadata({ [`fate_char_${currentCharId}`]: undefined });
+            OBR.room.setMetadata({ [`fate_char_${currentCharId}`]: undefined }).catch(e => console.log(e));
         }
+        
         window.backToList();
         window.renderCharacterList();
     }
+}
+
+// Função segura para inserir valores no HTML
+function safeSetVal(id, value) {
+    const el = document.getElementById(id);
+    if(el) el.value = value;
 }
 
 window.openCharacter = function(id) {
     currentCharId = id;
     const charData = characters[id] || {};
     
-    document.getElementById('char-name').value = charData.name || '';
-    document.getElementById('char-category').value = charData.category || 'Jogadores';
-    document.getElementById('char-age').value = charData.age || '';
-    document.getElementById('char-race').value = charData.race || 'Humano';
-    document.getElementById('attr-forca').value = charData.forca || 1;
-    document.getElementById('attr-magia').value = charData.magia || 1;
-    document.getElementById('attr-agilidade').value = charData.agilidade || 1;
-    document.getElementById('attr-sorte').value = charData.sorte || 1;
-    document.getElementById('grimoire-name').value = charData.grimoire || '';
-    document.getElementById('mana-zone').value = charData.mana || '';
-    document.getElementById('hab-1').value = charData.hab1 || '';
-    document.getElementById('hab-2').value = charData.hab2 || '';
-    document.getElementById('hab-3').value = charData.hab3 || '';
-    document.getElementById('hab-4').value = charData.hab4 || '';
+    safeSetVal('char-name', charData.name || '');
+    safeSetVal('char-category', charData.category || 'Jogadores');
+    safeSetVal('char-age', charData.age || '');
+    safeSetVal('char-race', charData.race || 'Humano');
+    safeSetVal('attr-forca', charData.forca || 1);
+    safeSetVal('attr-magia', charData.magia || 1);
+    safeSetVal('attr-agilidade', charData.agilidade || 1);
+    safeSetVal('attr-sorte', charData.sorte || 1);
+    safeSetVal('grimoire-name', charData.grimoire || '');
+    safeSetVal('mana-zone', charData.mana || '');
+    safeSetVal('hab-1', charData.hab1 || '');
+    safeSetVal('hab-2', charData.hab2 || '');
+    safeSetVal('hab-3', charData.hab3 || '');
+    safeSetVal('hab-4', charData.hab4 || '');
     
     playerSkills = charData.skills || {};
     currentPhoto = charData.photo || '';
+    
     window.setPhotoPreview(currentPhoto);
     window.renderSkills();
 
@@ -110,32 +129,38 @@ window.saveData = async function() {
     if (!currentCharId) return; 
 
     let playerName = "Mesa";
-    if (typeof OBR !== 'undefined' && OBR.isReady) playerName = await OBR.player.getName();
+    if (typeof OBR !== 'undefined' && OBR.isReady) {
+        playerName = await OBR.player.getName();
+    }
 
     const sheetData = {
-        name: document.getElementById('char-name').value,
-        category: document.getElementById('char-category').value,
+        name: document.getElementById('char-name')?.value || "Sem Nome",
+        category: document.getElementById('char-category')?.value || "Jogadores",
         ownerName: playerName,
-        age: document.getElementById('char-age').value,
-        race: document.getElementById('char-race').value,
-        forca: document.getElementById('attr-forca').value,
-        magia: document.getElementById('attr-magia').value,
-        agilidade: document.getElementById('attr-agilidade').value,
-        sorte: document.getElementById('attr-sorte').value,
-        grimoire: document.getElementById('grimoire-name').value,
-        mana: document.getElementById('mana-zone').value,
-        hab1: document.getElementById('hab-1').value,
-        hab2: document.getElementById('hab-2').value,
-        hab3: document.getElementById('hab-3').value,
-        hab4: document.getElementById('hab-4').value,
+        age: document.getElementById('char-age')?.value || "",
+        race: document.getElementById('char-race')?.value || "",
+        forca: document.getElementById('attr-forca')?.value || 1,
+        magia: document.getElementById('attr-magia')?.value || 1,
+        agilidade: document.getElementById('attr-agilidade')?.value || 1,
+        sorte: document.getElementById('attr-sorte')?.value || 1,
+        grimoire: document.getElementById('grimoire-name')?.value || "",
+        mana: document.getElementById('mana-zone')?.value || "",
+        hab1: document.getElementById('hab-1')?.value || "",
+        hab2: document.getElementById('hab-2')?.value || "",
+        hab3: document.getElementById('hab-3')?.value || "",
+        hab4: document.getElementById('hab-4')?.value || "",
         skills: playerSkills,
-        photo: "" 
+        photo: "" // Não salva na nuvem para não travar
     };
 
     characters[currentCharId] = sheetData;
+    window.saveDataLocalOnly();
     
+    // Manda pra mesa global
     if (typeof OBR !== 'undefined' && OBR.isReady) {
-        await OBR.room.setMetadata({ [`fate_char_${currentCharId}`]: sheetData });
+        try {
+            await OBR.room.setMetadata({ [`fate_char_${currentCharId}`]: sheetData });
+        } catch(e) { console.log("Aviso: GM precisa permitir salvar na mesa."); }
     }
 }
 
@@ -183,15 +208,18 @@ window.showCenterToast = function(msg) {
 
 window.rollSkill = function(skillName, attrName) {
     const attrInputId = `attr-${attrName.toLowerCase()}`;
-    let diceCount = parseInt(document.getElementById(attrInputId).value) || 1;
-    if(diceCount < 1) diceCount = 1;
+    const el = document.getElementById(attrInputId);
+    let diceCount = el ? parseInt(el.value) : 1;
+    if(isNaN(diceCount) || diceCount < 1) diceCount = 1;
 
     let results = [];
     for (let i = 0; i < diceCount; i++) {
         results.push(Math.floor(Math.random() * 20) + 1);
     }
 
-    const charName = document.getElementById('char-name').value || 'Desconhecido';
+    const charEl = document.getElementById('char-name');
+    const charName = (charEl && charEl.value !== '') ? charEl.value : 'Desconhecido';
+    
     const message = `🎲 ${charName}\n rolou ${skillName} (${attrName})\n [ ${results.join(' | ')} ]`;
     
     window.showCenterToast(message);
@@ -224,13 +252,18 @@ document.getElementById('photo-upload').addEventListener('change', function(e) {
         reader.onload = function(event) {
             currentPhoto = event.target.result;
             window.setPhotoPreview(currentPhoto);
+            window.saveData();
         };
         reader.readAsDataURL(file);
     }
 });
 
-document.addEventListener('input', window.saveData);
+// Auto-save ao digitar
+document.addEventListener('input', () => {
+    if(currentCharId) window.saveData();
+});
 
+// Lógica de Rede (Nuvem da Mesa)
 function processRoomData(metadata) {
     let mudouAlgo = false;
     for (let key in metadata) {
@@ -247,25 +280,37 @@ function processRoomData(metadata) {
     if (mudouAlgo) window.renderCharacterList();
 }
 
-if (typeof OBR !== 'undefined') {
-    OBR.onReady(async () => {
-        try {
-            const initialMeta = await OBR.room.getMetadata();
-            processRoomData(initialMeta);
-            window.renderCharacterList();
+// Inicialização Principal
+function initExtension() {
+    try {
+        const saved = localStorage.getItem('fate_system_chars_v7');
+        if (saved) characters = JSON.parse(saved);
+    } catch(e) {}
 
-            OBR.room.onMetadataChange((metadata) => {
-                processRoomData(metadata);
-            });
-            
-            OBR.broadcast.onMessage("fate-system-rolls", (event) => {
-                window.showCenterToast(event.data);
-            });
-        } catch(e) {
-            console.error("Erro ao iniciar a extensão do Owlbear: ", e);
-        }
-    });
-} else {
-    // Para rodar localmente caso o OBR não carregue
     window.renderCharacterList();
+
+    if (typeof OBR !== 'undefined') {
+        OBR.onReady(async () => {
+            try {
+                // Sincroniza com a nuvem da sala
+                const initialMeta = await OBR.room.getMetadata();
+                processRoomData(initialMeta);
+
+                // Fica ouvindo alterações de outras pessoas
+                OBR.room.onMetadataChange((metadata) => {
+                    processRoomData(metadata);
+                });
+                
+                // Ouve os dados rolando
+                OBR.broadcast.onMessage("fate-system-rolls", (event) => {
+                    window.showCenterToast(event.data);
+                });
+            } catch(e) {
+                console.error("Erro na integração OBR:", e);
+            }
+        });
+    }
 }
+
+// Inicia assim que a tela carregar
+document.addEventListener('DOMContentLoaded', initExtension);
