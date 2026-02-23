@@ -4,7 +4,56 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fate Sheet</title>
-    <link rel="stylesheet" href="style.css">
+    <style>
+        :root {
+            --bg-dark: #0f0f13; --bg-panel: #1c1c24; --accent-gold: #d4af37;
+            --accent-glow: rgba(212, 175, 55, 0.3); --text-main: #eaeaef;
+            --text-muted: #8a8a9e; --border-subtle: #2a2a35;
+        }
+
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg-dark); color: var(--text-main); padding: 15px; margin: 0; overflow-x: hidden; }
+
+        .screen { display: none; animation: fadeIn 0.3s ease; }
+        .screen.active { display: block; }
+
+        .top-bar { display: flex; justify-content: space-between; margin-bottom: 15px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px;}
+        .char-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 15px; }
+        .char-list-item { background: var(--bg-panel); padding: 12px 15px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; transition: 0.2s; font-weight: bold; border-left: 4px solid var(--border-subtle); }
+        .char-list-item:hover { background: #23232d; border-color: var(--border-subtle); transform: translateX(3px); border-left: 4px solid var(--accent-gold);}
+        .gm-item { border-left: 4px solid #ff4444; }
+        .btn-new { width: 100%; padding: 12px; background: rgba(212, 175, 55, 0.05); border: 1px dashed var(--accent-gold); color: var(--accent-gold); font-weight: bold; font-size: 14px; border-radius: 6px; cursor: pointer; transition: 0.2s; }
+        .btn-new:hover { background: var(--accent-gold); color: #000; }
+
+        .tabs { display: flex; gap: 15px; margin-bottom: 20px; border-bottom: 2px solid var(--border-subtle); padding-bottom: 5px; }
+        .tab-btn { background: none; border: none; color: var(--text-muted); font-size: 16px; font-weight: 600; cursor: pointer; padding: 8px 12px; transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 1px; }
+        .tab-btn:hover { color: var(--text-main); }
+        .tab-btn.active { color: var(--accent-gold); border-bottom: 2px solid var(--accent-gold); text-shadow: 0 0 8px var(--accent-glow); }
+
+        .tab-content { display: none; animation: fadeIn 0.3s ease; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        .form-group { margin-bottom: 12px; }
+        label { display: block; font-size: 11px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.5px; }
+        input[type="text"], input[type="number"], select { width: 100%; background: var(--bg-panel); border: 1px solid var(--border-subtle); color: var(--text-main); padding: 10px; border-radius: 6px; box-sizing: border-box; transition: 0.2s; }
+        input:focus { border-color: var(--accent-gold); outline: none; box-shadow: 0 0 5px var(--accent-glow); }
+
+        .photo-slot { width: 90px; height: 120px; background: var(--bg-panel); border: 1px dashed var(--accent-gold); border-radius: 6px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 12px; text-align: center; box-shadow: inset 0 0 10px rgba(0,0,0,0.5); cursor: pointer; background-size: cover; background-position: center; transition: 0.2s; overflow: hidden;}
+        .section-title { color: var(--accent-gold); margin: 20px 0 10px 0; border-bottom: 1px solid var(--border-subtle); padding-bottom: 5px; }
+
+        .attr-box { display: flex; justify-content: space-between; align-items: center; background: linear-gradient(90deg, var(--bg-panel) 0%, var(--bg-dark) 100%); padding: 12px 15px; margin-bottom: 8px; border-radius: 6px; border-left: 4px solid var(--accent-gold); font-weight: bold; }
+        .attr-input { width: 60px !important; text-align: center; font-size: 16px; font-weight: bold;}
+        .d20-icon { width: 16px; height: 16px; fill: none; stroke: var(--accent-gold); stroke-width: 2; vertical-align: middle; margin-left: 6px; margin-bottom: 2px;}
+
+        .skill-item { display: flex; justify-content: space-between; align-items: center; background: var(--bg-panel); padding: 10px 15px; margin-bottom: 8px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; transition: 0.2s; }
+        .skill-item:hover { background: #23232d; border-color: var(--border-subtle); transform: translateX(3px); }
+        .skill-controls { display: flex; align-items: center; gap: 12px; }
+        .btn-ctrl { background: var(--border-subtle); border: none; color: var(--text-main); width: 28px; height: 28px; border-radius: 4px; cursor: pointer; font-weight: bold; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        .btn-ctrl:hover { background: var(--accent-gold); color: #000; }
+
+        .toast { visibility: hidden; min-width: 250px; background-color: var(--bg-panel); border: 1px solid var(--accent-gold); color: var(--text-main); text-align: center; border-radius: 6px; padding: 16px; position: fixed; z-index: 1000; left: 50%; bottom: 30px; transform: translateX(-50%); box-shadow: 0 4px 15px rgba(0,0,0,0.8); opacity: 0; transition: opacity 0.4s, visibility 0.4s; cursor: pointer; font-weight: bold; }
+        .toast.show { visibility: visible; opacity: 1; }
+    </style>
 </head>
 <body>
 
@@ -46,24 +95,4 @@
             <h4 class="section-title">Atributos</h4>
             <div class="attr-box"><span>Força <svg class="d20-icon" fill="none" stroke="#d4af37" viewBox="0 0 24 24"><polygon points="12 2 2 12 12 22 22 12 12 2"></polygon><line x1="12" y1="2" x2="12" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line></svg></span><input type="number" id="attr-forca" class="attr-input" value="1"></div>
             <div class="attr-box"><span>Magia <svg class="d20-icon" fill="none" stroke="#d4af37" viewBox="0 0 24 24"><polygon points="12 2 2 12 12 22 22 12 12 2"></polygon><line x1="12" y1="2" x2="12" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line></svg></span><input type="number" id="attr-magia" class="attr-input" value="1"></div>
-            <div class="attr-box"><span>Agilidade <svg class="d20-icon" fill="none" stroke="#d4af37" viewBox="0 0 24 24"><polygon points="12 2 2 12 12 22 22 12 12 2"></polygon><line x1="12" y1="2" x2="12" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line></svg></span><input type="number" id="attr-agilidade" class="attr-input" value="1"></div>
-            <div class="attr-box"><span>Sorte <svg class="d20-icon" fill="none" stroke="#d4af37" viewBox="0 0 24 24"><polygon points="12 2 2 12 12 22 22 12 12 2"></polygon><line x1="12" y1="2" x2="12" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line></svg></span><input type="number" id="attr-sorte" class="attr-input" value="1"></div>
-
-            <h4 class="section-title">📖 Grimório</h4>
-            <div class="form-group"><input type="text" id="grimoire-name" placeholder="Nome do Grimório"></div>
-            <div class="form-group"><label>🔮 Mana Zone</label><input type="text" id="mana-zone"></div>
-            <div class="form-group"><label>Habilidade 1</label><input type="text" id="hab-1"></div>
-            <div class="form-group"><label>Habilidade 2</label><input type="text" id="hab-2"></div>
-            <div class="form-group"><label>Habilidade 3</label><input type="text" id="hab-3"></div>
-            <div class="form-group"><label>Habilidade 4</label><input type="text" id="hab-4"></div>
-        </div>
-
-        <div id="pericias" class="tab-content"><div id="skills-container"></div></div>
-    </div>
-
-    <div id="toast" class="toast"></div>
-
-    <script src="https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@2/lib/index.js"></script>
-    <script src="script.js"></script>
-</body>
-</html>
+            <div class="attr-box"><span>Agilidade <svg class="d20-icon" fill="none" stroke="#d4af37" viewBox="0 0
