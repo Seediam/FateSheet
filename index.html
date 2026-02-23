@@ -13,10 +13,9 @@
 
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg-dark); color: var(--text-main); padding: 15px; margin: 0; overflow-x: hidden; }
 
-        /* Tela de Carregamento (Some quando o script carregar) */
         #loading { text-align: center; color: var(--accent-gold); margin-top: 50px; font-weight: bold; font-size: 18px; animation: pulse 1.5s infinite;}
         @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
-        .app-container { display: none; } /* Escondido até o JS funcionar */
+        .app-container { display: none; }
 
         .screen { display: none; animation: fadeIn 0.3s ease; }
         .screen.active { display: block; }
@@ -25,9 +24,14 @@
         .btn-new { width: 100%; padding: 12px; background: rgba(212, 175, 55, 0.05); border: 1px dashed var(--accent-gold); color: var(--accent-gold); font-weight: bold; font-size: 14px; border-radius: 6px; cursor: pointer; transition: 0.2s; margin-bottom: 20px;}
         .btn-new:hover { background: var(--accent-gold); color: #000; }
 
-        .folder-title { color: var(--text-muted); font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin: 15px 0 5px 0; border-bottom: 1px solid var(--border-subtle); padding-bottom: 3px; }
-        .char-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px; }
-        .char-list-item { background: var(--bg-panel); padding: 10px 15px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; transition: 0.2s; font-weight: bold; border-left: 4px solid var(--accent-gold); display: flex; justify-content: space-between;}
+        /* Estilo das Pastas Retráteis */
+        .folder-header { display: flex; align-items: center; cursor: pointer; color: var(--accent-gold); font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; margin: 15px 0 8px 0; border-bottom: 1px solid var(--border-subtle); padding-bottom: 5px; transition: 0.2s;}
+        .folder-header:hover { color: #fff; }
+        .chevron { display: inline-block; width: 15px; transition: transform 0.3s ease; }
+        .folder-content { display: none; flex-direction: column; gap: 8px; margin-bottom: 15px; }
+        .folder-content.open { display: flex; }
+
+        .char-list-item { background: var(--bg-panel); padding: 10px 15px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; transition: 0.2s; font-weight: bold; border-left: 4px solid var(--accent-gold);}
         .char-list-item:hover { background: #23232d; border-color: var(--border-subtle); transform: translateX(3px); }
 
         .tabs { display: flex; gap: 15px; margin-bottom: 20px; border-bottom: 2px solid var(--border-subtle); padding-bottom: 5px; }
@@ -56,21 +60,15 @@
         .skill-controls { display: flex; align-items: center; gap: 12px; }
         .btn-ctrl { background: var(--border-subtle); border: none; color: var(--text-main); width: 28px; height: 28px; border-radius: 4px; cursor: pointer; font-weight: bold; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
         .btn-ctrl:hover { background: var(--accent-gold); color: #000; }
-
-        .toast { visibility: hidden; min-width: 280px; background-color: rgba(20, 20, 25, 0.95); border: 2px solid var(--accent-gold); color: #fff; text-align: center; border-radius: 8px; padding: 20px; position: fixed; z-index: 9999; left: 50%; top: 50%; transform: translate(-50%, -50%) scale(0.9); box-shadow: 0 0 20px rgba(212, 175, 55, 0.4), inset 0 0 10px rgba(0,0,0,0.8); opacity: 0; transition: all 0.2s ease; cursor: pointer; font-size: 16px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; pointer-events: none;}
-        .toast.show { visibility: visible; opacity: 1; transform: translate(-50%, -50%) scale(1); pointer-events: auto;}
     </style>
 </head>
 <body>
 
-    <div id="loading">
-        📖 Carregando Grimório...<br>
-        <small style="font-size: 12px; color: #666;">Aguardando o script.js</small>
-    </div>
+    <div id="loading">📖 Carregando Grimório Global...</div>
 
     <div class="app-container" id="app">
         <div id="screen-list" class="screen active">
-            <h3 class="section-title" style="text-align: center; margin-top: 5px;">Grimório da Mesa</h3>
+            <h3 class="section-title" style="text-align: center; margin-top: 5px;">Mesa Global</h3>
             <button class="btn-new" onclick="createNewCharacter()">+ Criar Personagem</button>
             <div id="character-folders"></div>
         </div>
@@ -100,7 +98,7 @@
                 </div>
 
                 <div class="form-group" style="margin-bottom: 20px;">
-                    <label>📁 Pasta / Categoria</label>
+                    <label>📁 Pasta da Mesa</label>
                     <select id="char-category" onchange="saveData()">
                         <option value="Jogadores">Jogadores</option>
                         <option value="NPCs">NPCs</option>
@@ -125,11 +123,9 @@
 
             <div id="pericias" class="tab-content"><div id="skills-container"></div></div>
         </div>
-
-        <div id="toast" class="toast"></div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@2/lib/index.js"></script>
-    <script src="script.js?v=9"></script>
+    <script src="script.js?v=11"></script>
 </body>
 </html>
