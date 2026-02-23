@@ -4,37 +4,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fate Sheet</title>
-    <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #1a1a1a; color: #f0f0f0; padding: 10px; }
-        .tabs { display: flex; gap: 10px; margin-bottom: 15px; border-bottom: 2px solid #333; padding-bottom: 5px; }
-        .tab-btn { background: none; border: none; color: #888; font-size: 16px; cursor: pointer; padding: 5px 10px; transition: 0.3s; }
-        .tab-btn.active { color: #d4af37; border-bottom: 2px solid #d4af37; }
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-        
-        .form-group { margin-bottom: 10px; }
-        label { display: block; font-size: 12px; color: #aaa; }
-        input[type="text"], input[type="number"] { width: 100%; background: #2a2a2a; border: 1px solid #444; color: white; padding: 8px; border-radius: 4px; box-sizing: border-box; }
-        
-        .attr-box { display: flex; justify-content: space-between; align-items: center; background: #222; padding: 10px; margin-bottom: 5px; border-radius: 4px; border-left: 3px solid #d4af37; }
-        .attr-input { width: 50px !important; text-align: center; }
-        
-        .skill-item { display: flex; justify-content: space-between; align-items: center; background: #2a2a2a; padding: 8px; margin-bottom: 5px; border-radius: 4px; cursor: pointer; transition: 0.2s;}
-        .skill-item:hover { background: #333; }
-        .skill-controls { display: flex; align-items: center; gap: 10px; }
-        .btn-ctrl { background: #444; border: none; color: white; padding: 2px 8px; cursor: pointer; border-radius: 3px; }
-        .btn-ctrl:hover { background: #666; }
-        
-        .gm-panel { background: #3a1c1c; padding: 10px; border-radius: 5px; margin-bottom: 15px; display: none; }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
     <div id="gm-panel" class="gm-panel">
         <label>👑 Visão do Mestre: Fichas Ativas</label>
-        <select id="gm-player-select" style="width: 100%; padding: 5px;">
+        <select id="gm-player-select">
             <option value="local">Sua própria ficha</option>
-            </select>
+        </select>
     </div>
 
     <div class="tabs">
@@ -43,8 +21,8 @@
     </div>
 
     <div id="personagem" class="tab-content active">
-        <div style="display: flex; gap: 10px;">
-            <div style="width: 80px; height: 100px; border: 2px dashed #444; display: flex; align-items: center; justify-content: center; color: #666; font-size: 10px; text-align: center;">Foto<br>(Em breve)</div>
+        <div style="display: flex; gap: 15px; margin-bottom: 20px;">
+            <div class="photo-slot">📷<br>Foto</div>
             <div style="flex: 1;">
                 <div class="form-group"><label>Nome</label><input type="text" id="char-name"></div>
                 <div style="display: flex; gap: 10px;">
@@ -54,23 +32,24 @@
             </div>
         </div>
 
-        <h4 style="color: #d4af37; margin-bottom: 5px;">Atributos</h4>
-        <div class="attr-box">Força <input type="number" id="attr-forca" class="attr-input" value="1"></div>
-        <div class="attr-box">Magia <input type="number" id="attr-magia" class="attr-input" value="1"></div>
-        <div class="attr-box">Agilidade <input type="number" id="attr-agilidade" class="attr-input" value="1"></div>
-        <div class="attr-box">Sorte <input type="number" id="attr-sorte" class="attr-input" value="1"></div>
+        <h4 style="color: var(--accent-gold); margin-bottom: 10px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 5px;">Atributos</h4>
+        <div class="attr-box">Força <input type="number" id="attr-forca" class="attr-input" value="1" onchange="saveData()"></div>
+        <div class="attr-box">Magia <input type="number" id="attr-magia" class="attr-input" value="1" onchange="saveData()"></div>
+        <div class="attr-box">Agilidade <input type="number" id="attr-agilidade" class="attr-input" value="1" onchange="saveData()"></div>
+        <div class="attr-box">Sorte <input type="number" id="attr-sorte" class="attr-input" value="1" onchange="saveData()"></div>
 
-        <h4 style="color: #d4af37; margin-top: 15px;">Grimório</h4>
+        <h4 style="color: var(--accent-gold); margin-top: 20px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 5px;">📖 Grimório</h4>
         <div class="form-group"><input type="text" id="grimoire-name" placeholder="Nome do Grimório"></div>
-        <div class="form-group"><label>Mana Zone</label><input type="text" id="mana-zone"></div>
+        <div class="form-group"><label>🔮 Mana Zone</label><input type="text" id="mana-zone"></div>
         
         <div class="form-group"><label>Habilidade 1 (Desc | Custo | Alcance)</label><input type="text" id="hab-1"></div>
         <div class="form-group"><label>Habilidade 2</label><input type="text" id="hab-2"></div>
+        <div class="form-group"><label>Habilidade 3</label><input type="text" id="hab-3"></div>
+        <div class="form-group"><label>Habilidade 4</label><input type="text" id="hab-4"></div>
     </div>
 
     <div id="pericias" class="tab-content">
-        <div id="skills-container">
-            </div>
+        <div id="skills-container"></div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@2/lib/index.js"></script>
