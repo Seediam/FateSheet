@@ -5,51 +5,68 @@
     <style>
         body { 
             margin: 0; 
-            background: rgba(20, 20, 25, 0.95); 
+            background: rgba(15, 15, 19, 0.98); 
             color: #fff; 
             display: flex; 
             align-items: center; 
             justify-content: center; 
             height: 100vh; 
             font-family: 'Segoe UI', Tahoma, sans-serif; 
-            border: 2px solid #d4af37; 
-            border-radius: 8px; 
+            border: 3px solid #d4af37; 
+            border-radius: 10px; 
             overflow: hidden; 
-            box-shadow: inset 0 0 20px rgba(0,0,0,0.8); 
+            box-shadow: inset 0 0 40px rgba(0,0,0,0.9); 
         }
         .content { text-align: center; width: 100%; padding: 20px; }
-        .title { font-size: 16px; color: #8a8a9e; margin-bottom: 15px; text-transform: uppercase; letter-spacing: 1px;}
-        .highlight { color: #d4af37; font-weight: bold; font-size: 20px;}
-        .roll { font-size: 32px; font-weight: bold; background: #111; padding: 15px 30px; border-radius: 6px; border: 1px dashed #d4af37; display: inline-block; color: #fff; text-shadow: 0 0 10px rgba(212, 175, 55, 0.5);}
-        .btn-close { margin-top: 25px; background: transparent; color: #8a8a9e; border: 1px solid #444; padding: 8px 20px; cursor: pointer; border-radius: 4px; transition: 0.2s; font-weight: bold;}
-        .btn-close:hover { background: #d4af37; color: #000; border-color: #d4af37; }
+        .char-name { color: #d4af37; font-weight: 900; font-size: 22px; text-transform: uppercase; letter-spacing: 2px; text-shadow: 0 0 10px rgba(212, 175, 55, 0.4);}
+        .action { font-size: 14px; color: #8a8a9e; margin: 5px 0 20px 0; text-transform: uppercase;}
+        
+        .dice-container { background: #1a1a24; padding: 20px 40px; border-radius: 8px; border: 1px solid #333; display: inline-block; box-shadow: 0 5px 15px rgba(0,0,0,0.5);}
+        .roll { font-size: 38px; font-weight: bold; color: #fff; text-shadow: 0 0 15px rgba(255, 255, 255, 0.5); letter-spacing: 3px;}
+        
+        .btn-close { margin-top: 25px; background: transparent; color: #666; border: none; cursor: pointer; transition: 0.2s; font-size: 12px; text-decoration: underline;}
+        .btn-close:hover { color: #d4af37; }
     </style>
 </head>
 <body>
     <div class="content">
-        <div class="title" id="title">Carregando Dado...</div>
-        <div class="roll" id="roll">...</div>
+        <div class="char-name" id="c-name">Carregando...</div>
+        <div class="action" id="c-action">Rolando dados</div>
+        
+        <div class="dice-container">
+            <div class="roll" id="c-roll">...</div>
+        </div>
+
         <br>
-        <button class="btn-close" onclick="fecharModal()">OK</button>
+        <button class="btn-close" onclick="fecharModal()">Fechar Janela</button>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@2/lib/index.js"></script>
     <script>
+        // Lê os dados da URL
         const params = new URLSearchParams(window.location.search);
-        const dataStr = params.get('data');
+        const charName = params.get('c');
+        const skill = params.get('s');
+        const attr = params.get('a');
+        const results = params.get('r');
         
-        if (dataStr) {
-            const data = JSON.parse(decodeURIComponent(dataStr));
-            document.getElementById('title').innerHTML = `<span class="highlight">${data.charName}</span> rolou<br>${data.skillName} <span style="font-size:12px;">(${data.attrName})</span>`;
-            document.getElementById('roll').innerText = `[ ${data.results.join(' | ')} ]`;
+        if (charName) {
+            document.getElementById('c-name').innerText = charName;
+            document.getElementById('c-action').innerHTML = `ROLOU <b>${skill}</b> <span style="font-size:11px;">(${attr})</span>`;
+            
+            // Formata o resultado para ficar [ 15 | 20 | 2 ]
+            const formattedResults = results.split(',').join(' <span style="color:#d4af37;">|</span> ');
+            document.getElementById('c-roll').innerHTML = `[ ${formattedResults} ]`;
         }
 
         function fecharModal() {
-            if (OBR.isReady) OBR.modal.close('fate-roll-modal');
+            if (typeof OBR !== 'undefined' && OBR.isReady) {
+                OBR.modal.close('fate-roll-modal');
+            }
         }
 
-        // Fecha sozinho depois de 4 segundos
-        setTimeout(fecharModal, 4000);
+        // Auto-fecha em 4.5 segundos
+        setTimeout(fecharModal, 4500);
     </script>
 </body>
 </html>
