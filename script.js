@@ -6,11 +6,13 @@ const skillsData = [
     { name: "Atuação", attr: "Sorte" }, { name: "Enganação", attr: "Sorte" }, { name: "Persuasão", attr: "Sorte" }
 ];
 
-let characters = {}; 
+let myLocalCharacters = {}; // Fichas criadas neste PC
+let allTableCharacters = []; // Fichas de todo mundo da mesa
 let currentCharId = null;
+let currentIsMine = true; // Define se posso editar ou só visualizar
 let playerSkills = {}; 
 let currentPhoto = "";
-let folderState = { "Jogadores": true, "NPCs": true, "Monstros": true }; 
+let folderState = { "Jogadores": true, "NPCs": true, "Monstros": true };
 
 window.onload = function() {
     const loading = document.getElementById('loading');
@@ -30,15 +32,42 @@ window.openTab = function(tabName, event) {
 }
 
 window.backToList = function() {
-    window.saveData().then(() => {
-        document.getElementById('screen-sheet').classList.remove('active');
-        document.getElementById('screen-list').classList.add('active');
-        window.renderCharacterList();
-    });
+    if(currentIsMine) window.saveData();
+    document.getElementById('screen-sheet').classList.remove('active');
+    document.getElementById('screen-list').classList.add('active');
+    window.buildGlobalList();
 }
 
 window.toggleFolder = function(folderName) {
     folderState[folderName] = !folderState[folderName];
+    window.renderCharacterList();
+}
+
+// ------ NOVO SISTEMA GLOBAL: Junta suas fichas com a dos amigos ------
+window.buildGlobalList = async function() {
+    allTableCharacters = [];
+    
+    // 1. Adiciona as SUAS fichas (que estão no seu site/PC)
+    for (let id in myLocalCharacters) {
+        let char = myLocalCharacters[id];
+        allTableCharacters.push({ ...char, id: id, isMine: true, owner: "Você" });
+    }
+
+    // 2. Se estiver no Owlbear, pega as fichas dos OUTROS jogadores
+    if (typeof OBR !== 'undefined' && OBR.isReady) {
+        try {
+            const players = await OBR.party.getPlayers();
+            players.forEach(p => {
+                let pChars = p.metadata["fatesheet_chars"];
+                if (pChars) {
+                    for (let id in pChars) {
+                        allTableCharacters.push({ ...pChars[id], id: id, isMine: false, owner: p.name });
+                    }
+                }
+            });
+        } catch(e) {}
+    }
+    
     window.renderCharacterList();
 }
 
@@ -49,12 +78,11 @@ window.renderCharacterList = function() {
 
     const categories = { "Jogadores": [], "NPCs": [], "Monstros": [] };
 
-    for (let id in characters) {
-        let char = characters[id];
+    allTableCharacters.forEach(char => {
         let cat = char.category || "Jogadores";
         if (!categories[cat]) categories[cat] = [];
-        categories[cat].push({ id: id, name: char.name || "Sem Nome" }); 
-    }
+        categories[cat].push(char);
+    });
 
     let hasAny = false;
     for (let cat in categories) {
@@ -72,8 +100,9 @@ window.renderCharacterList = function() {
             `;
             
             categories[cat].forEach(char => {
+                let badge = char.isMine ? '' : `<span style="font-size:9px; color:#888;">(${char.owner})</span>`;
                 html += `<div class="char-list-item" onclick="openCharacter('${char.id}')">
-                            <span>${char.name}</span>
+                            <span>${char.name} ${badge}</span>
                          </div>`;
             });
             html += `</div>`;
@@ -82,39 +111,38 @@ window.renderCharacterList = function() {
     }
 
     if(!hasAny) {
-        container.innerHTML = '<div style="text-align:center; color:#666; margin-top: 20px;">A Mesa Global está vazia. Crie um personagem!</div>';
+        container.innerHTML = '<div style="text-align:center; color:#666; margin-top: 20px;">Nenhuma ficha criada ainda.</div>';
     }
 }
 
 window.saveDataLocalOnly = function() {
-    try { localStorage.setItem('fate_system_chars_v12', JSON.stringify(characters)); } catch(e){}
+    try { localStorage.setItem('fatesheet_db', JSON.stringify(myLocalCharacters)); } catch(e){}
 }
 
 window.createNewCharacter = function() {
     const newId = 'char_' + Date.now();
-    characters[newId] = { name: "Novo Personagem", category: "Jogadores", skills: {}, photo: "" };
+    myLocalCharacters[newId] = { name: "Novo Personagem", category: "Jogadores", skills: {}, photo: "" };
     window.saveDataLocalOnly();
-    
-    // Já cria na mesa global na hora
-    if (typeof OBR !== 'undefined' && OBR.isReady) {
-        OBR.room.setMetadata({ "fatesheet/characters": characters });
-    }
-    
+    window.buildGlobalList();
     window.openCharacter(newId);
 }
 
 window.deleteCharacter = function() {
-    if(confirm("Deseja APAGAR ESTA FICHA DO SERVIDOR? Ela sumirá para todos.")) {
-        delete characters[currentCharId];
+    if(!currentIsMine) {
+        alert("Você só pode apagar as fichas que você mesmo criou!");
+        return;
+    }
+    if(confirm("Apagar esta ficha permanentemente?")) {
+        delete myLocalCharacters[currentCharId];
         window.saveDataLocalOnly();
         
         if (typeof OBR !== 'undefined' && OBR.isReady) {
-            OBR.room.setMetadata({ "fatesheet/characters": characters }).catch(e => console.log(e));
+            OBR.player.setMetadata({ "fatesheet_chars": myLocalCharacters });
         }
         
         document.getElementById('screen-sheet').classList.remove('active');
         document.getElementById('screen-list').classList.add('active');
-        window.renderCharacterList();
+        window.buildGlobalList();
     }
 }
 
@@ -125,7 +153,10 @@ function safeSetVal(id, value) {
 
 window.openCharacter = function(id) {
     currentCharId = id;
-    const charData = characters[id] || {};
+    
+    // Procura na lista global
+    const charData = allTableCharacters.find(c => c.id === id) || {};
+    currentIsMine = charData.isMine !== false; // True por padrão se for local
     
     safeSetVal('char-name', charData.name || '');
     safeSetVal('char-category', charData.category || 'Jogadores');
@@ -148,13 +179,19 @@ window.openCharacter = function(id) {
     window.setPhotoPreview(currentPhoto);
     window.renderSkills();
 
+    // TRAVA DE SEGURANÇA: Se a ficha não é sua, bloqueia os inputs (Modo Leitura)
+    const inputs = document.querySelectorAll('#screen-sheet input, #screen-sheet select');
+    inputs.forEach(input => {
+        if(input.id !== 'photo-upload') input.disabled = !currentIsMine;
+    });
+
     document.getElementById('screen-list').classList.remove('active');
     document.getElementById('screen-sheet').classList.add('active');
 }
 
-// ------ NOVO SISTEMA DE NUVEM: A Chave "fatesheet/characters" ------
+// ------ SALVA NO SEU PERFIL DO OWLBEAR ------
 window.saveData = async function() {
-    if (!currentCharId) return; 
+    if (!currentCharId || !currentIsMine) return; 
 
     const sheetData = {
         name: document.getElementById('char-name')?.value || "Sem Nome",
@@ -175,14 +212,14 @@ window.saveData = async function() {
         photo: "" 
     };
 
-    characters[currentCharId] = sheetData;
+    myLocalCharacters[currentCharId] = sheetData;
     window.saveDataLocalOnly();
     
+    // Manda pro seu perfil no Owlbear, os outros vão ler de você!
     if (typeof OBR !== 'undefined' && OBR.isReady) {
         try {
-            // Salva TODOS os personagens juntos em uma única chave blindada
-            await OBR.room.setMetadata({ "fatesheet/characters": characters });
-        } catch(e) { console.log("Aviso: GM precisa permitir salvar na mesa.", e); }
+            await OBR.player.setMetadata({ "fatesheet_chars": myLocalCharacters });
+        } catch(e) {}
     }
 }
 
@@ -193,17 +230,26 @@ window.renderSkills = function() {
 
     skillsData.forEach(skill => {
         if (playerSkills[skill.name] === undefined) playerSkills[skill.name] = 0;
+        
+        // Se for Modo Leitura, esconde os botões de + e -
+        let controls = '';
+        if(currentIsMine) {
+            controls = `
+                <button class="btn-ctrl" onclick="updateSkill('${skill.name}', -1, event)">-</button>
+                <span style="width: 20px; text-align: center;">${playerSkills[skill.name]}</span>
+                <button class="btn-ctrl" onclick="updateSkill('${skill.name}', 1, event)">+</button>
+            `;
+        } else {
+            controls = `<span style="width: 40px; text-align: center; color: #d4af37;">${playerSkills[skill.name]} pts</span>`;
+        }
+
         const div = document.createElement('div');
         div.className = 'skill-item';
         div.innerHTML = `
             <div onclick="rollSkill('${skill.name}', '${skill.attr}')" style="flex:1;">
                 <strong>${skill.name}</strong> <span style="font-size: 10px; color: var(--text-muted);">(${skill.attr})</span>
             </div>
-            <div class="skill-controls">
-                <button class="btn-ctrl" onclick="updateSkill('${skill.name}', -1, event)">-</button>
-                <span style="width: 20px; text-align: center;">${playerSkills[skill.name]}</span>
-                <button class="btn-ctrl" onclick="updateSkill('${skill.name}', 1, event)">+</button>
-            </div>
+            <div class="skill-controls">${controls}</div>
         `;
         container.appendChild(div);
     });
@@ -211,13 +257,14 @@ window.renderSkills = function() {
 
 window.updateSkill = function(skillName, change, event) {
     event.stopPropagation(); 
+    if(!currentIsMine) return;
     playerSkills[skillName] += change;
     if (playerSkills[skillName] < 0) playerSkills[skillName] = 0;
     window.renderSkills();
     window.saveData();
 }
 
-// ------ ABERTURA DO MODAL (LINK ABSOLUTO DO GITHUB) ------
+// ------ A MÁGICA DA ROLAGEM NO MEIO DA TELA ------
 window.rollSkill = function(skillName, attrName) {
     const attrInputId = `attr-${attrName.toLowerCase()}`;
     const el = document.getElementById(attrInputId);
@@ -232,11 +279,12 @@ window.rollSkill = function(skillName, attrName) {
     const charEl = document.getElementById('char-name');
     const charName = (charEl && charEl.value !== '') ? charEl.value : 'Desconhecido';
     
+    // Empacota os dados limpos para a URL
     const rollData = {
-        charName: charName,
-        skillName: skillName,
-        attrName: attrName,
-        results: results
+        c: charName,
+        s: skillName,
+        a: attrName,
+        r: results.join(',')
     };
 
     abrirModalCentral(rollData);
@@ -248,16 +296,19 @@ window.rollSkill = function(skillName, attrName) {
 
 function abrirModalCentral(data) {
     if (typeof OBR !== 'undefined' && OBR.isReady) {
-        const dataUrl = encodeURIComponent(JSON.stringify(data));
-        // Link cravado no seu repositório para o Owlbear não se perder
-        const modalURL = `https://seediam.github.io/FateSheet/resultado.html?data=${dataUrl}`;
+        // LINK ABSOLUTO DIRETO DO SEU GITHUB: É impossível o Owlbear se perder agora
+        const baseUrl = "https://seediam.github.io/FateSheet/resultado.html";
+        const query = `?c=${encodeURIComponent(data.c)}&s=${encodeURIComponent(data.s)}&a=${encodeURIComponent(data.a)}&r=${encodeURIComponent(data.r)}`;
         
         OBR.modal.open({
             id: "fate-roll-modal",
-            url: modalURL,
-            width: 400,
+            url: baseUrl + query,
+            width: 450,
             height: 250
         });
+    } else {
+        // Se estiver testando direto no site, dá um alert
+        alert(`${data.c} rolou ${data.s} (${data.a}): [ ${data.r} ]`);
     }
 }
 
@@ -278,36 +329,50 @@ window.setPhotoPreview = function(base64Str) {
 }
 
 document.getElementById('photo-upload').addEventListener('change', function(e) {
+    if(!currentIsMine) return;
     const file = e.target.files[0];
     if (file) {
         const reader = new FileReader();
         reader.onload = function(event) {
             currentPhoto = event.target.result;
             window.setPhotoPreview(currentPhoto);
+            window.saveData();
         };
         reader.readAsDataURL(file);
     }
 });
 
-document.addEventListener('input', () => { if(currentCharId) window.saveData(); });
-
-function processRoomData(metadata) {
-    // Escuta apenas a nossa chave blindada
-    if (metadata["fatesheet/characters"]) {
-        characters = metadata["fatesheet/characters"];
-        window.renderCharacterList();
-    }
-}
+document.addEventListener('input', () => { if(currentCharId && currentIsMine) window.saveData(); });
 
 function initExtension() {
     try {
-        const saved = localStorage.getItem('fate_system_chars_v12');
-        if (saved) characters = JSON.parse(saved);
+        const saved = localStorage.getItem('fatesheet_db');
+        if (saved) myLocalCharacters = JSON.parse(saved);
     } catch(e) {}
 
-    window.renderCharacterList();
+    window.buildGlobalList();
 
     if (typeof OBR !== 'undefined') {
         OBR.onReady(async () => {
             try {
-                const
+                // Ao entrar na sala, espelha suas fichas locais na nuvem para os outros verem
+                await OBR.player.setMetadata({ "fatesheet_chars": myLocalCharacters });
+                
+                // Reconstrói a lista puxando a de todo mundo
+                window.buildGlobalList();
+
+                // Fica ouvindo se os outros alterarem algo
+                OBR.party.onChange((updatedPlayers) => {
+                    window.buildGlobalList();
+                });
+                
+                // Fica ouvindo as rolagens
+                OBR.broadcast.onMessage("fatesheet-rolls", (event) => {
+                    abrirModalCentral(event.data);
+                });
+            } catch(e) {
+                console.error("Erro no OBR:", e);
+            }
+        });
+    }
+}
