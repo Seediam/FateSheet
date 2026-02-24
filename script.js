@@ -10,7 +10,7 @@ let characters = {};
 let currentCharId = null;
 let playerSkills = {}; 
 let currentPhoto = "";
-let folderState = { "Jogadores": true, "NPCs": true, "Monstros": true }; // Controle de abrir/fechar pastas
+let folderState = { "Jogadores": true, "NPCs": true, "Monstros": true }; 
 
 window.onload = function() {
     const loading = document.getElementById('loading');
@@ -37,7 +37,6 @@ window.backToList = function() {
     });
 }
 
-// SISTEMA DE PASTAS RETRÁTEIS
 window.toggleFolder = function(folderName) {
     folderState[folderName] = !folderState[folderName];
     window.renderCharacterList();
@@ -54,7 +53,7 @@ window.renderCharacterList = function() {
         let char = characters[id];
         let cat = char.category || "Jogadores";
         if (!categories[cat]) categories[cat] = [];
-        categories[cat].push({ id: id, name: char.name || "Sem Nome" }); // Removido o nome do dono
+        categories[cat].push({ id: id, name: char.name || "Sem Nome" }); 
     }
 
     let hasAny = false;
@@ -83,22 +82,34 @@ window.renderCharacterList = function() {
     }
 
     if(!hasAny) {
-        container.innerHTML = '<div style="text-align:center; color:#666; margin-top: 20px;">O Servidor da Mesa está vazio.</div>';
+        container.innerHTML = '<div style="text-align:center; color:#666; margin-top: 20px;">A Mesa Global está vazia. Crie um personagem!</div>';
     }
+}
+
+window.saveDataLocalOnly = function() {
+    try { localStorage.setItem('fate_system_chars_v12', JSON.stringify(characters)); } catch(e){}
 }
 
 window.createNewCharacter = function() {
     const newId = 'char_' + Date.now();
     characters[newId] = { name: "Novo Personagem", category: "Jogadores", skills: {}, photo: "" };
+    window.saveDataLocalOnly();
+    
+    // Já cria na mesa global na hora
+    if (typeof OBR !== 'undefined' && OBR.isReady) {
+        OBR.room.setMetadata({ "fatesheet/characters": characters });
+    }
+    
     window.openCharacter(newId);
 }
 
 window.deleteCharacter = function() {
     if(confirm("Deseja APAGAR ESTA FICHA DO SERVIDOR? Ela sumirá para todos.")) {
         delete characters[currentCharId];
+        window.saveDataLocalOnly();
         
         if (typeof OBR !== 'undefined' && OBR.isReady) {
-            OBR.room.setMetadata({ [`fate_char_${currentCharId}`]: undefined }).catch(e => console.log(e));
+            OBR.room.setMetadata({ "fatesheet/characters": characters }).catch(e => console.log(e));
         }
         
         document.getElementById('screen-sheet').classList.remove('active');
@@ -141,7 +152,7 @@ window.openCharacter = function(id) {
     document.getElementById('screen-sheet').classList.add('active');
 }
 
-// SALVA GLOBALMENTE NA NUVEM DA MESA
+// ------ NOVO SISTEMA DE NUVEM: A Chave "fatesheet/characters" ------
 window.saveData = async function() {
     if (!currentCharId) return; 
 
@@ -165,11 +176,13 @@ window.saveData = async function() {
     };
 
     characters[currentCharId] = sheetData;
+    window.saveDataLocalOnly();
     
     if (typeof OBR !== 'undefined' && OBR.isReady) {
         try {
-            await OBR.room.setMetadata({ [`fate_char_${currentCharId}`]: sheetData });
-        } catch(e) {}
+            // Salva TODOS os personagens juntos em uma única chave blindada
+            await OBR.room.setMetadata({ "fatesheet/characters": characters });
+        } catch(e) { console.log("Aviso: GM precisa permitir salvar na mesa.", e); }
     }
 }
 
@@ -204,7 +217,7 @@ window.updateSkill = function(skillName, change, event) {
     window.saveData();
 }
 
-// ------ A ROLAGEM QUE ACIONA A JANELA CENTRAL ------
+// ------ ABERTURA DO MODAL (LINK ABSOLUTO DO GITHUB) ------
 window.rollSkill = function(skillName, attrName) {
     const attrInputId = `attr-${attrName.toLowerCase()}`;
     const el = document.getElementById(attrInputId);
@@ -226,22 +239,22 @@ window.rollSkill = function(skillName, attrName) {
         results: results
     };
 
-    // Abre para você
     abrirModalCentral(rollData);
 
-    // Manda abrir para os outros
     if (typeof OBR !== 'undefined' && OBR.isReady) {
-        OBR.broadcast.sendMessage("fate-system-rolls", rollData);
+        OBR.broadcast.sendMessage("fatesheet-rolls", rollData);
     }
 }
 
 function abrirModalCentral(data) {
     if (typeof OBR !== 'undefined' && OBR.isReady) {
         const dataUrl = encodeURIComponent(JSON.stringify(data));
-        // IMPORTANTE: Este é o caminho do GitHub Pages que você está usando
+        // Link cravado no seu repositório para o Owlbear não se perder
+        const modalURL = `https://seediam.github.io/FateSheet/resultado.html?data=${dataUrl}`;
+        
         OBR.modal.open({
             id: "fate-roll-modal",
-            url: `/FateSheet/resultado.html?data=${dataUrl}`, 
+            url: modalURL,
             width: 400,
             height: 250
         });
@@ -279,37 +292,22 @@ document.getElementById('photo-upload').addEventListener('change', function(e) {
 document.addEventListener('input', () => { if(currentCharId) window.saveData(); });
 
 function processRoomData(metadata) {
-    let mudouAlgo = false;
-    for (let key in metadata) {
-        if (key.startsWith('fate_char_')) {
-            const id = key.replace('fate_char_', '');
-            if (metadata[key] === undefined || metadata[key] === null) {
-                if(characters[id]) { delete characters[id]; mudouAlgo = true; }
-            } else {
-                characters[id] = metadata[key];
-                mudouAlgo = true;
-            }
-        }
+    // Escuta apenas a nossa chave blindada
+    if (metadata["fatesheet/characters"]) {
+        characters = metadata["fatesheet/characters"];
+        window.renderCharacterList();
     }
-    if (mudouAlgo) window.renderCharacterList();
 }
 
 function initExtension() {
+    try {
+        const saved = localStorage.getItem('fate_system_chars_v12');
+        if (saved) characters = JSON.parse(saved);
+    } catch(e) {}
+
+    window.renderCharacterList();
+
     if (typeof OBR !== 'undefined') {
         OBR.onReady(async () => {
             try {
-                // Lê o banco de dados principal da sala
-                const initialMeta = await OBR.room.getMetadata();
-                processRoomData(initialMeta);
-
-                // Ouve quando qualquer pessoa criar/editar/apagar um personagem
-                OBR.room.onMetadataChange((metadata) => processRoomData(metadata));
-                
-                // Ouve as rolagens na mesa e abre o HTML central
-                OBR.broadcast.onMessage("fate-system-rolls", (event) => {
-                    abrirModalCentral(event.data);
-                });
-            } catch(e) {}
-        });
-    }
-}
+                const
