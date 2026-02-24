@@ -6,29 +6,27 @@ const skillsData = [
     { name: "Atuação", attr: "Sorte" }, { name: "Enganação", attr: "Sorte" }, { name: "Persuasão", attr: "Sorte" }
 ];
 
-let myLocalCharacters = {}; // Fichas criadas neste PC
-let allTableCharacters = []; // Fichas de todo mundo da mesa
+let myLocalCharacters = {}; 
+let allTableCharacters = []; 
 let currentCharId = null;
-let currentIsMine = true; // Define se posso editar ou só visualizar
+let currentIsMine = true; 
 let playerSkills = {}; 
+let playerInventory = [];
 let currentPhoto = "";
 let folderState = { "Jogadores": true, "NPCs": true, "Monstros": true };
+let isOverweight = false;
 
 window.onload = function() {
-    const loading = document.getElementById('loading');
-    const app = document.getElementById('app');
-    if(loading && app) {
-        loading.style.display = 'none';
-        app.style.display = 'block';
-    }
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
     initExtension();
 };
 
-window.openTab = function(tabName, event) {
+window.openTab = function(tabName) {
     document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
     document.getElementById(tabName).classList.add('active');
-    if(event) event.currentTarget.classList.add('active');
+    event.currentTarget.classList.add('active');
 }
 
 window.backToList = function() {
@@ -43,17 +41,11 @@ window.toggleFolder = function(folderName) {
     window.renderCharacterList();
 }
 
-// ------ NOVO SISTEMA GLOBAL: Junta suas fichas com a dos amigos ------
 window.buildGlobalList = async function() {
     allTableCharacters = [];
-    
-    // 1. Adiciona as SUAS fichas (que estão no seu site/PC)
     for (let id in myLocalCharacters) {
-        let char = myLocalCharacters[id];
-        allTableCharacters.push({ ...char, id: id, isMine: true, owner: "Você" });
+        allTableCharacters.push({ ...myLocalCharacters[id], id: id, isMine: true, owner: "Local" });
     }
-
-    // 2. Se estiver no Owlbear, pega as fichas dos OUTROS jogadores
     if (typeof OBR !== 'undefined' && OBR.isReady) {
         try {
             const players = await OBR.party.getPlayers();
@@ -67,15 +59,12 @@ window.buildGlobalList = async function() {
             });
         } catch(e) {}
     }
-    
     window.renderCharacterList();
 }
 
 window.renderCharacterList = function() {
     const container = document.getElementById('character-folders');
-    if(!container) return;
     container.innerHTML = '';
-
     const categories = { "Jogadores": [], "NPCs": [], "Monstros": [] };
 
     allTableCharacters.forEach(char => {
@@ -84,35 +73,52 @@ window.renderCharacterList = function() {
         categories[cat].push(char);
     });
 
-    let hasAny = false;
     for (let cat in categories) {
         if (categories[cat].length > 0) {
-            hasAny = true;
             let isOpen = folderState[cat];
-            let arrow = isOpen ? '▼' : '►';
-            let displayStyle = isOpen ? 'flex' : 'none';
-
             let html = `
                 <div class="folder-header" onclick="toggleFolder('${cat}')">
-                    <span class="chevron">${arrow}</span> 📁 ${cat}
+                    <span class="chevron">${isOpen ? '▼' : '►'}</span> 📁 ${cat}
                 </div>
-                <div class="folder-content" style="display: ${displayStyle};">
+                <div class="folder-content" style="display: ${isOpen ? 'flex' : 'none'};">
             `;
-            
             categories[cat].forEach(char => {
                 let badge = char.isMine ? '' : `<span style="font-size:9px; color:#888;">(${char.owner})</span>`;
-                html += `<div class="char-list-item" onclick="openCharacter('${char.id}')">
-                            <span>${char.name} ${badge}</span>
-                         </div>`;
+                html += `<div class="char-list-item" onclick="openCharacter('${char.id}')"><span>${char.name} ${badge}</span></div>`;
             });
             html += `</div>`;
             container.innerHTML += html;
         }
     }
+}
 
-    if(!hasAny) {
-        container.innerHTML = '<div style="text-align:center; color:#666; margin-top: 20px;">Nenhuma ficha criada ainda.</div>';
-    }
+// ------ IMPORTAR E EXPORTAR ------
+window.exportCharacter = function() {
+    if(!currentIsMine) return alert("Você só pode exportar suas próprias fichas.");
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(myLocalCharacters[currentCharId]));
+    const dlAnchor = document.createElement('a');
+    dlAnchor.setAttribute("href", dataStr);
+    dlAnchor.setAttribute("download", (myLocalCharacters[currentCharId].name || "Ficha") + "_Fate.json");
+    document.body.appendChild(dlAnchor);
+    dlAnchor.click();
+    dlAnchor.remove();
+}
+
+window.importCharacter = function(event) {
+    const file = event.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const importedData = JSON.parse(e.target.result);
+            const newId = 'char_' + Date.now();
+            myLocalCharacters[newId] = importedData;
+            window.saveDataLocalOnly();
+            window.buildGlobalList();
+            alert("Ficha importada com sucesso!");
+        } catch(err) { alert("Erro ao ler o arquivo JSON."); }
+    };
+    reader.readAsText(file);
 }
 
 window.saveDataLocalOnly = function() {
@@ -121,28 +127,21 @@ window.saveDataLocalOnly = function() {
 
 window.createNewCharacter = function() {
     const newId = 'char_' + Date.now();
-    myLocalCharacters[newId] = { name: "Novo Personagem", category: "Jogadores", skills: {}, photo: "" };
+    myLocalCharacters[newId] = { name: "Novo Personagem", category: "Jogadores", classe: "Plebeu", skills: {}, inventory: [], photo: "" };
     window.saveDataLocalOnly();
     window.buildGlobalList();
     window.openCharacter(newId);
 }
 
 window.deleteCharacter = function() {
-    if(!currentIsMine) {
-        alert("Você só pode apagar as fichas que você mesmo criou!");
-        return;
-    }
+    if(!currentIsMine) return alert("Você só pode apagar as fichas que você criou no seu PC!");
     if(confirm("Apagar esta ficha permanentemente?")) {
         delete myLocalCharacters[currentCharId];
         window.saveDataLocalOnly();
-        
         if (typeof OBR !== 'undefined' && OBR.isReady) {
             OBR.player.setMetadata({ "fatesheet_chars": myLocalCharacters });
         }
-        
-        document.getElementById('screen-sheet').classList.remove('active');
-        document.getElementById('screen-list').classList.add('active');
-        window.buildGlobalList();
+        window.backToList();
     }
 }
 
@@ -153,15 +152,16 @@ function safeSetVal(id, value) {
 
 window.openCharacter = function(id) {
     currentCharId = id;
-    
-    // Procura na lista global
     const charData = allTableCharacters.find(c => c.id === id) || {};
-    currentIsMine = charData.isMine !== false; // True por padrão se for local
+    currentIsMine = charData.isMine !== false;
     
     safeSetVal('char-name', charData.name || '');
     safeSetVal('char-category', charData.category || 'Jogadores');
     safeSetVal('char-age', charData.age || '');
     safeSetVal('char-race', charData.race || 'Humano');
+    safeSetVal('char-class', charData.classe || 'Plebeu');
+    safeSetVal('char-prof', charData.prof || '');
+    safeSetVal('char-prof-desc', charData.profDesc || '');
     safeSetVal('attr-forca', charData.forca || 1);
     safeSetVal('attr-magia', charData.magia || 1);
     safeSetVal('attr-agilidade', charData.agilidade || 1);
@@ -174,22 +174,103 @@ window.openCharacter = function(id) {
     safeSetVal('hab-4', charData.hab4 || '');
     
     playerSkills = charData.skills || {};
+    playerInventory = charData.inventory || [];
     currentPhoto = charData.photo || '';
     
     window.setPhotoPreview(currentPhoto);
     window.renderSkills();
+    window.renderInventory();
+    window.calcVitals();
 
-    // TRAVA DE SEGURANÇA: Se a ficha não é sua, bloqueia os inputs (Modo Leitura)
-    const inputs = document.querySelectorAll('#screen-sheet input, #screen-sheet select');
-    inputs.forEach(input => {
-        if(input.id !== 'photo-upload') input.disabled = !currentIsMine;
-    });
+    const inputs = document.querySelectorAll('#screen-sheet input, #screen-sheet select, #screen-sheet textarea');
+    inputs.forEach(input => { if(input.id !== 'import-file') input.disabled = !currentIsMine; });
 
     document.getElementById('screen-list').classList.remove('active');
     document.getElementById('screen-sheet').classList.add('active');
 }
 
-// ------ SALVA NO SEU PERFIL DO OWLBEAR ------
+// ------ CÁLCULO DE STATUS, CLASSE E MOCHILA ------
+window.calcVitals = function() {
+    let forcaBase = parseInt(document.getElementById('attr-forca').value) || 0;
+    let sorteBase = parseInt(document.getElementById('attr-sorte').value) || 0;
+    let classe = document.getElementById('char-class').value;
+
+    let extraMana = 0;
+    if(classe === 'Andarilho') extraMana = 50;
+    if(classe === 'Estrangeiro') extraMana = 100;
+    if(classe === 'Nobre') extraMana = 150;
+
+    let maxMana = 50 + extraMana;
+    let maxHealth = 100 + (sorteBase * 50);
+
+    document.getElementById('val-vida').innerText = `${maxHealth} / ${maxHealth}`;
+    document.getElementById('val-mana').innerText = `${maxMana} / ${maxMana}`;
+
+    // Peso
+    let maxWeight = forcaBase * 5;
+    let currentWeight = playerInventory.reduce((acc, item) => acc + ((parseFloat(item.peso)||0) * (parseInt(item.qtd)||1)), 0);
+    
+    let pesoEl = document.getElementById('val-peso');
+    let boxPeso = document.getElementById('box-peso');
+    let avisoPeso = document.getElementById('peso-aviso');
+    
+    pesoEl.innerText = `${currentWeight.toFixed(1)} / ${maxWeight}`;
+    
+    if (currentWeight > maxWeight) {
+        isOverweight = true;
+        boxPeso.classList.add('overweight');
+        avisoPeso.style.display = 'block';
+    } else {
+        isOverweight = false;
+        boxPeso.classList.remove('overweight');
+        avisoPeso.style.display = 'none';
+    }
+
+    if(currentIsMine && currentCharId) window.saveData();
+}
+
+window.renderInventory = function() {
+    const container = document.getElementById('inventory-container');
+    container.innerHTML = '';
+    
+    playerInventory.forEach((item, index) => {
+        let disabled = currentIsMine ? '' : 'disabled';
+        let row = document.createElement('div');
+        row.className = 'inv-item';
+        row.innerHTML = `
+            <div class="inv-row">
+                <input type="text" class="inv-input" style="flex: 2;" placeholder="Item" value="${item.nome}" onchange="updateInv(${index}, 'nome', this.value)" ${disabled}>
+                <input type="number" class="inv-input" style="flex: 1;" placeholder="Peso" value="${item.peso}" onchange="updateInv(${index}, 'peso', this.value)" ${disabled}>
+                <input type="number" class="inv-input" style="flex: 1;" placeholder="Qtd" value="${item.qtd}" onchange="updateInv(${index}, 'qtd', this.value)" ${disabled}>
+                ${currentIsMine ? `<button class="btn-danger" onclick="removeInv(${index})">X</button>` : ''}
+            </div>
+            <div class="inv-row" style="margin-top: 5px;">
+                <input type="text" class="inv-input" style="flex: 1;" placeholder="Descrição do item..." value="${item.desc}" onchange="updateInv(${index}, 'desc', this.value)" ${disabled}>
+            </div>
+        `;
+        container.appendChild(row);
+    });
+    window.calcVitals();
+}
+
+window.addInventoryItem = function() {
+    if(!currentIsMine) return;
+    playerInventory.push({ nome: "", desc: "", peso: 0, qtd: 1 });
+    window.renderInventory();
+}
+
+window.updateInv = function(index, field, value) {
+    if(!currentIsMine) return;
+    playerInventory[index][field] = value;
+    window.calcVitals(); // Auto-salva dentro do calc
+}
+
+window.removeInv = function(index) {
+    if(!currentIsMine) return;
+    playerInventory.splice(index, 1);
+    window.renderInventory();
+}
+
 window.saveData = async function() {
     if (!currentCharId || !currentIsMine) return; 
 
@@ -198,6 +279,9 @@ window.saveData = async function() {
         category: document.getElementById('char-category')?.value || "Jogadores",
         age: document.getElementById('char-age')?.value || "",
         race: document.getElementById('char-race')?.value || "",
+        classe: document.getElementById('char-class')?.value || "Plebeu",
+        prof: document.getElementById('char-prof')?.value || "",
+        profDesc: document.getElementById('char-prof-desc')?.value || "",
         forca: document.getElementById('attr-forca')?.value || 1,
         magia: document.getElementById('attr-magia')?.value || 1,
         agilidade: document.getElementById('attr-agilidade')?.value || 1,
@@ -209,41 +293,35 @@ window.saveData = async function() {
         hab3: document.getElementById('hab-3')?.value || "",
         hab4: document.getElementById('hab-4')?.value || "",
         skills: playerSkills,
-        photo: "" 
+        inventory: playerInventory,
+        photo: currentPhoto 
     };
 
     myLocalCharacters[currentCharId] = sheetData;
     window.saveDataLocalOnly();
     
-    // Manda pro seu perfil no Owlbear, os outros vão ler de você!
     if (typeof OBR !== 'undefined' && OBR.isReady) {
-        try {
-            await OBR.player.setMetadata({ "fatesheet_chars": myLocalCharacters });
-        } catch(e) {}
+        let syncChars = {};
+        for(let id in myLocalCharacters) {
+            syncChars[id] = { ...myLocalCharacters[id] };
+            delete syncChars[id].photo; // Protege a rede
+        }
+        await OBR.player.setMetadata({ "fatesheet_chars": syncChars });
     }
 }
 
 window.renderSkills = function() {
     const container = document.getElementById('skills-container');
-    if(!container) return;
     container.innerHTML = '';
-
     skillsData.forEach(skill => {
         if (playerSkills[skill.name] === undefined) playerSkills[skill.name] = 0;
-        
-        // Se for Modo Leitura, esconde os botões de + e -
-        let controls = '';
-        if(currentIsMine) {
-            controls = `
-                <button class="btn-ctrl" onclick="updateSkill('${skill.name}', -1, event)">-</button>
-                <span style="width: 20px; text-align: center;">${playerSkills[skill.name]}</span>
-                <button class="btn-ctrl" onclick="updateSkill('${skill.name}', 1, event)">+</button>
-            `;
-        } else {
-            controls = `<span style="width: 40px; text-align: center; color: #d4af37;">${playerSkills[skill.name]} pts</span>`;
-        }
+        let controls = currentIsMine ? `
+            <button class="btn-ctrl" onclick="updateSkill('${skill.name}', -1, event)">-</button>
+            <span style="width: 20px; text-align: center;">${playerSkills[skill.name]}</span>
+            <button class="btn-ctrl" onclick="updateSkill('${skill.name}', 1, event)">+</button>
+        ` : `<span style="width: 40px; text-align: center; color: #d4af37;">${playerSkills[skill.name]}</span>`;
 
-        const div = document.createElement('div');
+        let div = document.createElement('div');
         div.className = 'skill-item';
         div.innerHTML = `
             <div onclick="rollSkill('${skill.name}', '${skill.attr}')" style="flex:1;">
@@ -264,41 +342,48 @@ window.updateSkill = function(skillName, change, event) {
     window.saveData();
 }
 
-// ------ A MÁGICA DA ROLAGEM NO MEIO DA TELA ------
+// ------ A ROLAGEM COM MODIFICADORES ------
 window.rollSkill = function(skillName, attrName) {
-    const attrInputId = `attr-${attrName.toLowerCase()}`;
-    const el = document.getElementById(attrInputId);
-    let diceCount = el ? parseInt(el.value) : 1;
-    if(isNaN(diceCount) || diceCount < 1) diceCount = 1;
+    let baseAttr = parseInt(document.getElementById(`attr-${attrName.toLowerCase()}`).value) || 1;
+    let classe = document.getElementById('char-class').value;
+    
+    // Bônus de Classe nos dados
+    if (classe === 'Plebeu') { if(attrName === 'Força') baseAttr += 1; if(attrName === 'Magia') baseAttr -= 1; }
+    if (classe === 'Andarilho' && attrName === 'Agilidade') baseAttr += 1;
+    if (classe === 'Estrangeiro' && attrName === 'Sorte') baseAttr += 1;
+    if (classe === 'Nobre' && attrName === 'Magia') baseAttr += 1;
+    
+    if(baseAttr < 1) baseAttr = 1;
 
     let results = [];
-    for (let i = 0; i < diceCount; i++) {
-        results.push(Math.floor(Math.random() * 20) + 1);
+    for (let i = 0; i < baseAttr; i++) {
+        let die = Math.floor(Math.random() * 20) + 1;
+        // Aplica a desvantagem da mochila nos resultados
+        if (isOverweight && (attrName === 'Força' || attrName === 'Agilidade')) {
+            die -= 5;
+        }
+        results.push(die);
     }
 
-    const charEl = document.getElementById('char-name');
-    const charName = (charEl && charEl.value !== '') ? charEl.value : 'Desconhecido';
+    const charName = document.getElementById('char-name').value || 'Desconhecido';
     
-    // Empacota os dados limpos para a URL
     const rollData = {
         c: charName,
         s: skillName,
         a: attrName,
-        r: results.join(',')
+        r: results.join(','),
+        pen: isOverweight && (attrName === 'Força' || attrName === 'Agilidade') ? "true" : "false"
     };
 
     abrirModalCentral(rollData);
-
-    if (typeof OBR !== 'undefined' && OBR.isReady) {
-        OBR.broadcast.sendMessage("fatesheet-rolls", rollData);
-    }
+    if (typeof OBR !== 'undefined' && OBR.isReady) OBR.broadcast.sendMessage("fatesheet-rolls", rollData);
 }
 
 function abrirModalCentral(data) {
     if (typeof OBR !== 'undefined' && OBR.isReady) {
-        // LINK ABSOLUTO DIRETO DO SEU GITHUB: É impossível o Owlbear se perder agora
-        const baseUrl = "https://seediam.github.io/FateSheet/resultado.html";
-        const query = `?c=${encodeURIComponent(data.c)}&s=${encodeURIComponent(data.s)}&a=${encodeURIComponent(data.a)}&r=${encodeURIComponent(data.r)}`;
+        // DETECTOR AUTOMÁTICO DO SEU SITE (Nunca mais erra o link)
+        const baseUrl = new URL('resultado.html', window.location.href).toString();
+        const query = `?c=${encodeURIComponent(data.c)}&s=${encodeURIComponent(data.s)}&a=${encodeURIComponent(data.a)}&r=${encodeURIComponent(data.r)}&pen=${data.pen}`;
         
         OBR.modal.open({
             id: "fate-roll-modal",
@@ -307,7 +392,6 @@ function abrirModalCentral(data) {
             height: 250
         });
     } else {
-        // Se estiver testando direto no site, dá um alert
         alert(`${data.c} rolou ${data.s} (${data.a}): [ ${data.r} ]`);
     }
 }
@@ -315,16 +399,11 @@ function abrirModalCentral(data) {
 window.setPhotoPreview = function(base64Str) {
     const preview = document.getElementById('photo-preview');
     const text = document.getElementById('photo-text');
-    if(!preview || !text) return;
-
+    if(!preview) return;
     if (base64Str) {
-        preview.style.backgroundImage = `url("${base64Str}")`;
-        preview.style.border = 'none';
-        text.style.display = 'none';
+        preview.style.backgroundImage = `url("${base64Str}")`; preview.style.border = 'none'; text.style.display = 'none';
     } else {
-        preview.style.backgroundImage = 'none';
-        preview.style.border = '1px dashed var(--accent-gold)';
-        text.style.display = 'block';
+        preview.style.backgroundImage = 'none'; preview.style.border = '1px dashed var(--accent-gold)'; text.style.display = 'block';
     }
 }
 
@@ -355,24 +434,16 @@ function initExtension() {
     if (typeof OBR !== 'undefined') {
         OBR.onReady(async () => {
             try {
-                // Ao entrar na sala, espelha suas fichas locais na nuvem para os outros verem
-                await OBR.player.setMetadata({ "fatesheet_chars": myLocalCharacters });
-                
-                // Reconstrói a lista puxando a de todo mundo
+                let syncChars = {};
+                for(let id in myLocalCharacters) {
+                    syncChars[id] = { ...myLocalCharacters[id] };
+                    delete syncChars[id].photo; 
+                }
+                await OBR.player.setMetadata({ "fatesheet_chars": syncChars });
                 window.buildGlobalList();
-
-                // Fica ouvindo se os outros alterarem algo
-                OBR.party.onChange((updatedPlayers) => {
-                    window.buildGlobalList();
-                });
-                
-                // Fica ouvindo as rolagens
-                OBR.broadcast.onMessage("fatesheet-rolls", (event) => {
-                    abrirModalCentral(event.data);
-                });
-            } catch(e) {
-                console.error("Erro no OBR:", e);
-            }
+                OBR.party.onChange(() => window.buildGlobalList());
+                OBR.broadcast.onMessage("fatesheet-rolls", (event) => abrirModalCentral(event.data));
+            } catch(e) {}
         });
     }
 }
