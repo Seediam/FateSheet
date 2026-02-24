@@ -100,6 +100,15 @@
             </div>
 
             <div id="personagem" class="tab-content active">
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label>📁 Pasta da Mesa</label>
+                    <select id="char-category" onchange="updateCategoryUI()">
+                        <option value="Jogadores">Jogadores</option>
+                        <option value="NPCs">NPCs</option>
+                        <option value="Monstros">Monstros</option>
+                    </select>
+                </div>
+
                 <div style="display: flex; gap: 15px; margin-bottom: 10px;">
                     <label for="photo-upload" class="photo-slot" id="photo-preview"><span id="photo-text">📷<br>Importar</span></label>
                     <input type="file" id="photo-upload" accept="image/*" style="display: none;">
@@ -107,36 +116,43 @@
                         <div class="form-group"><label>Nome</label><input type="text" id="char-name"></div>
                         <div style="display: flex; gap: 5px;">
                             <div class="form-group" style="flex: 1;"><label>Idade</label><input type="number" id="char-age"></div>
-                            <div class="form-group" style="flex: 2;"><label>Raça</label><input type="text" id="char-race" value="Humano"></div>
+                            
+                            <div class="form-group" style="flex: 2;">
+                                <label>Raça</label>
+                                <input type="text" id="char-race-player" value="Humano">
+                                <select id="char-race-monster" style="display: none;">
+                                    <option value="Terrestres">Terrestres</option>
+                                    <option value="Voadores">Voadores</option>
+                                    <option value="Aquáticos">Aquáticos</option>
+                                </select>
+                            </div>
+
                         </div>
                     </div>
                 </div>
 
-                <div style="display: flex; gap: 10px;">
-                    <div class="form-group" style="flex: 1;">
-                        <label>Classe</label>
-                        <select id="char-class" onchange="calcVitals()">
-                            <option value="Plebeu">Plebeu</option>
-                            <option value="Andarilho">Andarilho</option>
-                            <option value="Estrangeiro">Estrangeiro</option>
-                            <option value="Nobre">Nobre</option>
-                        </select>
+                <div id="box-classe-prof">
+                    <div style="display: flex; gap: 10px;">
+                        <div class="form-group" style="flex: 1;">
+                            <label>Classe</label>
+                            <select id="char-class" onchange="calcVitals()">
+                                <option value="Plebeu">Plebeu</option>
+                                <option value="Andarilho">Andarilho</option>
+                                <option value="Estrangeiro">Estrangeiro</option>
+                                <option value="Nobre">Nobre</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="flex: 1;"><label>Profissão</label><input type="text" id="char-prof"></div>
                     </div>
-                    <div class="form-group" style="flex: 1;"><label>Profissão</label><input type="text" id="char-prof"></div>
-                </div>
-                <div class="form-group"><label>Descrição da Profissão</label><textarea id="char-prof-desc" rows="2"></textarea></div>
-
-                <div class="form-group">
-                    <label>📁 Pasta / Categoria</label>
-                    <select id="char-category" onchange="saveData()">
-                        <option value="Jogadores">Jogadores</option>
-                        <option value="NPCs">NPCs</option>
-                        <option value="Monstros">Monstros</option>
-                    </select>
+                    <div class="form-group"><label>Descrição da Profissão</label><textarea id="char-prof-desc" rows="2"></textarea></div>
                 </div>
 
                 <div class="status-box">
-                    <div class="status-item"><label style="color:#ff4444">Vida</label><span id="val-vida">100 / 100</span></div>
+                    <div class="status-item">
+                        <label style="color:#ff4444">Vida</label>
+                        <span id="val-vida-player">100 / 100</span>
+                        <input type="number" id="val-vida-monster" value="100" style="display:none; width: 100%; background: transparent; border: none; color: #fff; font-size: 18px; font-weight: bold; text-align: center; outline: none; border-bottom: 1px dashed #ff4444; margin-top: 5px;" onchange="saveData()">
+                    </div>
                     <div class="status-item"><label style="color:#44aaff">Mana</label><span id="val-mana">50 / 50</span></div>
                 </div>
 
@@ -174,6 +190,6 @@
         </div>
     </div>
 
-    <script type="module" src="script.js?v=28"></script>
+    <script type="module" src="script.js?v=33"></script>
 </body>
 </html>
