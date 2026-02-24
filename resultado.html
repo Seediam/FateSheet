@@ -35,9 +35,7 @@
     <div id="popup-box" class="popup">
         <div class="char-name" id="c-name">Rolando...</div>
         <div class="action" id="c-action">...</div>
-        
         <div class="penalty" id="c-pen">⚠️ SOBREPESO: -5 APLICADO</div>
-
         <div class="roll-box" id="c-roll">...</div>
     </div>
 
@@ -68,14 +66,13 @@
 
                 if(data.pen === "true") document.getElementById('c-pen').style.display = "block";
 
-                // Efeito visual no crítico igual ao seu sistema de dados!
                 if (temCritico) {
                     document.getElementById('popup-box').classList.add('crit-anim');
                 }
             }
 
-            // Fecha a janela sozinha para todos
-            setTimeout(() => { OBR.modal.close('fate-roll-modal'); }, 5000);
+            // Fecha sozinho depois de 4.5s
+            setTimeout(() => { OBR.modal.close('fate-roll-modal'); }, 4500);
         });
     </script>
 </body>
