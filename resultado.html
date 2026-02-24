@@ -3,58 +3,80 @@
 <head>
     <meta charset="UTF-8">
     <style>
-        body { margin: 0; background: rgba(15, 15, 19, 0.98); color: #fff; display: flex; align-items: center; justify-content: center; height: 100vh; font-family: 'Segoe UI', Tahoma, sans-serif; border: 3px solid #d4af37; border-radius: 10px; overflow: hidden; box-shadow: inset 0 0 40px rgba(0,0,0,0.9); }
-        .content { text-align: center; width: 100%; padding: 20px; }
-        .char-name { color: #d4af37; font-weight: 900; font-size: 22px; text-transform: uppercase; letter-spacing: 2px; text-shadow: 0 0 10px rgba(212, 175, 55, 0.4);}
+        @keyframes camera-shake {
+            0% { transform: translate(1px, 1px) rotate(0deg); }
+            10% { transform: translate(-2px, -2px) rotate(-1deg); }
+            20% { transform: translate(-3px, 0px) rotate(1deg); }
+            30% { transform: translate(3px, 2px) rotate(0deg); }
+            40% { transform: translate(1px, -1px) rotate(1deg); }
+            50% { transform: translate(-1px, 2px) rotate(-1deg); }
+            60% { transform: translate(-3px, 1px) rotate(0deg); }
+            70% { transform: translate(3px, 1px) rotate(-1deg); }
+            80% { transform: translate(-1px, -1px) rotate(1deg); }
+            90% { transform: translate(1px, 2px) rotate(0deg); }
+            100% { transform: translate(0px, 0px) rotate(0deg); }
+        }
+        
+        body { margin: 0; background: transparent; display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; font-family: 'Segoe UI', Tahoma, sans-serif; }
+        
+        .popup { background: rgba(15, 15, 20, 0.98); box-shadow: 0 10px 40px rgba(0,0,0,0.9); border: 2px solid #d4af37; padding: 20px; border-radius: 8px; width: 90%; max-width: 350px; text-align: center; color: white;}
+        
+        .char-name { color: #d4af37; font-weight: 900; font-size: 20px; text-transform: uppercase; letter-spacing: 2px;}
         .action { font-size: 14px; color: #8a8a9e; margin: 5px 0 15px 0; text-transform: uppercase;}
         
-        .dice-container { background: #1a1a24; padding: 20px 40px; border-radius: 8px; border: 1px solid #333; display: inline-block; box-shadow: 0 5px 15px rgba(0,0,0,0.5);}
-        .roll { font-size: 38px; font-weight: bold; color: #fff; text-shadow: 0 0 15px rgba(255, 255, 255, 0.5); letter-spacing: 3px;}
+        .roll-box { font-size: 32px; font-weight: bold; background: #111; padding: 15px; border-radius: 6px; border: 1px dashed #d4af37; margin: 15px 0; text-shadow: 0 0 15px rgba(255, 255, 255, 0.5); letter-spacing: 2px;}
         .penalty { color: #ff4444; font-size: 12px; font-weight: bold; margin-bottom: 10px; display: none;}
-
-        .btn-close { margin-top: 25px; background: transparent; color: #666; border: none; cursor: pointer; transition: 0.2s; font-size: 12px; text-decoration: underline;}
-        .btn-close:hover { color: #d4af37; }
+        
+        .crit-anim { animation: camera-shake 0.4s both; border-color: #ffd700; box-shadow: 0 0 30px rgba(255, 215, 0, 0.8); }
     </style>
 </head>
 <body>
-    <div class="content">
+    
+    <div id="popup-box" class="popup">
         <div class="char-name" id="c-name">Rolando...</div>
         <div class="action" id="c-action">...</div>
         
         <div class="penalty" id="c-pen">⚠️ SOBREPESO: -5 APLICADO</div>
 
-        <div class="dice-container">
-            <div class="roll" id="c-roll">...</div>
-        </div>
-
-        <br>
-        <button class="btn-close" onclick="fecharModal()">Fechar Janela</button>
+        <div class="roll-box" id="c-roll">...</div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@2/lib/index.js"></script>
-    <script>
-        const params = new URLSearchParams(window.location.search);
-        const charName = params.get('c');
-        const skill = params.get('s');
-        const attr = params.get('a');
-        const results = params.get('r');
-        const penalty = params.get('pen');
-        
-        if (charName) {
-            document.getElementById('c-name').innerText = charName;
-            document.getElementById('c-action').innerHTML = `ROLOU <b>${skill}</b> <span style="font-size:11px;">(${attr})</span>`;
+    <script type="module">
+        import OBR from "https://esm.sh/@owlbear-rodeo/sdk";
+
+        OBR.onReady(() => {
+            const params = new URLSearchParams(window.location.search);
+            const dataStr = params.get('data');
             
-            const formattedResults = results.split(',').join(' <span style="color:#d4af37;">|</span> ');
-            document.getElementById('c-roll').innerHTML = `[ ${formattedResults} ]`;
+            if (dataStr) {
+                const data = JSON.parse(decodeURIComponent(dataStr));
+                
+                document.getElementById('c-name').innerText = data.c;
+                document.getElementById('c-action').innerHTML = `ROLOU <b>${data.s}</b> <span style="font-size:11px;">(${data.a})</span>`;
+                
+                const resArray = data.r.split(',');
+                let temCritico = false;
 
-            if(penalty === "true") document.getElementById('c-pen').style.display = "block";
-        }
+                const formattedResults = resArray.map(v => {
+                    let num = parseInt(v);
+                    if (num >= 20) { temCritico = true; return `<span style="color:#ffd700;">${v}</span>`; }
+                    if (num <= 4) return `<span style="color:#ff4444;">${v}</span>`;
+                    return v;
+                }).join(' <span style="color:#666;">|</span> ');
 
-        function fecharModal() {
-            if (typeof OBR !== 'undefined' && OBR.isAvailable) OBR.modal.close('fate-roll-modal');
-        }
+                document.getElementById('c-roll').innerHTML = `[ ${formattedResults} ]`;
 
-        setTimeout(fecharModal, 4500);
+                if(data.pen === "true") document.getElementById('c-pen').style.display = "block";
+
+                // Se tirou 20 puro, treme a tela igual no sistema de dados!
+                if (temCritico) {
+                    document.getElementById('popup-box').classList.add('crit-anim');
+                }
+            }
+
+            // Fecha a janela sozinha após 5 segundos
+            setTimeout(() => { OBR.modal.close('fate-roll-modal'); }, 5000);
+        });
     </script>
 </body>
 </html>
