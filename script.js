@@ -8,7 +8,7 @@ const skillsData = [
     { name: "Atuação", attr: "Sorte" }, { name: "Enganação", attr: "Sorte" }, { name: "Persuasão", attr: "Sorte" }
 ];
 
-let characters = {}; // Todas as fichas da mesa ficam aqui
+let characters = {}; 
 let currentCharId = null;
 let playerSkills = {}; 
 let playerInventory = [];
@@ -72,31 +72,24 @@ window.renderCharacterList = function() {
             container.innerHTML += html;
         }
     }
-
-    if(!hasAny) {
-        container.innerHTML = '<div style="text-align:center; color:#666; margin-top: 20px;">A Mesa está vazia.</div>';
-    }
+    if(!hasAny) container.innerHTML = '<div style="text-align:center; color:#666; margin-top: 20px;">A Mesa está vazia.</div>';
 }
 
 window.createNewCharacter = function() {
     const newId = 'char_' + Date.now();
-    characters[newId] = { name: "Novo Personagem", category: "Jogadores", classe: "Plebeu", skills: {}, inventory: [], photo: "" };
+    characters[newId] = { name: "Novo Personagem", category: "Jogadores", classe: "Plebeu", skills: {}, inventory: [], photo: "", color: "#d4af37" };
     currentCharId = newId;
-    window.saveData(); // Já cria no servidor
+    window.saveData(); 
     window.openCharacter(newId);
 }
 
-// O SEGREDO DO APAGAMENTO: Mandamos 'undefined' diretamente pra chave daquela ficha específica!
 window.deleteCharacter = async function() {
     if(confirm("Apagar esta ficha permanentemente para TODOS na mesa?")) {
         const idToDelete = currentCharId;
         delete characters[idToDelete];
-        
         if (OBR.isAvailable) {
-            // Apaga da nuvem enviando um vazio pra chave dela
             await OBR.room.setMetadata({ [`fatesheet_${idToDelete}`]: undefined });
         }
-        
         window.backToList();
     }
 }
@@ -133,6 +126,12 @@ function safeSetVal(id, value) {
     if(el) el.value = value;
 }
 
+window.updateSheetColor = function() {
+    let color = document.getElementById('char-color').value;
+    document.documentElement.style.setProperty('--accent-gold', color);
+    window.saveData();
+}
+
 window.updateCategoryUI = function() {
     const cat = document.getElementById('char-category').value;
     const isMonster = (cat === 'Monstros');
@@ -150,6 +149,9 @@ window.openCharacter = function(id) {
     const charData = characters[id] || {};
     
     safeSetVal('char-name', charData.name || '');
+    safeSetVal('char-color', charData.color || '#d4af37');
+    document.documentElement.style.setProperty('--accent-gold', charData.color || '#d4af37');
+
     safeSetVal('char-category', charData.category || 'Jogadores');
     safeSetVal('char-age', charData.age || '');
     safeSetVal('char-class', charData.classe || 'Plebeu');
@@ -231,7 +233,7 @@ window.renderInventory = function() {
                 <button class="btn-danger" onclick="removeInv(${index})">X</button>
             </div>
             <div class="inv-row" style="margin-top: 5px;">
-                <input type="text" class="inv-input" style="flex: 1;" placeholder="Descrição do item..." value="${item.desc}" onchange="updateInv(${index}, 'desc', this.value)">
+                <input type="text" class="inv-input" style="flex: 1;" placeholder="Descrição..." value="${item.desc}" onchange="updateInv(${index}, 'desc', this.value)">
             </div>
         `;
         container.appendChild(row);
@@ -240,6 +242,10 @@ window.renderInventory = function() {
 }
 
 window.addInventoryItem = function() {
+    if(isOverweight) {
+        alert("Sua mochila está lotada! Você está muito pesado para carregar novos itens.");
+        return;
+    }
     playerInventory.push({ nome: "", desc: "", peso: 0, qtd: 1 });
     window.renderInventory();
     window.saveData();
@@ -257,13 +263,13 @@ window.removeInv = function(index) {
     window.saveData();
 }
 
-// COMO A FICHA É GLOBAL, ELA SALVA DIRETO NA SALA!
 window.saveData = async function() {
     if (!currentCharId) return; 
     let isMonster = document.getElementById('char-category')?.value === 'Monstros';
 
     const sheetData = {
         name: document.getElementById('char-name')?.value || "Sem Nome",
+        color: document.getElementById('char-color')?.value || "#d4af37",
         category: document.getElementById('char-category')?.value || "Jogadores",
         age: document.getElementById('char-age')?.value || "",
         race: isMonster ? document.getElementById('char-race-monster').value : document.getElementById('char-race-player').value,
@@ -289,7 +295,6 @@ window.saveData = async function() {
     characters[currentCharId] = sheetData;
     
     if (OBR.isAvailable) {
-        // Salva essa ficha isolada no servidor
         await OBR.room.setMetadata({ [`fatesheet_${currentCharId}`]: sheetData });
     }
 }
@@ -325,9 +330,10 @@ window.updateSkill = function(skillName, change, event) {
     window.saveData();
 }
 
-// ------ ROLAGEM COM OBR.MODAL.OPEN (IGUAL AOS DADOS) ------
 window.rollSkill = function(skillName, attrName) {
-    let baseAttr = parseInt(document.getElementById(`attr-${attrName.toLowerCase()}`).value) || 1;
+    // RESOLVE O BUG DA FORÇA
+    let idMapped = attrName.toLowerCase().replace('ç', 'c');
+    let baseAttr = parseInt(document.getElementById(`attr-${idMapped}`).value) || 1;
     let classe = document.getElementById('char-class').value;
     let isMonster = document.getElementById('char-category').value === 'Monstros';
     
@@ -342,30 +348,29 @@ window.rollSkill = function(skillName, attrName) {
     let results = [];
     for (let i = 0; i < baseAttr; i++) {
         let die = Math.floor(Math.random() * 20) + 1;
-        if (isOverweight && (attrName === 'Força' || attrName === 'Agilidade')) die -= 5;
+        if (isOverweight) die -= 5; // -5 EM TODAS AS ROLAGENS
         results.push(die);
     }
 
     const charName = document.getElementById('char-name').value || 'Desconhecido';
+    const charColor = document.getElementById('char-color').value || '#d4af37';
     
     const rollData = {
         c: charName,
         s: skillName,
         a: attrName,
         r: results.join(','),
-        pen: isOverweight && (attrName === 'Força' || attrName === 'Agilidade') ? "true" : "false"
+        pen: isOverweight ? "true" : "false",
+        color: charColor
     };
 
-    // Abre a sua janela
     window.abrirModalCentral(rollData);
-    // Manda os outros abrirem
     if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", rollData);
 }
 
 window.abrirModalCentral = function(data) {
     if (OBR.isAvailable) {
         const dataUrl = encodeURIComponent(JSON.stringify(data));
-        // LINK ABSOLUTO PARA ACHAR O ARQUIVO EM QUALQUER LUGAR
         OBR.modal.open({
             id: "fate-roll-modal",
             url: `https://seediam.github.io/FateSheet/resultado.html?data=${dataUrl}`, 
@@ -401,7 +406,6 @@ document.getElementById('photo-upload').addEventListener('change', function(e) {
 
 document.addEventListener('input', () => { if(currentCharId) window.saveData(); });
 
-// Puxa e escuta a mesa
 function processRoomData(metadata) {
     let mudouAlgo = false;
     for (let key in metadata) {
@@ -422,20 +426,17 @@ function initExtension() {
     if (OBR.isAvailable) {
         OBR.onReady(async () => {
             try {
-                // Lê o que já está na mesa global
                 const meta = await OBR.room.getMetadata();
                 processRoomData(meta);
                 
-                // Escuta criações e deleções
                 OBR.room.onMetadataChange((metadata) => processRoomData(metadata));
                 
-                // Escuta as rolagens
                 OBR.broadcast.onMessage("fatesheet-rolls", (event) => {
                     window.abrirModalCentral(event.data);
                 });
             } catch(e) {}
         });
     } else {
-        window.renderCharacterList(); // Teste fora do Owlbear
+        window.renderCharacterList(); 
     }
 }
