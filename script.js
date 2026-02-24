@@ -44,9 +44,9 @@ window.toggleFolder = function(folderName) {
 window.buildGlobalList = async function() {
     allTableCharacters = [];
     for (let id in myLocalCharacters) {
-        allTableCharacters.push({ ...myLocalCharacters[id], id: id, isMine: true, owner: "Local" });
+        allTableCharacters.push({ ...myLocalCharacters[id], id: id, isMine: true, owner: "Você" });
     }
-    if (typeof OBR !== 'undefined' && OBR.isReady) {
+    if (typeof OBR !== 'undefined' && OBR.isAvailable) {
         try {
             const players = await OBR.party.getPlayers();
             players.forEach(p => {
@@ -138,7 +138,7 @@ window.deleteCharacter = function() {
     if(confirm("Apagar esta ficha permanentemente?")) {
         delete myLocalCharacters[currentCharId];
         window.saveDataLocalOnly();
-        if (typeof OBR !== 'undefined' && OBR.isReady) {
+        if (typeof OBR !== 'undefined' && OBR.isAvailable) {
             OBR.player.setMetadata({ "fatesheet_chars": myLocalCharacters });
         }
         window.backToList();
@@ -262,7 +262,7 @@ window.addInventoryItem = function() {
 window.updateInv = function(index, field, value) {
     if(!currentIsMine) return;
     playerInventory[index][field] = value;
-    window.calcVitals(); // Auto-salva dentro do calc
+    window.calcVitals(); 
 }
 
 window.removeInv = function(index) {
@@ -300,11 +300,11 @@ window.saveData = async function() {
     myLocalCharacters[currentCharId] = sheetData;
     window.saveDataLocalOnly();
     
-    if (typeof OBR !== 'undefined' && OBR.isReady) {
+    if (typeof OBR !== 'undefined' && OBR.isAvailable) {
         let syncChars = {};
         for(let id in myLocalCharacters) {
             syncChars[id] = { ...myLocalCharacters[id] };
-            delete syncChars[id].photo; // Protege a rede
+            delete syncChars[id].photo; 
         }
         await OBR.player.setMetadata({ "fatesheet_chars": syncChars });
     }
@@ -342,12 +342,11 @@ window.updateSkill = function(skillName, change, event) {
     window.saveData();
 }
 
-// ------ A ROLAGEM COM MODIFICADORES ------
+// ------ A MÁGICA DA ROLAGEM NO MEIO DA TELA ------
 window.rollSkill = function(skillName, attrName) {
     let baseAttr = parseInt(document.getElementById(`attr-${attrName.toLowerCase()}`).value) || 1;
     let classe = document.getElementById('char-class').value;
     
-    // Bônus de Classe nos dados
     if (classe === 'Plebeu') { if(attrName === 'Força') baseAttr += 1; if(attrName === 'Magia') baseAttr -= 1; }
     if (classe === 'Andarilho' && attrName === 'Agilidade') baseAttr += 1;
     if (classe === 'Estrangeiro' && attrName === 'Sorte') baseAttr += 1;
@@ -358,7 +357,6 @@ window.rollSkill = function(skillName, attrName) {
     let results = [];
     for (let i = 0; i < baseAttr; i++) {
         let die = Math.floor(Math.random() * 20) + 1;
-        // Aplica a desvantagem da mochila nos resultados
         if (isOverweight && (attrName === 'Força' || attrName === 'Agilidade')) {
             die -= 5;
         }
@@ -375,14 +373,19 @@ window.rollSkill = function(skillName, attrName) {
         pen: isOverweight && (attrName === 'Força' || attrName === 'Agilidade') ? "true" : "false"
     };
 
-    abrirModalCentral(rollData);
-    if (typeof OBR !== 'undefined' && OBR.isReady) OBR.broadcast.sendMessage("fatesheet-rolls", rollData);
+    // Abre para você
+    window.abrirModalCentral(rollData);
+
+    // Manda para os outros abrirem
+    if (typeof OBR !== 'undefined' && OBR.isAvailable) {
+        OBR.broadcast.sendMessage("fatesheet-rolls", rollData);
+    }
 }
 
-function abrirModalCentral(data) {
-    if (typeof OBR !== 'undefined' && OBR.isReady) {
-        // DETECTOR AUTOMÁTICO DO SEU SITE (Nunca mais erra o link)
-        const baseUrl = new URL('resultado.html', window.location.href).toString();
+window.abrirModalCentral = function(data) {
+    if (typeof OBR !== 'undefined' && OBR.isAvailable) {
+        // LINK ABSOLUTO PARA NUNCA MAIS DAR ERRO NO OWLBEAR
+        const baseUrl = "https://seediam.github.io/FateSheet/resultado.html";
         const query = `?c=${encodeURIComponent(data.c)}&s=${encodeURIComponent(data.s)}&a=${encodeURIComponent(data.a)}&r=${encodeURIComponent(data.r)}&pen=${data.pen}`;
         
         OBR.modal.open({
@@ -434,15 +437,15 @@ function initExtension() {
     if (typeof OBR !== 'undefined') {
         OBR.onReady(async () => {
             try {
-                let syncChars = {};
-                for(let id in myLocalCharacters) {
-                    syncChars[id] = { ...myLocalCharacters[id] };
-                    delete syncChars[id].photo; 
-                }
-                await OBR.player.setMetadata({ "fatesheet_chars": syncChars });
+                await OBR.player.setMetadata({ "fatesheet_chars": myLocalCharacters });
                 window.buildGlobalList();
+                
                 OBR.party.onChange(() => window.buildGlobalList());
-                OBR.broadcast.onMessage("fatesheet-rolls", (event) => abrirModalCentral(event.data));
+                
+                // ESCUTA OS OUTROS JOGADORES ROLANDO
+                OBR.broadcast.onMessage("fatesheet-rolls", (event) => {
+                    window.abrirModalCentral(event.data);
+                });
             } catch(e) {}
         });
     }
