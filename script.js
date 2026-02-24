@@ -1,3 +1,5 @@
+import OBR from "https://esm.sh/@owlbear-rodeo/sdk";
+
 const skillsData = [
     { name: "Arcanismo", attr: "Magia" }, { name: "História", attr: "Magia" }, { name: "Natureza", attr: "Magia" }, { name: "Religião", attr: "Magia" },
     { name: "Intuição", attr: "Sorte" }, { name: "Medicina", attr: "Sorte" }, { name: "Percepção", attr: "Sorte" }, { name: "Sobrevivência", attr: "Sorte" },
@@ -6,8 +8,7 @@ const skillsData = [
     { name: "Atuação", attr: "Sorte" }, { name: "Enganação", attr: "Sorte" }, { name: "Persuasão", attr: "Sorte" }
 ];
 
-let myLocalCharacters = {}; 
-let allTableCharacters = []; 
+let characters = {}; 
 let currentCharId = null;
 let currentIsMine = true; 
 let playerSkills = {}; 
@@ -15,19 +16,22 @@ let playerInventory = [];
 let currentPhoto = "";
 let folderState = { "Jogadores": true, "NPCs": true, "Monstros": true };
 let isOverweight = false;
+let modalTimer = null;
 
+// Expor tudo no window porque é type="module"
 window.openTab = function(tabName) {
     document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-    document.getElementById(tabName).classList.add('active');
+    const target = document.getElementById(tabName);
+    if(target) target.classList.add('active');
     event.currentTarget.classList.add('active');
 }
 
 window.backToList = function() {
-    if(currentIsMine) window.saveData();
+    window.saveData();
     document.getElementById('screen-sheet').classList.remove('active');
     document.getElementById('screen-list').classList.add('active');
-    window.buildGlobalList();
+    window.renderCharacterList();
 }
 
 window.toggleFolder = function(folderName) {
@@ -35,40 +39,23 @@ window.toggleFolder = function(folderName) {
     window.renderCharacterList();
 }
 
-window.buildGlobalList = async function() {
-    allTableCharacters = [];
-    for (let id in myLocalCharacters) {
-        allTableCharacters.push({ ...myLocalCharacters[id], id: id, isMine: true, owner: "Você" });
-    }
-    if (typeof OBR !== 'undefined' && OBR.isReady) {
-        try {
-            const players = await OBR.party.getPlayers();
-            players.forEach(p => {
-                let pChars = p.metadata["fatesheet_chars"];
-                if (pChars) {
-                    for (let id in pChars) {
-                        allTableCharacters.push({ ...pChars[id], id: id, isMine: false, owner: p.name });
-                    }
-                }
-            });
-        } catch(e) {}
-    }
-    window.renderCharacterList();
-}
-
 window.renderCharacterList = function() {
     const container = document.getElementById('character-folders');
+    if(!container) return;
     container.innerHTML = '';
     const categories = { "Jogadores": [], "NPCs": [], "Monstros": [] };
 
-    allTableCharacters.forEach(char => {
+    for (let id in characters) {
+        let char = characters[id];
         let cat = char.category || "Jogadores";
         if (!categories[cat]) categories[cat] = [];
-        categories[cat].push(char);
-    });
+        categories[cat].push({ ...char, id: id });
+    }
 
+    let hasAny = false;
     for (let cat in categories) {
         if (categories[cat].length > 0) {
+            hasAny = true;
             let isOpen = folderState[cat];
             let html = `
                 <div class="folder-header" onclick="toggleFolder('${cat}')">
@@ -77,21 +64,22 @@ window.renderCharacterList = function() {
                 <div class="folder-content" style="display: ${isOpen ? 'flex' : 'none'};">
             `;
             categories[cat].forEach(char => {
-                let badge = char.isMine ? '' : `<span style="font-size:9px; color:#888;">(${char.owner})</span>`;
+                let badge = char.isMine ? '' : `<span style="font-size:9px; color:#888;">(Global)</span>`;
                 html += `<div class="char-list-item" onclick="openCharacter('${char.id}')"><span>${char.name} ${badge}</span></div>`;
             });
             html += `</div>`;
             container.innerHTML += html;
         }
     }
+
+    if(!hasAny) container.innerHTML = '<div style="text-align:center; color:#666; margin-top: 20px;">Nenhuma ficha criada.</div>';
 }
 
 window.exportCharacter = function() {
-    if(!currentIsMine) return alert("Você só pode exportar suas próprias fichas.");
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(myLocalCharacters[currentCharId]));
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(characters[currentCharId]));
     const dlAnchor = document.createElement('a');
     dlAnchor.setAttribute("href", dataStr);
-    dlAnchor.setAttribute("download", (myLocalCharacters[currentCharId].name || "Ficha") + "_Fate.json");
+    dlAnchor.setAttribute("download", (characters[currentCharId].name || "Ficha") + "_Fate.json");
     document.body.appendChild(dlAnchor);
     dlAnchor.click();
     dlAnchor.remove();
@@ -105,10 +93,10 @@ window.importCharacter = function(event) {
         try {
             const importedData = JSON.parse(e.target.result);
             const newId = 'char_' + Date.now();
-            myLocalCharacters[newId] = importedData;
+            characters[newId] = importedData;
             window.saveDataLocalOnly();
-            window.buildGlobalList();
             window.syncToOwlbear();
+            window.renderCharacterList();
             alert("Ficha importada com sucesso!");
         } catch(err) { alert("Erro ao ler o arquivo JSON."); }
     };
@@ -116,37 +104,29 @@ window.importCharacter = function(event) {
 }
 
 window.saveDataLocalOnly = function() {
-    try { localStorage.setItem('fatesheet_db', JSON.stringify(myLocalCharacters)); } catch(e){}
+    try { localStorage.setItem('fatesheet_db', JSON.stringify(characters)); } catch(e){}
 }
 
-window.syncToOwlbear = async function(deletedId = null) {
-    if (typeof OBR !== 'undefined' && OBR.isReady) {
-        let syncChars = {};
-        for(let id in myLocalCharacters) {
-            syncChars[id] = { ...myLocalCharacters[id] };
-            delete syncChars[id].photo; 
-        }
-        if(deletedId) syncChars[deletedId] = undefined;
-        await OBR.player.setMetadata({ "fatesheet_chars": syncChars });
+window.syncToOwlbear = async function() {
+    if (OBR.isAvailable) {
+        // Envia tudão pra mesa
+        await OBR.room.setMetadata({ "fatesheet_chars": characters });
     }
 }
 
 window.createNewCharacter = function() {
     const newId = 'char_' + Date.now();
-    myLocalCharacters[newId] = { name: "Novo Personagem", category: "Jogadores", classe: "Plebeu", skills: {}, inventory: [], photo: "" };
+    characters[newId] = { name: "Novo Personagem", category: "Jogadores", classe: "Plebeu", skills: {}, inventory: [], photo: "" };
     window.saveDataLocalOnly();
     window.syncToOwlbear();
-    window.buildGlobalList();
     window.openCharacter(newId);
 }
 
 window.deleteCharacter = async function() {
-    if(!currentIsMine) return alert("Você só pode apagar as fichas que você criou no seu PC!");
     if(confirm("Apagar esta ficha permanentemente?")) {
-        let idParaApagar = currentCharId;
-        delete myLocalCharacters[idParaApagar];
+        delete characters[currentCharId];
         window.saveDataLocalOnly();
-        await window.syncToOwlbear(idParaApagar);
+        await window.syncToOwlbear();
         window.backToList();
     }
 }
@@ -170,8 +150,8 @@ window.updateCategoryUI = function() {
 
 window.openCharacter = function(id) {
     currentCharId = id;
-    const charData = allTableCharacters.find(c => c.id === id) || {};
-    currentIsMine = charData.isMine !== false;
+    const charData = characters[id] || {};
+    currentIsMine = true;
     
     safeSetVal('char-name', charData.name || '');
     safeSetVal('char-category', charData.category || 'Jogadores');
@@ -184,6 +164,7 @@ window.openCharacter = function(id) {
     else safeSetVal('char-race-player', charData.race || 'Humano');
 
     safeSetVal('val-vida-monster', charData.vidaMonster || 100);
+
     safeSetVal('attr-forca', charData.forca || 1);
     safeSetVal('attr-magia', charData.magia || 1);
     safeSetVal('attr-agilidade', charData.agilidade || 1);
@@ -203,9 +184,7 @@ window.openCharacter = function(id) {
     window.setPhotoPreview(currentPhoto);
     window.renderSkills();
     window.renderInventory();
-
-    const inputs = document.querySelectorAll('#screen-sheet input, #screen-sheet select, #screen-sheet textarea');
-    inputs.forEach(input => { if(input.id !== 'import-file') input.disabled = !currentIsMine; });
+    window.calcVitals();
 
     document.getElementById('screen-list').classList.remove('active');
     document.getElementById('screen-sheet').classList.add('active');
@@ -222,6 +201,7 @@ window.calcVitals = function() {
         if(classe === 'Andarilho') extraMana = 50;
         if(classe === 'Estrangeiro') extraMana = 100;
         if(classe === 'Nobre') extraMana = 150;
+
         document.getElementById('val-vida-player').innerText = `${100 + (sorteBase * 50)} / ${100 + (sorteBase * 50)}`;
         document.getElementById('val-mana').innerText = `${50 + extraMana} / ${50 + extraMana}`;
     } else {
@@ -231,36 +211,38 @@ window.calcVitals = function() {
     let maxWeight = forcaBase * 5;
     let currentWeight = playerInventory.reduce((acc, item) => acc + ((parseFloat(item.peso)||0) * (parseInt(item.qtd)||1)), 0);
     
-    document.getElementById('val-peso').innerText = `${currentWeight.toFixed(1)} / ${maxWeight}`;
+    let pesoEl = document.getElementById('val-peso');
+    let boxPeso = document.getElementById('box-peso');
+    let avisoPeso = document.getElementById('peso-aviso');
+    
+    pesoEl.innerText = `${currentWeight.toFixed(1)} / ${maxWeight}`;
     
     if (currentWeight > maxWeight) {
         isOverweight = true;
-        document.getElementById('box-peso').classList.add('overweight');
-        document.getElementById('peso-aviso').style.display = 'block';
+        boxPeso.classList.add('overweight');
+        avisoPeso.style.display = 'block';
     } else {
         isOverweight = false;
-        document.getElementById('box-peso').classList.remove('overweight');
-        document.getElementById('peso-aviso').style.display = 'none';
+        boxPeso.classList.remove('overweight');
+        avisoPeso.style.display = 'none';
     }
-    if(currentIsMine && currentCharId) window.saveData();
 }
 
 window.renderInventory = function() {
     const container = document.getElementById('inventory-container');
     container.innerHTML = '';
     playerInventory.forEach((item, index) => {
-        let disabled = currentIsMine ? '' : 'disabled';
         let row = document.createElement('div');
         row.className = 'inv-item';
         row.innerHTML = `
             <div class="inv-row">
-                <input type="text" class="inv-input" style="flex: 2;" placeholder="Item" value="${item.nome}" onchange="updateInv(${index}, 'nome', this.value)" ${disabled}>
-                <input type="number" class="inv-input" style="flex: 1;" placeholder="Peso" value="${item.peso}" onchange="updateInv(${index}, 'peso', this.value)" ${disabled}>
-                <input type="number" class="inv-input" style="flex: 1;" placeholder="Qtd" value="${item.qtd}" onchange="updateInv(${index}, 'qtd', this.value)" ${disabled}>
-                ${currentIsMine ? `<button class="btn-danger" onclick="removeInv(${index})">X</button>` : ''}
+                <input type="text" class="inv-input" style="flex: 2;" placeholder="Item" value="${item.nome}" onchange="updateInv(${index}, 'nome', this.value)">
+                <input type="number" class="inv-input" style="flex: 1;" placeholder="Peso" value="${item.peso}" onchange="updateInv(${index}, 'peso', this.value)">
+                <input type="number" class="inv-input" style="flex: 1;" placeholder="Qtd" value="${item.qtd}" onchange="updateInv(${index}, 'qtd', this.value)">
+                <button class="btn-danger" onclick="removeInv(${index})">X</button>
             </div>
             <div class="inv-row" style="margin-top: 5px;">
-                <input type="text" class="inv-input" style="flex: 1;" placeholder="Descrição do item..." value="${item.desc}" onchange="updateInv(${index}, 'desc', this.value)" ${disabled}>
+                <input type="text" class="inv-input" style="flex: 1;" placeholder="Descrição do item..." value="${item.desc}" onchange="updateInv(${index}, 'desc', this.value)">
             </div>
         `;
         container.appendChild(row);
@@ -269,35 +251,40 @@ window.renderInventory = function() {
 }
 
 window.addInventoryItem = function() {
-    if(!currentIsMine) return;
     playerInventory.push({ nome: "", desc: "", peso: 0, qtd: 1 });
     window.renderInventory();
+    window.saveData();
 }
 
 window.updateInv = function(index, field, value) {
-    if(!currentIsMine) return;
     playerInventory[index][field] = value;
-    window.calcVitals(); 
+    window.renderInventory(); 
+    window.saveData();
 }
 
 window.removeInv = function(index) {
-    if(!currentIsMine) return;
     playerInventory.splice(index, 1);
     window.renderInventory();
+    window.saveData();
 }
 
 window.saveData = async function() {
-    if (!currentCharId || !currentIsMine) return; 
+    if (!currentCharId) return; 
+
     let isMonster = document.getElementById('char-category')?.value === 'Monstros';
+
     const sheetData = {
         name: document.getElementById('char-name')?.value || "Sem Nome",
         category: document.getElementById('char-category')?.value || "Jogadores",
         age: document.getElementById('char-age')?.value || "",
+        
         race: isMonster ? document.getElementById('char-race-monster').value : document.getElementById('char-race-player').value,
         classe: document.getElementById('char-class')?.value || "Plebeu",
         prof: document.getElementById('char-prof')?.value || "",
         profDesc: document.getElementById('char-prof-desc')?.value || "",
+        
         vidaMonster: document.getElementById('val-vida-monster')?.value || 100,
+
         forca: document.getElementById('attr-forca')?.value || 1,
         magia: document.getElementById('attr-magia')?.value || 1,
         agilidade: document.getElementById('attr-agilidade')?.value || 1,
@@ -313,7 +300,7 @@ window.saveData = async function() {
         photo: currentPhoto 
     };
 
-    myLocalCharacters[currentCharId] = sheetData;
+    characters[currentCharId] = sheetData;
     window.saveDataLocalOnly();
     window.syncToOwlbear();
 }
@@ -323,11 +310,11 @@ window.renderSkills = function() {
     container.innerHTML = '';
     skillsData.forEach(skill => {
         if (playerSkills[skill.name] === undefined) playerSkills[skill.name] = 0;
-        let controls = currentIsMine ? `
+        let controls = `
             <button class="btn-ctrl" onclick="updateSkill('${skill.name}', -1, event)">-</button>
             <span style="width: 20px; text-align: center;">${playerSkills[skill.name]}</span>
             <button class="btn-ctrl" onclick="updateSkill('${skill.name}', 1, event)">+</button>
-        ` : `<span style="width: 40px; text-align: center; color: #d4af37;">${playerSkills[skill.name]}</span>`;
+        `;
 
         let div = document.createElement('div');
         div.className = 'skill-item';
@@ -343,14 +330,12 @@ window.renderSkills = function() {
 
 window.updateSkill = function(skillName, change, event) {
     event.stopPropagation(); 
-    if(!currentIsMine) return;
     playerSkills[skillName] += change;
     if (playerSkills[skillName] < 0) playerSkills[skillName] = 0;
     window.renderSkills();
     window.saveData();
 }
 
-// ------ ROLAGEM E CHAMADA DO MODAL ------
 window.rollSkill = function(skillName, attrName) {
     let baseAttr = parseInt(document.getElementById(`attr-${attrName.toLowerCase()}`).value) || 1;
     let classe = document.getElementById('char-class').value;
@@ -365,40 +350,62 @@ window.rollSkill = function(skillName, attrName) {
     if(baseAttr < 1) baseAttr = 1;
 
     let results = [];
+    let teveCritico = false;
     for (let i = 0; i < baseAttr; i++) {
         let die = Math.floor(Math.random() * 20) + 1;
         if (isOverweight && (attrName === 'Força' || attrName === 'Agilidade')) die -= 5;
+        if (die >= 20) teveCritico = true;
         results.push(die);
     }
 
     const charName = document.getElementById('char-name').value || 'Desconhecido';
+    
     const rollData = {
         c: charName,
         s: skillName,
         a: attrName,
         r: results.join(','),
-        pen: isOverweight && (attrName === 'Força' || attrName === 'Agilidade') ? "true" : "false"
+        pen: isOverweight && (attrName === 'Força' || attrName === 'Agilidade') ? "true" : "false",
+        crit: teveCritico
     };
 
-    window.abrirModalCentral(rollData);
-    if (typeof OBR !== 'undefined' && OBR.isReady) {
-        OBR.broadcast.sendMessage("fatesheet-rolls", rollData);
-    }
+    window.mostrarRolagem(rollData);
+    if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", rollData);
 }
 
-window.abrirModalCentral = function(data) {
-    if (typeof OBR !== 'undefined' && OBR.isReady) {
-        const dataUrl = encodeURIComponent(JSON.stringify(data));
-        // ABRINDO COM O LINK ABSOLUTO DIRETO PARA GARANTIR FUNCIONAMENTO NO MAPA
-        OBR.modal.open({
-            id: "fate-roll-modal",
-            url: `https://seediam.github.io/FateSheet/resultado.html?data=${dataUrl}`, 
-            width: 450,
-            height: 250
-        });
+// ------ A ROLAGEM DENTRO DA PRÓPRIA EXTENSÃO ------
+window.mostrarRolagem = function(data) {
+    const modal = document.getElementById('overlay-modal');
+    const box = document.getElementById('modal-content-box');
+    
+    document.getElementById('modal-name').innerText = data.c;
+    document.getElementById('modal-action').innerHTML = `ROLOU <b>${data.s}</b> <span style="font-size:11px;">(${data.a})</span>`;
+    
+    let resArray = data.r.split(',');
+    let formattedResults = resArray.map(v => {
+        let num = parseInt(v);
+        if (num >= 20) return `<span style="color:#ffd700;">${v}</span>`;
+        if (num <= 4) return `<span style="color:#ff4444;">${v}</span>`;
+        return v;
+    }).join(' <span style="color:#666;">|</span> ');
+
+    document.getElementById('modal-roll').innerHTML = `[ ${formattedResults} ]`;
+    document.getElementById('modal-pen').style.display = data.pen === "true" ? "block" : "none";
+
+    modal.style.display = 'flex';
+    
+    if (data.crit) {
+        box.classList.add('crit-anim');
     } else {
-        alert(`${data.c} rolou ${data.s} (${data.a}): [ ${data.r} ]`);
+        box.classList.remove('crit-anim');
     }
+
+    if(modalTimer) clearTimeout(modalTimer);
+    modalTimer = setTimeout(() => { window.closeModal(); }, 5000);
+}
+
+window.closeModal = function() {
+    document.getElementById('overlay-modal').style.display = 'none';
 }
 
 window.setPhotoPreview = function(base64Str) {
@@ -413,7 +420,6 @@ window.setPhotoPreview = function(base64Str) {
 }
 
 document.getElementById('photo-upload').addEventListener('change', function(e) {
-    if(!currentIsMine) return;
     const file = e.target.files[0];
     if (file) {
         const reader = new FileReader();
@@ -426,28 +432,42 @@ document.getElementById('photo-upload').addEventListener('change', function(e) {
     }
 });
 
-document.addEventListener('input', () => { if(currentCharId && currentIsMine) window.saveData(); });
+document.addEventListener('input', () => { if(currentCharId) window.saveData(); });
 
-function initExtension() {
+// Inicialização com OBR Local + Módulo ESM
+window.onload = function() {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+
     try {
         const saved = localStorage.getItem('fatesheet_db');
-        if (saved) myLocalCharacters = JSON.parse(saved);
+        if (saved) characters = JSON.parse(saved);
+        window.renderCharacterList();
     } catch(e) {}
 
-    window.buildGlobalList();
-
-    if (typeof OBR !== 'undefined') {
+    if (OBR.isAvailable) {
         OBR.onReady(async () => {
             try {
-                await window.syncToOwlbear();
-                window.buildGlobalList();
+                // Recupera a lista global real do servidor
+                let meta = await OBR.room.getMetadata();
+                if(meta && meta["fatesheet_chars"]) {
+                    characters = meta["fatesheet_chars"];
+                }
+                window.renderCharacterList();
                 
-                OBR.party.onChange(() => window.buildGlobalList());
+                OBR.room.onMetadataChange((metadata) => {
+                    if (metadata["fatesheet_chars"]) {
+                        characters = metadata["fatesheet_chars"];
+                        window.renderCharacterList();
+                        // Se a ficha aberta for apagada por outro
+                        if(currentCharId && !characters[currentCharId]) window.backToList();
+                    }
+                });
                 
                 OBR.broadcast.onMessage("fatesheet-rolls", (event) => {
-                    window.abrirModalCentral(event.data);
+                    window.mostrarRolagem(event.data);
                 });
             } catch(e) {}
         });
     }
-}
+};
