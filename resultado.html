@@ -68,13 +68,13 @@
 
                 if(data.pen === "true") document.getElementById('c-pen').style.display = "block";
 
-                // Se tirou 20 puro, treme a tela igual no sistema de dados!
+                // Efeito visual no crítico igual ao seu sistema de dados!
                 if (temCritico) {
                     document.getElementById('popup-box').classList.add('crit-anim');
                 }
             }
 
-            // Fecha a janela sozinha após 5 segundos
+            // Fecha a janela sozinha para todos
             setTimeout(() => { OBR.modal.close('fate-roll-modal'); }, 5000);
         });
     </script>
