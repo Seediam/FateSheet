@@ -72,6 +72,7 @@ window.renderCharacterList = function() {
             container.innerHTML += html;
         }
     }
+
     if(!hasAny) container.innerHTML = '<div style="text-align:center; color:#666; margin-top: 20px;">A Mesa está vazia.</div>';
 }
 
@@ -83,12 +84,13 @@ window.createNewCharacter = function() {
     window.openCharacter(newId);
 }
 
+// CORREÇÃO DO DELETE GLOBAL: Define como undefined na nuvem pra apagar pra valer
 window.deleteCharacter = async function() {
     if(confirm("Apagar esta ficha permanentemente para TODOS na mesa?")) {
         const idToDelete = currentCharId;
         delete characters[idToDelete];
         if (OBR.isAvailable) {
-            await OBR.room.setMetadata({ [`fatesheet_${idToDelete}`]: undefined });
+            await OBR.room.setMetadata({ [`fatesheet_char_${idToDelete}`]: undefined });
         }
         window.backToList();
     }
@@ -241,9 +243,10 @@ window.renderInventory = function() {
     window.calcVitals();
 }
 
+// TRAVA PARA NÃO CRIAR ITENS SE ESTIVER PESADO DEMAIS
 window.addInventoryItem = function() {
     if(isOverweight) {
-        alert("Sua mochila está lotada! Você está muito pesado para carregar novos itens.");
+        alert("Mochila cheia! Você está muito pesado para carregar novos itens.");
         return;
     }
     playerInventory.push({ nome: "", desc: "", peso: 0, qtd: 1 });
@@ -295,7 +298,7 @@ window.saveData = async function() {
     characters[currentCharId] = sheetData;
     
     if (OBR.isAvailable) {
-        await OBR.room.setMetadata({ [`fatesheet_${currentCharId}`]: sheetData });
+        await OBR.room.setMetadata({ [`fatesheet_char_${currentCharId}`]: sheetData });
     }
 }
 
@@ -348,12 +351,13 @@ window.rollSkill = function(skillName, attrName) {
     let results = [];
     for (let i = 0; i < baseAttr; i++) {
         let die = Math.floor(Math.random() * 20) + 1;
-        if (isOverweight) die -= 5; // -5 EM TODAS AS ROLAGENS
+        if (isOverweight) die -= 5; // -5 EM TODAS AS ROLAGENS AGORA!
         results.push(die);
     }
 
     const charName = document.getElementById('char-name').value || 'Desconhecido';
-    const charColor = document.getElementById('char-color').value || '#d4af37';
+    const charColor = document.getElementById('char-color') ? document.getElementById('char-color').value : '#d4af37';
+    let skillMod = playerSkills[skillName] || 0;
     
     const rollData = {
         c: charName,
@@ -361,7 +365,8 @@ window.rollSkill = function(skillName, attrName) {
         a: attrName,
         r: results.join(','),
         pen: isOverweight ? "true" : "false",
-        color: charColor
+        color: charColor,
+        mod: skillMod // PASSA O MÓDULO DA PERÍCIA (ex: +2)
     };
 
     window.abrirModalCentral(rollData);
@@ -374,7 +379,7 @@ window.abrirModalCentral = function(data) {
         OBR.modal.open({
             id: "fate-roll-modal",
             url: `https://seediam.github.io/FateSheet/resultado.html?data=${dataUrl}`, 
-            width: 400,
+            width: 450, // Um pouco mais largo para os expoentes caberem
             height: 250
         });
     }
@@ -406,11 +411,12 @@ document.getElementById('photo-upload').addEventListener('change', function(e) {
 
 document.addEventListener('input', () => { if(currentCharId) window.saveData(); });
 
+// BANCO DE DADOS GLOBAL COM AS CORREÇÕES
 function processRoomData(metadata) {
     let mudouAlgo = false;
     for (let key in metadata) {
         if (key.startsWith('fatesheet_char_')) {
-            const id = key.replace('fatesheet_', '');
+            const id = key.replace('fatesheet_char_', '');
             if (metadata[key] === undefined || metadata[key] === null) {
                 if(characters[id]) { delete characters[id]; mudouAlgo = true; }
             } else {
