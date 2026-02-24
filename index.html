@@ -71,14 +71,16 @@
 </head>
 <body>
 
-    <div id="loading">📖 Carregando Mesa Global...</div>
+    <div id="loading">📖 Carregando Grimório...</div>
 
     <div class="app-container" id="app">
         <div id="screen-list" class="screen active">
             <h3 class="section-title" style="text-align: center; margin-top: 5px; border:none;">Mesa Global</h3>
+            
             <button class="btn-new" onclick="createNewCharacter()">+ Criar Novo Personagem</button>
             <input type="file" id="import-file" accept=".json" style="display: none;" onchange="importCharacter(event)">
             <button class="btn-import" onclick="document.getElementById('import-file').click()">📥 Importar Ficha (JSON)</button>
+
             <div id="character-folders"></div>
         </div>
 
@@ -124,7 +126,7 @@
                                 </select>
                             </div>
                             <div class="form-group" style="flex: 1;">
-                                <label>Cor Aura</label>
+                                <label>Aura</label>
                                 <input type="color" id="char-color" value="#d4af37" onchange="updateSheetColor()" style="padding: 2px; height: 36px; cursor:pointer;">
                             </div>
                         </div>
@@ -189,7 +191,6 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@2/lib/index.js"></script>
-    <script type="module" src="script.js?v=99"></script>
+    <script type="module" src="script.js?v=48"></script>
 </body>
 </html>
