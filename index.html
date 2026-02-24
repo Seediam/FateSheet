@@ -67,44 +67,11 @@
         .btn-danger { background: #3a1c1c; border: none; color: #fff; cursor: pointer; border-radius: 4px; padding: 0 10px;}
         .btn-danger:hover { background: var(--danger); }
         .overweight { border-color: var(--danger) !important; color: var(--danger) !important; }
-
-        /* Estilo da Janela Flutuante Interna */
-        #overlay-modal {
-            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(0,0,0,0.8); z-index: 9999; justify-content: center; align-items: center;
-        }
-        .modal-box {
-            background: rgba(15, 15, 20, 0.98); box-shadow: 0 10px 40px rgba(0,0,0,0.9);
-            border: 2px solid var(--accent-gold); padding: 20px; border-radius: 8px;
-            width: 90%; max-width: 350px; text-align: center; color: white;
-            transition: all 0.3s;
-        }
-        .modal-name { color: var(--accent-gold); font-weight: 900; font-size: 20px; text-transform: uppercase; letter-spacing: 2px; }
-        .modal-action { font-size: 14px; color: var(--text-muted); margin: 5px 0 15px 0; text-transform: uppercase; }
-        .modal-roll { font-size: 32px; font-weight: bold; background: #111; padding: 15px; border-radius: 6px; border: 1px dashed var(--accent-gold); margin: 15px 0; text-shadow: 0 0 15px rgba(255, 255, 255, 0.5); letter-spacing: 2px; }
-        .modal-pen { color: var(--danger); font-size: 12px; font-weight: bold; margin-bottom: 10px; display: none; }
-        .btn-close-modal { margin-top: 25px; background: transparent; color: #666; border: none; cursor: pointer; transition: 0.2s; font-size: 12px; text-decoration: underline; }
-        .btn-close-modal:hover { color: var(--accent-gold); }
-
-        @keyframes camera-shake {
-            0% { transform: translate(1px, 1px) rotate(0deg); }
-            10% { transform: translate(-2px, -2px) rotate(-1deg); }
-            20% { transform: translate(-3px, 0px) rotate(1deg); }
-            30% { transform: translate(3px, 2px) rotate(0deg); }
-            40% { transform: translate(1px, -1px) rotate(1deg); }
-            50% { transform: translate(-1px, 2px) rotate(-1deg); }
-            60% { transform: translate(-3px, 1px) rotate(0deg); }
-            70% { transform: translate(3px, 1px) rotate(-1deg); }
-            80% { transform: translate(-1px, -1px) rotate(1deg); }
-            90% { transform: translate(1px, 2px) rotate(0deg); }
-            100% { transform: translate(0px, 0px) rotate(0deg); }
-        }
-        .crit-anim { animation: camera-shake 0.4s both; border-color: #ffd700 !important; box-shadow: 0 0 30px rgba(255, 215, 0, 0.8); }
     </style>
 </head>
 <body>
 
-    <div id="loading">📖 Carregando Grimório...</div>
+    <div id="loading">📖 Carregando Mesa Global...</div>
 
     <div class="app-container" id="app">
         <div id="screen-list" class="screen active">
@@ -122,17 +89,26 @@
                 <button class="btn-ctrl" onclick="backToList()" style="width: auto; padding: 0 10px; font-size: 12px;">← Voltar</button>
                 <div style="display: flex; gap: 5px;">
                     <button class="btn-ctrl" onclick="exportCharacter()" style="width: auto; padding: 0 10px; background: #222; font-size: 12px;">📤 Exportar</button>
-                    <button class="btn-ctrl" onclick="deleteCharacter()" style="width: auto; padding: 0 10px; background: #5a1a1a; font-size: 12px;">Apagar</button>
+                    <button class="btn-ctrl" onclick="deleteCharacter()" style="width: auto; padding: 0 10px; background: #5a1a1a; font-size: 12px;">Apagar Ficha</button>
                 </div>
             </div>
 
             <div class="tabs">
-                <button class="tab-btn active" onclick="openTab('personagem')">Personagem</button>
-                <button class="tab-btn" onclick="openTab('pericias')">Perícias</button>
-                <button class="tab-btn" onclick="openTab('mochila')">Mochila</button>
+                <button class="tab-btn active" onclick="openTab('personagem', event)">Personagem</button>
+                <button class="tab-btn" onclick="openTab('pericias', event)">Perícias</button>
+                <button class="tab-btn" onclick="openTab('mochila', event)">Mochila</button>
             </div>
 
             <div id="personagem" class="tab-content active">
+                <div class="form-group" style="margin-bottom: 20px;">
+                    <label>📁 Pasta da Mesa</label>
+                    <select id="char-category" onchange="updateCategoryUI()">
+                        <option value="Jogadores">Jogadores</option>
+                        <option value="NPCs">NPCs</option>
+                        <option value="Monstros">Monstros</option>
+                    </select>
+                </div>
+
                 <div style="display: flex; gap: 15px; margin-bottom: 10px;">
                     <label for="photo-upload" class="photo-slot" id="photo-preview"><span id="photo-text">📷<br>Importar</span></label>
                     <input type="file" id="photo-upload" accept="image/*" style="display: none;">
@@ -140,7 +116,6 @@
                         <div class="form-group"><label>Nome</label><input type="text" id="char-name"></div>
                         <div style="display: flex; gap: 5px;">
                             <div class="form-group" style="flex: 1;"><label>Idade</label><input type="number" id="char-age"></div>
-                            
                             <div class="form-group" style="flex: 2;">
                                 <label>Raça</label>
                                 <input type="text" id="char-race-player" value="Humano">
@@ -150,7 +125,6 @@
                                     <option value="Aquáticos">Aquáticos</option>
                                 </select>
                             </div>
-
                         </div>
                     </div>
                 </div>
@@ -169,15 +143,6 @@
                         <div class="form-group" style="flex: 1;"><label>Profissão</label><input type="text" id="char-prof"></div>
                     </div>
                     <div class="form-group"><label>Descrição da Profissão</label><textarea id="char-prof-desc" rows="2"></textarea></div>
-                </div>
-
-                <div class="form-group">
-                    <label>📁 Pasta / Categoria</label>
-                    <select id="char-category" onchange="updateCategoryUI()">
-                        <option value="Jogadores">Jogadores</option>
-                        <option value="NPCs">NPCs</option>
-                        <option value="Monstros">Monstros</option>
-                    </select>
                 </div>
 
                 <div class="status-box">
@@ -214,22 +179,11 @@
                     </div>
                 </div>
                 <p id="peso-aviso" style="color: var(--danger); font-size: 11px; text-align: center; display: none; font-weight: bold;">⚠️ SOBREPESO! Desvantagem de -5 em Força e Agilidade.</p>
-                
                 <h4 class="section-title" style="display: flex; justify-content: space-between;">Itens 
                     <button class="btn-ctrl" style="width:auto; padding: 2px 10px;" onclick="addInventoryItem()">+ Item</button>
                 </h4>
                 <div id="inventory-container"></div>
             </div>
-        </div>
-    </div>
-
-    <div id="overlay-modal">
-        <div class="modal-box" id="modal-content-box">
-            <div class="modal-name" id="modal-name">Rolando...</div>
-            <div class="modal-action" id="modal-action">...</div>
-            <div class="modal-pen" id="modal-pen">⚠️ SOBREPESO: -5 APLICADO</div>
-            <div class="modal-roll" id="modal-roll">...</div>
-            <button class="btn-close-modal" onclick="closeModal()">Fechar Janela</button>
         </div>
     </div>
 
