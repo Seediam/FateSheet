@@ -1,5 +1,3 @@
-import OBR from "https://esm.sh/@owlbear-rodeo/sdk";
-
 const skillsData = [
     { name: "Arcanismo", attr: "Magia" }, { name: "História", attr: "Magia" }, { name: "Natureza", attr: "Magia" }, { name: "Religião", attr: "Magia" },
     { name: "Intuição", attr: "Sorte" }, { name: "Medicina", attr: "Sorte" }, { name: "Percepção", attr: "Sorte" }, { name: "Sobrevivência", attr: "Sorte" },
@@ -17,12 +15,6 @@ let playerInventory = [];
 let currentPhoto = "";
 let folderState = { "Jogadores": true, "NPCs": true, "Monstros": true };
 let isOverweight = false;
-
-window.onload = function() {
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
-    initExtension();
-};
 
 window.openTab = function(tabName) {
     document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
@@ -48,7 +40,7 @@ window.buildGlobalList = async function() {
     for (let id in myLocalCharacters) {
         allTableCharacters.push({ ...myLocalCharacters[id], id: id, isMine: true, owner: "Você" });
     }
-    if (OBR.isAvailable) {
+    if (typeof OBR !== 'undefined' && OBR.isReady) {
         try {
             const players = await OBR.party.getPlayers();
             players.forEach(p => {
@@ -127,20 +119,14 @@ window.saveDataLocalOnly = function() {
     try { localStorage.setItem('fatesheet_db', JSON.stringify(myLocalCharacters)); } catch(e){}
 }
 
-// ------ A CURA CONTRA OS PERSONAGENS ZUMBIS ------
 window.syncToOwlbear = async function(deletedId = null) {
-    if (OBR.isAvailable) {
+    if (typeof OBR !== 'undefined' && OBR.isReady) {
         let syncChars = {};
         for(let id in myLocalCharacters) {
             syncChars[id] = { ...myLocalCharacters[id] };
             delete syncChars[id].photo; 
         }
-        
-        // Se estivermos deletando, forçamos o servidor a transformar essa chave em NADA.
-        if(deletedId) {
-            syncChars[deletedId] = undefined;
-        }
-        
+        if(deletedId) syncChars[deletedId] = undefined;
         await OBR.player.setMetadata({ "fatesheet_chars": syncChars });
     }
 }
@@ -156,14 +142,11 @@ window.createNewCharacter = function() {
 
 window.deleteCharacter = async function() {
     if(!currentIsMine) return alert("Você só pode apagar as fichas que você criou no seu PC!");
-    if(confirm("Apagar esta ficha permanentemente da mesa?")) {
+    if(confirm("Apagar esta ficha permanentemente?")) {
         let idParaApagar = currentCharId;
         delete myLocalCharacters[idParaApagar];
         window.saveDataLocalOnly();
-        
-        // Apaga do servidor do Owlbear de verdade
         await window.syncToOwlbear(idParaApagar);
-        
         window.backToList();
     }
 }
@@ -173,22 +156,14 @@ function safeSetVal(id, value) {
     if(el) el.value = value;
 }
 
-// ------ A MÁGICA DA MUDANÇA DE UI (MONSTRO VS JOGADOR) ------
 window.updateCategoryUI = function() {
     const cat = document.getElementById('char-category').value;
     const isMonster = (cat === 'Monstros');
-    
-    // Esconde/Mostra caixas
     document.getElementById('box-classe-prof').style.display = isMonster ? 'none' : 'block';
-    
-    // Troca a caixa de raça
     document.getElementById('char-race-player').style.display = isMonster ? 'none' : 'block';
     document.getElementById('char-race-monster').style.display = isMonster ? 'block' : 'none';
-    
-    // Troca a caixa de vida
     document.getElementById('val-vida-player').style.display = isMonster ? 'none' : 'block';
     document.getElementById('val-vida-monster').style.display = isMonster ? 'block' : 'none';
-    
     window.calcVitals();
     window.saveData();
 }
@@ -201,19 +176,14 @@ window.openCharacter = function(id) {
     safeSetVal('char-name', charData.name || '');
     safeSetVal('char-category', charData.category || 'Jogadores');
     safeSetVal('char-age', charData.age || '');
-    
     safeSetVal('char-class', charData.classe || 'Plebeu');
     safeSetVal('char-prof', charData.prof || '');
     safeSetVal('char-prof-desc', charData.profDesc || '');
     
-    if(charData.category === 'Monstros') {
-        safeSetVal('char-race-monster', charData.race || 'Terrestres');
-    } else {
-        safeSetVal('char-race-player', charData.race || 'Humano');
-    }
+    if(charData.category === 'Monstros') safeSetVal('char-race-monster', charData.race || 'Terrestres');
+    else safeSetVal('char-race-player', charData.race || 'Humano');
 
     safeSetVal('val-vida-monster', charData.vidaMonster || 100);
-
     safeSetVal('attr-forca', charData.forca || 1);
     safeSetVal('attr-magia', charData.magia || 1);
     safeSetVal('attr-agilidade', charData.agilidade || 1);
@@ -247,49 +217,37 @@ window.calcVitals = function() {
     let sorteBase = parseInt(document.getElementById('attr-sorte').value) || 0;
     let classe = document.getElementById('char-class').value;
 
-    let extraMana = 0;
-    
     if (cat !== 'Monstros') {
+        let extraMana = 0;
         if(classe === 'Andarilho') extraMana = 50;
         if(classe === 'Estrangeiro') extraMana = 100;
         if(classe === 'Nobre') extraMana = 150;
-
-        let maxMana = 50 + extraMana;
-        let maxHealth = 100 + (sorteBase * 50);
-
-        document.getElementById('val-vida-player').innerText = `${maxHealth} / ${maxHealth}`;
-        document.getElementById('val-mana').innerText = `${maxMana} / ${maxMana}`;
+        document.getElementById('val-vida-player').innerText = `${100 + (sorteBase * 50)} / ${100 + (sorteBase * 50)}`;
+        document.getElementById('val-mana').innerText = `${50 + extraMana} / ${50 + extraMana}`;
     } else {
-        // Monstros tem mana padrão 50 e a vida é controlada pelo input numérico
         document.getElementById('val-mana').innerText = `50 / 50`;
     }
 
     let maxWeight = forcaBase * 5;
     let currentWeight = playerInventory.reduce((acc, item) => acc + ((parseFloat(item.peso)||0) * (parseInt(item.qtd)||1)), 0);
     
-    let pesoEl = document.getElementById('val-peso');
-    let boxPeso = document.getElementById('box-peso');
-    let avisoPeso = document.getElementById('peso-aviso');
-    
-    pesoEl.innerText = `${currentWeight.toFixed(1)} / ${maxWeight}`;
+    document.getElementById('val-peso').innerText = `${currentWeight.toFixed(1)} / ${maxWeight}`;
     
     if (currentWeight > maxWeight) {
         isOverweight = true;
-        boxPeso.classList.add('overweight');
-        avisoPeso.style.display = 'block';
+        document.getElementById('box-peso').classList.add('overweight');
+        document.getElementById('peso-aviso').style.display = 'block';
     } else {
         isOverweight = false;
-        boxPeso.classList.remove('overweight');
-        avisoPeso.style.display = 'none';
+        document.getElementById('box-peso').classList.remove('overweight');
+        document.getElementById('peso-aviso').style.display = 'none';
     }
-
     if(currentIsMine && currentCharId) window.saveData();
 }
 
 window.renderInventory = function() {
     const container = document.getElementById('inventory-container');
     container.innerHTML = '';
-    
     playerInventory.forEach((item, index) => {
         let disabled = currentIsMine ? '' : 'disabled';
         let row = document.createElement('div');
@@ -330,21 +288,16 @@ window.removeInv = function(index) {
 
 window.saveData = async function() {
     if (!currentCharId || !currentIsMine) return; 
-
     let isMonster = document.getElementById('char-category')?.value === 'Monstros';
-
     const sheetData = {
         name: document.getElementById('char-name')?.value || "Sem Nome",
         category: document.getElementById('char-category')?.value || "Jogadores",
         age: document.getElementById('char-age')?.value || "",
-        
         race: isMonster ? document.getElementById('char-race-monster').value : document.getElementById('char-race-player').value,
         classe: document.getElementById('char-class')?.value || "Plebeu",
         prof: document.getElementById('char-prof')?.value || "",
         profDesc: document.getElementById('char-prof-desc')?.value || "",
-        
         vidaMonster: document.getElementById('val-vida-monster')?.value || 100,
-
         forca: document.getElementById('attr-forca')?.value || 1,
         magia: document.getElementById('attr-magia')?.value || 1,
         agilidade: document.getElementById('attr-agilidade')?.value || 1,
@@ -397,32 +350,28 @@ window.updateSkill = function(skillName, change, event) {
     window.saveData();
 }
 
+// ------ ROLAGEM E CHAMADA DO MODAL ------
 window.rollSkill = function(skillName, attrName) {
     let baseAttr = parseInt(document.getElementById(`attr-${attrName.toLowerCase()}`).value) || 1;
     let classe = document.getElementById('char-class').value;
     let isMonster = document.getElementById('char-category').value === 'Monstros';
     
-    // Bônus de Classe SÓ se não for monstro
     if(!isMonster) {
         if (classe === 'Plebeu') { if(attrName === 'Força') baseAttr += 1; if(attrName === 'Magia') baseAttr -= 1; }
         if (classe === 'Andarilho' && attrName === 'Agilidade') baseAttr += 1;
         if (classe === 'Estrangeiro' && attrName === 'Sorte') baseAttr += 1;
         if (classe === 'Nobre' && attrName === 'Magia') baseAttr += 1;
     }
-    
     if(baseAttr < 1) baseAttr = 1;
 
     let results = [];
     for (let i = 0; i < baseAttr; i++) {
         let die = Math.floor(Math.random() * 20) + 1;
-        if (isOverweight && (attrName === 'Força' || attrName === 'Agilidade')) {
-            die -= 5;
-        }
+        if (isOverweight && (attrName === 'Força' || attrName === 'Agilidade')) die -= 5;
         results.push(die);
     }
 
     const charName = document.getElementById('char-name').value || 'Desconhecido';
-    
     const rollData = {
         c: charName,
         s: skillName,
@@ -432,16 +381,19 @@ window.rollSkill = function(skillName, attrName) {
     };
 
     window.abrirModalCentral(rollData);
-    if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", rollData);
+    if (typeof OBR !== 'undefined' && OBR.isReady) {
+        OBR.broadcast.sendMessage("fatesheet-rolls", rollData);
+    }
 }
 
 window.abrirModalCentral = function(data) {
-    if (OBR.isAvailable) {
+    if (typeof OBR !== 'undefined' && OBR.isReady) {
         const dataUrl = encodeURIComponent(JSON.stringify(data));
+        // ABRINDO COM O LINK ABSOLUTO DIRETO PARA GARANTIR FUNCIONAMENTO NO MAPA
         OBR.modal.open({
             id: "fate-roll-modal",
-            url: `/FateSheet/resultado.html?data=${dataUrl}`, 
-            width: 400,
+            url: `https://seediam.github.io/FateSheet/resultado.html?data=${dataUrl}`, 
+            width: 450,
             height: 250
         });
     } else {
@@ -474,6 +426,8 @@ document.getElementById('photo-upload').addEventListener('change', function(e) {
     }
 });
 
+document.addEventListener('input', () => { if(currentCharId && currentIsMine) window.saveData(); });
+
 function initExtension() {
     try {
         const saved = localStorage.getItem('fatesheet_db');
@@ -482,10 +436,10 @@ function initExtension() {
 
     window.buildGlobalList();
 
-    if (OBR.isAvailable) {
+    if (typeof OBR !== 'undefined') {
         OBR.onReady(async () => {
             try {
-                window.syncToOwlbear(); // Sincroniza ao abrir a sala
+                await window.syncToOwlbear();
                 window.buildGlobalList();
                 
                 OBR.party.onChange(() => window.buildGlobalList());
