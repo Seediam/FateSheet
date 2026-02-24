@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <style>
+        :root { --aura-color: #d4af37; }
+
         @keyframes camera-shake {
             0% { transform: translate(1px, 1px) rotate(0deg); }
             10% { transform: translate(-2px, -2px) rotate(-1deg); }
@@ -19,15 +21,15 @@
         
         body { margin: 0; background: transparent; display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; font-family: 'Segoe UI', Tahoma, sans-serif; }
         
-        .popup { background: rgba(15, 15, 20, 0.98); box-shadow: 0 10px 40px rgba(0,0,0,0.9); border: 2px solid #d4af37; padding: 20px; border-radius: 8px; width: 90%; max-width: 350px; text-align: center; color: white;}
+        .popup { background: rgba(15, 15, 20, 0.98); box-shadow: 0 0 30px rgba(0,0,0,0.9); border: 2px solid var(--aura-color); padding: 20px; border-radius: 8px; width: 90%; max-width: 350px; text-align: center; color: white;}
         
-        .char-name { color: #d4af37; font-weight: 900; font-size: 20px; text-transform: uppercase; letter-spacing: 2px;}
+        .char-name { color: var(--aura-color); font-weight: 900; font-size: 20px; text-transform: uppercase; letter-spacing: 2px; text-shadow: 0 0 10px rgba(0,0,0,0.5);}
         .action { font-size: 14px; color: #8a8a9e; margin: 5px 0 15px 0; text-transform: uppercase;}
         
-        .roll-box { font-size: 32px; font-weight: bold; background: #111; padding: 15px; border-radius: 6px; border: 1px dashed #d4af37; margin: 15px 0; text-shadow: 0 0 15px rgba(255, 255, 255, 0.5); letter-spacing: 2px;}
+        .roll-box { font-size: 32px; font-weight: bold; background: #111; padding: 15px; border-radius: 6px; border: 1px dashed var(--aura-color); margin: 15px 0; text-shadow: 0 0 15px rgba(255, 255, 255, 0.5); letter-spacing: 2px;}
         .penalty { color: #ff4444; font-size: 12px; font-weight: bold; margin-bottom: 10px; display: none;}
         
-        .crit-anim { animation: camera-shake 0.4s both; border-color: #ffd700; box-shadow: 0 0 30px rgba(255, 215, 0, 0.8); }
+        .crit-anim { animation: camera-shake 0.4s both; border-color: var(--aura-color) !important; box-shadow: 0 0 50px var(--aura-color); }
     </style>
 </head>
 <body>
@@ -49,6 +51,11 @@
             if (dataStr) {
                 const data = JSON.parse(decodeURIComponent(dataStr));
                 
+                // MÁGICA DA COR: Pega a cor que a pessoa escolheu na ficha e joga no CSS!
+                if(data.color) {
+                    document.documentElement.style.setProperty('--aura-color', data.color);
+                }
+
                 document.getElementById('c-name').innerText = data.c;
                 document.getElementById('c-action').innerHTML = `ROLOU <b>${data.s}</b> <span style="font-size:11px;">(${data.a})</span>`;
                 
@@ -71,7 +78,6 @@
                 }
             }
 
-            // Fecha sozinho depois de 4.5s
             setTimeout(() => { OBR.modal.close('fate-roll-modal'); }, 4500);
         });
     </script>
