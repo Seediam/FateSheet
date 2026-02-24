@@ -55,4 +55,127 @@
         .attr-input { width: 50px !important; text-align: center; font-size: 16px; font-weight: bold;}
         .d20-icon { width: 16px; height: 16px; fill: none; stroke: var(--accent-gold); stroke-width: 2; vertical-align: middle; margin-left: 6px; margin-bottom: 2px;}
 
-        .skill-item { display: flex; justify-content: space-between; align-items: center; background: var(--bg-panel); padding: 10px 15px; margin-bottom: 8px; border-radius: 6px; cursor: pointer; border: 1px solid
+        .skill-item { display: flex; justify-content: space-between; align-items: center; background: var(--bg-panel); padding: 10px 15px; margin-bottom: 8px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; transition: 0.2s; }
+        .skill-item:hover { background: #23232d; border-color: var(--border-subtle); transform: translateX(3px); }
+        .skill-controls { display: flex; align-items: center; gap: 12px; }
+        .btn-ctrl { background: var(--border-subtle); border: none; color: var(--text-main); width: 28px; height: 28px; border-radius: 4px; cursor: pointer; font-weight: bold; display: flex; align-items: center; justify-content: center; transition: 0.2s; }
+        .btn-ctrl:hover { background: var(--accent-gold); color: #000; }
+
+        /* Estilos da Mochila */
+        .inv-item { display: flex; flex-wrap: wrap; gap: 5px; background: var(--bg-panel); padding: 10px; border-radius: 6px; margin-bottom: 8px; border-left: 3px solid #666;}
+        .inv-row { display: flex; gap: 5px; width: 100%; }
+        .inv-input { padding: 6px !important; font-size: 12px; }
+        .btn-danger { background: #3a1c1c; border: none; color: #fff; cursor: pointer; border-radius: 4px; padding: 0 10px;}
+        .btn-danger:hover { background: var(--danger); }
+        .overweight { border-color: var(--danger) !important; color: var(--danger) !important; }
+    </style>
+</head>
+<body>
+
+    <div id="loading">📖 Carregando Grimório...</div>
+
+    <div class="app-container" id="app">
+        <div id="screen-list" class="screen active">
+            <h3 class="section-title" style="text-align: center; margin-top: 5px; border:none;">Mesa Global</h3>
+            
+            <button class="btn-new" onclick="createNewCharacter()">+ Criar Novo Personagem</button>
+            <input type="file" id="import-file" accept=".json" style="display: none;" onchange="importCharacter(event)">
+            <button class="btn-import" onclick="document.getElementById('import-file').click()">📥 Importar Ficha (JSON)</button>
+
+            <div id="character-folders"></div>
+        </div>
+
+        <div id="screen-sheet" class="screen">
+            <div class="top-bar">
+                <button class="btn-ctrl" onclick="backToList()" style="width: auto; padding: 0 10px; font-size: 12px;">← Voltar</button>
+                <div style="display: flex; gap: 5px;">
+                    <button class="btn-ctrl" onclick="exportCharacter()" style="width: auto; padding: 0 10px; background: #222; font-size: 12px;">📤 Exportar</button>
+                    <button class="btn-ctrl" onclick="deleteCharacter()" style="width: auto; padding: 0 10px; background: #5a1a1a; font-size: 12px;">Apagar</button>
+                </div>
+            </div>
+
+            <div class="tabs">
+                <button class="tab-btn active" onclick="openTab('personagem')">Personagem</button>
+                <button class="tab-btn" onclick="openTab('pericias')">Perícias</button>
+                <button class="tab-btn" onclick="openTab('mochila')">Mochila</button>
+            </div>
+
+            <div id="personagem" class="tab-content active">
+                <div style="display: flex; gap: 15px; margin-bottom: 10px;">
+                    <label for="photo-upload" class="photo-slot" id="photo-preview"><span id="photo-text">📷<br>Importar</span></label>
+                    <input type="file" id="photo-upload" accept="image/*" style="display: none;">
+                    <div style="flex: 1;">
+                        <div class="form-group"><label>Nome</label><input type="text" id="char-name"></div>
+                        <div style="display: flex; gap: 5px;">
+                            <div class="form-group" style="flex: 1;"><label>Idade</label><input type="number" id="char-age"></div>
+                            <div class="form-group" style="flex: 2;"><label>Raça</label><input type="text" id="char-race" value="Humano"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; gap: 10px;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>Classe</label>
+                        <select id="char-class" onchange="calcVitals()">
+                            <option value="Plebeu">Plebeu</option>
+                            <option value="Andarilho">Andarilho</option>
+                            <option value="Estrangeiro">Estrangeiro</option>
+                            <option value="Nobre">Nobre</option>
+                        </select>
+                    </div>
+                    <div class="form-group" style="flex: 1;"><label>Profissão</label><input type="text" id="char-prof"></div>
+                </div>
+                <div class="form-group"><label>Descrição da Profissão</label><textarea id="char-prof-desc" rows="2"></textarea></div>
+
+                <div class="form-group">
+                    <label>📁 Pasta / Categoria</label>
+                    <select id="char-category" onchange="saveData()">
+                        <option value="Jogadores">Jogadores</option>
+                        <option value="NPCs">NPCs</option>
+                        <option value="Monstros">Monstros</option>
+                    </select>
+                </div>
+
+                <div class="status-box">
+                    <div class="status-item"><label style="color:#ff4444">Vida</label><span id="val-vida">100 / 100</span></div>
+                    <div class="status-item"><label style="color:#44aaff">Mana</label><span id="val-mana">50 / 50</span></div>
+                </div>
+
+                <h4 class="section-title">Atributos</h4>
+                <div class="attr-box"><span>Força <svg class="d20-icon" width="16" height="16" fill="none" stroke="#d4af37" viewBox="0 0 24 24"><polygon points="12 2 2 12 12 22 22 12 12 2"></polygon><line x1="12" y1="2" x2="12" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line></svg></span><input type="number" id="attr-forca" class="attr-input" value="1" oninput="calcVitals()"></div>
+                <div class="attr-box"><span>Magia <svg class="d20-icon" width="16" height="16" fill="none" stroke="#d4af37" viewBox="0 0 24 24"><polygon points="12 2 2 12 12 22 22 12 12 2"></polygon><line x1="12" y1="2" x2="12" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line></svg></span><input type="number" id="attr-magia" class="attr-input" value="1" oninput="calcVitals()"></div>
+                <div class="attr-box"><span>Agilidade <svg class="d20-icon" width="16" height="16" fill="none" stroke="#d4af37" viewBox="0 0 24 24"><polygon points="12 2 2 12 12 22 22 12 12 2"></polygon><line x1="12" y1="2" x2="12" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line></svg></span><input type="number" id="attr-agilidade" class="attr-input" value="1" oninput="calcVitals()"></div>
+                <div class="attr-box"><span>Sorte <svg class="d20-icon" width="16" height="16" fill="none" stroke="#d4af37" viewBox="0 0 24 24"><polygon points="12 2 2 12 12 22 22 12 12 2"></polygon><line x1="12" y1="2" x2="12" y2="22"></line><line x1="2" y1="12" x2="22" y2="12"></line></svg></span><input type="number" id="attr-sorte" class="attr-input" value="1" oninput="calcVitals()"></div>
+
+                <h4 class="section-title">📖 Grimório</h4>
+                <div class="form-group"><input type="text" id="grimoire-name" placeholder="Nome do Grimório"></div>
+                <div class="form-group"><label>🔮 Mana Zone</label><input type="text" id="mana-zone"></div>
+                <div class="form-group"><label>Habilidade 1</label><input type="text" id="hab-1" placeholder="Desc | Custo | Alcance"></div>
+                <div class="form-group"><label>Habilidade 2</label><input type="text" id="hab-2"></div>
+                <div class="form-group"><label>Habilidade 3</label><input type="text" id="hab-3"></div>
+                <div class="form-group"><label>Habilidade 4</label><input type="text" id="hab-4"></div>
+            </div>
+
+            <div id="pericias" class="tab-content"><div id="skills-container"></div></div>
+
+            <div id="mochila" class="tab-content">
+                <div class="status-box">
+                    <div class="status-item" id="box-peso">
+                        <label>Peso do Personagem</label>
+                        <span id="val-peso">0 / 5</span>
+                    </div>
+                </div>
+                <p id="peso-aviso" style="color: var(--danger); font-size: 11px; text-align: center; display: none; font-weight: bold;">⚠️ SOBREPESO! Desvantagem de -5 em Força e Agilidade.</p>
+                
+                <h4 class="section-title" style="display: flex; justify-content: space-between;">Itens 
+                    <button class="btn-ctrl" style="width:auto; padding: 2px 10px;" onclick="addInventoryItem()">+ Item</button>
+                </h4>
+                <div id="inventory-container"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@2/lib/index.js"></script>
+    <script src="script.js?v=25"></script>
+</body>
+</html>
