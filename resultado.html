@@ -51,7 +51,6 @@
             if (dataStr) {
                 const data = JSON.parse(decodeURIComponent(dataStr));
                 
-                // MÁGICA DA COR: Pega a cor que a pessoa escolheu na ficha e joga no CSS!
                 if(data.color) {
                     document.documentElement.style.setProperty('--aura-color', data.color);
                 }
@@ -60,13 +59,22 @@
                 document.getElementById('c-action').innerHTML = `ROLOU <b>${data.s}</b> <span style="font-size:11px;">(${data.a})</span>`;
                 
                 const resArray = data.r.split(',');
+                const skillMod = parseInt(data.mod) || 0;
                 let temCritico = false;
 
                 const formattedResults = resArray.map(v => {
-                    let num = parseInt(v);
-                    if (num >= 20) { temCritico = true; return `<span style="color:#ffd700;">${v}</span>`; }
-                    if (num <= 4) return `<span style="color:#ff4444;">${v}</span>`;
-                    return v;
+                    let raw = parseInt(v);
+                    let total = raw + skillMod;
+                    
+                    // Cria a representação da perícia (Ex: +2 que vai ficar pequeno no alto)
+                    let modStr = skillMod !== 0 ? `<sup style="font-size: 0.5em; opacity: 0.7;">${skillMod > 0 ? '+'+skillMod : skillMod}</sup>` : '';
+                    let textDisplay = `${total}${modStr}`;
+
+                    // Regras de cor do Crítico continuam usando o DADO PURO para não haver trapaças!
+                    if (raw >= 20) { temCritico = true; return `<span style="color:#ffd700;">${textDisplay}</span>`; }
+                    if (raw <= 4) return `<span style="color:#ff4444;">${textDisplay}</span>`;
+                    return textDisplay;
+
                 }).join(' <span style="color:#666;">|</span> ');
 
                 document.getElementById('c-roll').innerHTML = `[ ${formattedResults} ]`;
