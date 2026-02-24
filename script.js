@@ -8,30 +8,31 @@ const skillsData = [
     { name: "Atuação", attr: "Sorte" }, { name: "Enganação", attr: "Sorte" }, { name: "Persuasão", attr: "Sorte" }
 ];
 
-let characters = {}; 
+let characters = {}; // Todas as fichas da mesa ficam aqui
 let currentCharId = null;
-let currentIsMine = true; 
 let playerSkills = {}; 
 let playerInventory = [];
 let currentPhoto = "";
 let folderState = { "Jogadores": true, "NPCs": true, "Monstros": true };
 let isOverweight = false;
-let modalTimer = null;
 
-// Expor tudo no window porque é type="module"
-window.openTab = function(tabName) {
+window.onload = function() {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    initExtension();
+};
+
+window.openTab = function(tabName, event) {
     document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-    const target = document.getElementById(tabName);
-    if(target) target.classList.add('active');
-    event.currentTarget.classList.add('active');
+    document.getElementById(tabName).classList.add('active');
+    if(event) event.currentTarget.classList.add('active');
 }
 
 window.backToList = function() {
     window.saveData();
     document.getElementById('screen-sheet').classList.remove('active');
     document.getElementById('screen-list').classList.add('active');
-    window.renderCharacterList();
 }
 
 window.toggleFolder = function(folderName) {
@@ -43,13 +44,14 @@ window.renderCharacterList = function() {
     const container = document.getElementById('character-folders');
     if(!container) return;
     container.innerHTML = '';
+
     const categories = { "Jogadores": [], "NPCs": [], "Monstros": [] };
 
     for (let id in characters) {
         let char = characters[id];
         let cat = char.category || "Jogadores";
         if (!categories[cat]) categories[cat] = [];
-        categories[cat].push({ ...char, id: id });
+        categories[cat].push({ id: id, name: char.name || "Sem Nome" });
     }
 
     let hasAny = false;
@@ -64,15 +66,39 @@ window.renderCharacterList = function() {
                 <div class="folder-content" style="display: ${isOpen ? 'flex' : 'none'};">
             `;
             categories[cat].forEach(char => {
-                let badge = char.isMine ? '' : `<span style="font-size:9px; color:#888;">(Global)</span>`;
-                html += `<div class="char-list-item" onclick="openCharacter('${char.id}')"><span>${char.name} ${badge}</span></div>`;
+                html += `<div class="char-list-item" onclick="openCharacter('${char.id}')"><span>${char.name}</span></div>`;
             });
             html += `</div>`;
             container.innerHTML += html;
         }
     }
 
-    if(!hasAny) container.innerHTML = '<div style="text-align:center; color:#666; margin-top: 20px;">Nenhuma ficha criada.</div>';
+    if(!hasAny) {
+        container.innerHTML = '<div style="text-align:center; color:#666; margin-top: 20px;">A Mesa está vazia.</div>';
+    }
+}
+
+window.createNewCharacter = function() {
+    const newId = 'char_' + Date.now();
+    characters[newId] = { name: "Novo Personagem", category: "Jogadores", classe: "Plebeu", skills: {}, inventory: [], photo: "" };
+    currentCharId = newId;
+    window.saveData(); // Já cria no servidor
+    window.openCharacter(newId);
+}
+
+// O SEGREDO DO APAGAMENTO: Mandamos 'undefined' diretamente pra chave daquela ficha específica!
+window.deleteCharacter = async function() {
+    if(confirm("Apagar esta ficha permanentemente para TODOS na mesa?")) {
+        const idToDelete = currentCharId;
+        delete characters[idToDelete];
+        
+        if (OBR.isAvailable) {
+            // Apaga da nuvem enviando um vazio pra chave dela
+            await OBR.room.setMetadata({ [`fatesheet_${idToDelete}`]: undefined });
+        }
+        
+        window.backToList();
+    }
 }
 
 window.exportCharacter = function() {
@@ -93,42 +119,13 @@ window.importCharacter = function(event) {
         try {
             const importedData = JSON.parse(e.target.result);
             const newId = 'char_' + Date.now();
+            currentCharId = newId;
             characters[newId] = importedData;
-            window.saveDataLocalOnly();
-            window.syncToOwlbear();
-            window.renderCharacterList();
+            window.saveData();
             alert("Ficha importada com sucesso!");
-        } catch(err) { alert("Erro ao ler o arquivo JSON."); }
+        } catch(err) { alert("Erro ao ler JSON."); }
     };
     reader.readAsText(file);
-}
-
-window.saveDataLocalOnly = function() {
-    try { localStorage.setItem('fatesheet_db', JSON.stringify(characters)); } catch(e){}
-}
-
-window.syncToOwlbear = async function() {
-    if (OBR.isAvailable) {
-        // Envia tudão pra mesa
-        await OBR.room.setMetadata({ "fatesheet_chars": characters });
-    }
-}
-
-window.createNewCharacter = function() {
-    const newId = 'char_' + Date.now();
-    characters[newId] = { name: "Novo Personagem", category: "Jogadores", classe: "Plebeu", skills: {}, inventory: [], photo: "" };
-    window.saveDataLocalOnly();
-    window.syncToOwlbear();
-    window.openCharacter(newId);
-}
-
-window.deleteCharacter = async function() {
-    if(confirm("Apagar esta ficha permanentemente?")) {
-        delete characters[currentCharId];
-        window.saveDataLocalOnly();
-        await window.syncToOwlbear();
-        window.backToList();
-    }
 }
 
 function safeSetVal(id, value) {
@@ -151,7 +148,6 @@ window.updateCategoryUI = function() {
 window.openCharacter = function(id) {
     currentCharId = id;
     const charData = characters[id] || {};
-    currentIsMine = true;
     
     safeSetVal('char-name', charData.name || '');
     safeSetVal('char-category', charData.category || 'Jogadores');
@@ -164,7 +160,6 @@ window.openCharacter = function(id) {
     else safeSetVal('char-race-player', charData.race || 'Humano');
 
     safeSetVal('val-vida-monster', charData.vidaMonster || 100);
-
     safeSetVal('attr-forca', charData.forca || 1);
     safeSetVal('attr-magia', charData.magia || 1);
     safeSetVal('attr-agilidade', charData.agilidade || 1);
@@ -184,7 +179,6 @@ window.openCharacter = function(id) {
     window.setPhotoPreview(currentPhoto);
     window.renderSkills();
     window.renderInventory();
-    window.calcVitals();
 
     document.getElementById('screen-list').classList.remove('active');
     document.getElementById('screen-sheet').classList.add('active');
@@ -201,7 +195,6 @@ window.calcVitals = function() {
         if(classe === 'Andarilho') extraMana = 50;
         if(classe === 'Estrangeiro') extraMana = 100;
         if(classe === 'Nobre') extraMana = 150;
-
         document.getElementById('val-vida-player').innerText = `${100 + (sorteBase * 50)} / ${100 + (sorteBase * 50)}`;
         document.getElementById('val-mana').innerText = `${50 + extraMana} / ${50 + extraMana}`;
     } else {
@@ -211,20 +204,16 @@ window.calcVitals = function() {
     let maxWeight = forcaBase * 5;
     let currentWeight = playerInventory.reduce((acc, item) => acc + ((parseFloat(item.peso)||0) * (parseInt(item.qtd)||1)), 0);
     
-    let pesoEl = document.getElementById('val-peso');
-    let boxPeso = document.getElementById('box-peso');
-    let avisoPeso = document.getElementById('peso-aviso');
-    
-    pesoEl.innerText = `${currentWeight.toFixed(1)} / ${maxWeight}`;
+    document.getElementById('val-peso').innerText = `${currentWeight.toFixed(1)} / ${maxWeight}`;
     
     if (currentWeight > maxWeight) {
         isOverweight = true;
-        boxPeso.classList.add('overweight');
-        avisoPeso.style.display = 'block';
+        document.getElementById('box-peso').classList.add('overweight');
+        document.getElementById('peso-aviso').style.display = 'block';
     } else {
         isOverweight = false;
-        boxPeso.classList.remove('overweight');
-        avisoPeso.style.display = 'none';
+        document.getElementById('box-peso').classList.remove('overweight');
+        document.getElementById('peso-aviso').style.display = 'none';
     }
 }
 
@@ -268,23 +257,20 @@ window.removeInv = function(index) {
     window.saveData();
 }
 
+// COMO A FICHA É GLOBAL, ELA SALVA DIRETO NA SALA!
 window.saveData = async function() {
     if (!currentCharId) return; 
-
     let isMonster = document.getElementById('char-category')?.value === 'Monstros';
 
     const sheetData = {
         name: document.getElementById('char-name')?.value || "Sem Nome",
         category: document.getElementById('char-category')?.value || "Jogadores",
         age: document.getElementById('char-age')?.value || "",
-        
         race: isMonster ? document.getElementById('char-race-monster').value : document.getElementById('char-race-player').value,
         classe: document.getElementById('char-class')?.value || "Plebeu",
         prof: document.getElementById('char-prof')?.value || "",
         profDesc: document.getElementById('char-prof-desc')?.value || "",
-        
         vidaMonster: document.getElementById('val-vida-monster')?.value || 100,
-
         forca: document.getElementById('attr-forca')?.value || 1,
         magia: document.getElementById('attr-magia')?.value || 1,
         agilidade: document.getElementById('attr-agilidade')?.value || 1,
@@ -301,8 +287,11 @@ window.saveData = async function() {
     };
 
     characters[currentCharId] = sheetData;
-    window.saveDataLocalOnly();
-    window.syncToOwlbear();
+    
+    if (OBR.isAvailable) {
+        // Salva essa ficha isolada no servidor
+        await OBR.room.setMetadata({ [`fatesheet_${currentCharId}`]: sheetData });
+    }
 }
 
 window.renderSkills = function() {
@@ -336,6 +325,7 @@ window.updateSkill = function(skillName, change, event) {
     window.saveData();
 }
 
+// ------ ROLAGEM COM OBR.MODAL.OPEN (IGUAL AOS DADOS) ------
 window.rollSkill = function(skillName, attrName) {
     let baseAttr = parseInt(document.getElementById(`attr-${attrName.toLowerCase()}`).value) || 1;
     let classe = document.getElementById('char-class').value;
@@ -350,11 +340,9 @@ window.rollSkill = function(skillName, attrName) {
     if(baseAttr < 1) baseAttr = 1;
 
     let results = [];
-    let teveCritico = false;
     for (let i = 0; i < baseAttr; i++) {
         let die = Math.floor(Math.random() * 20) + 1;
         if (isOverweight && (attrName === 'Força' || attrName === 'Agilidade')) die -= 5;
-        if (die >= 20) teveCritico = true;
         results.push(die);
     }
 
@@ -365,47 +353,26 @@ window.rollSkill = function(skillName, attrName) {
         s: skillName,
         a: attrName,
         r: results.join(','),
-        pen: isOverweight && (attrName === 'Força' || attrName === 'Agilidade') ? "true" : "false",
-        crit: teveCritico
+        pen: isOverweight && (attrName === 'Força' || attrName === 'Agilidade') ? "true" : "false"
     };
 
-    window.mostrarRolagem(rollData);
+    // Abre a sua janela
+    window.abrirModalCentral(rollData);
+    // Manda os outros abrirem
     if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", rollData);
 }
 
-// ------ A ROLAGEM DENTRO DA PRÓPRIA EXTENSÃO ------
-window.mostrarRolagem = function(data) {
-    const modal = document.getElementById('overlay-modal');
-    const box = document.getElementById('modal-content-box');
-    
-    document.getElementById('modal-name').innerText = data.c;
-    document.getElementById('modal-action').innerHTML = `ROLOU <b>${data.s}</b> <span style="font-size:11px;">(${data.a})</span>`;
-    
-    let resArray = data.r.split(',');
-    let formattedResults = resArray.map(v => {
-        let num = parseInt(v);
-        if (num >= 20) return `<span style="color:#ffd700;">${v}</span>`;
-        if (num <= 4) return `<span style="color:#ff4444;">${v}</span>`;
-        return v;
-    }).join(' <span style="color:#666;">|</span> ');
-
-    document.getElementById('modal-roll').innerHTML = `[ ${formattedResults} ]`;
-    document.getElementById('modal-pen').style.display = data.pen === "true" ? "block" : "none";
-
-    modal.style.display = 'flex';
-    
-    if (data.crit) {
-        box.classList.add('crit-anim');
-    } else {
-        box.classList.remove('crit-anim');
+window.abrirModalCentral = function(data) {
+    if (OBR.isAvailable) {
+        const dataUrl = encodeURIComponent(JSON.stringify(data));
+        // LINK ABSOLUTO PARA ACHAR O ARQUIVO EM QUALQUER LUGAR
+        OBR.modal.open({
+            id: "fate-roll-modal",
+            url: `https://seediam.github.io/FateSheet/resultado.html?data=${dataUrl}`, 
+            width: 400,
+            height: 250
+        });
     }
-
-    if(modalTimer) clearTimeout(modalTimer);
-    modalTimer = setTimeout(() => { window.closeModal(); }, 5000);
-}
-
-window.closeModal = function() {
-    document.getElementById('overlay-modal').style.display = 'none';
 }
 
 window.setPhotoPreview = function(base64Str) {
@@ -434,40 +401,41 @@ document.getElementById('photo-upload').addEventListener('change', function(e) {
 
 document.addEventListener('input', () => { if(currentCharId) window.saveData(); });
 
-// Inicialização com OBR Local + Módulo ESM
-window.onload = function() {
-    document.getElementById('loading').style.display = 'none';
-    document.getElementById('app').style.display = 'block';
+// Puxa e escuta a mesa
+function processRoomData(metadata) {
+    let mudouAlgo = false;
+    for (let key in metadata) {
+        if (key.startsWith('fatesheet_char_')) {
+            const id = key.replace('fatesheet_', '');
+            if (metadata[key] === undefined || metadata[key] === null) {
+                if(characters[id]) { delete characters[id]; mudouAlgo = true; }
+            } else {
+                characters[id] = metadata[key];
+                mudouAlgo = true;
+            }
+        }
+    }
+    if (mudouAlgo) window.renderCharacterList();
+}
 
-    try {
-        const saved = localStorage.getItem('fatesheet_db');
-        if (saved) characters = JSON.parse(saved);
-        window.renderCharacterList();
-    } catch(e) {}
-
+function initExtension() {
     if (OBR.isAvailable) {
         OBR.onReady(async () => {
             try {
-                // Recupera a lista global real do servidor
-                let meta = await OBR.room.getMetadata();
-                if(meta && meta["fatesheet_chars"]) {
-                    characters = meta["fatesheet_chars"];
-                }
-                window.renderCharacterList();
+                // Lê o que já está na mesa global
+                const meta = await OBR.room.getMetadata();
+                processRoomData(meta);
                 
-                OBR.room.onMetadataChange((metadata) => {
-                    if (metadata["fatesheet_chars"]) {
-                        characters = metadata["fatesheet_chars"];
-                        window.renderCharacterList();
-                        // Se a ficha aberta for apagada por outro
-                        if(currentCharId && !characters[currentCharId]) window.backToList();
-                    }
-                });
+                // Escuta criações e deleções
+                OBR.room.onMetadataChange((metadata) => processRoomData(metadata));
                 
+                // Escuta as rolagens
                 OBR.broadcast.onMessage("fatesheet-rolls", (event) => {
-                    window.mostrarRolagem(event.data);
+                    window.abrirModalCentral(event.data);
                 });
             } catch(e) {}
         });
+    } else {
+        window.renderCharacterList(); // Teste fora do Owlbear
     }
-};
+}
