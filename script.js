@@ -45,6 +45,7 @@ const grimoiresDb = {
 };
 
 let characters = {}; 
+let combatLog = []; 
 let currentCharId = null;
 let currentIsMine = true; 
 let playerSkills = {}; 
@@ -88,7 +89,7 @@ window.renderCharacterList = function() {
         let char = characters[id];
         let cat = char.category || "Jogadores";
         if (!categories[cat]) categories[cat] = [];
-        categories[cat].push({ id: id, name: char.name || "Sem Nome" });
+        categories[cat].push({ id: id, name: char.name || "Sem Nome", av: char.avatar || "🧙‍♂️" });
     }
 
     let hasAny = false;
@@ -96,14 +97,9 @@ window.renderCharacterList = function() {
         if (categories[cat].length > 0) {
             hasAny = true;
             let isOpen = folderState[cat];
-            let html = `
-                <div class="folder-header" onclick="toggleFolder('${cat}')">
-                    <span class="chevron">${isOpen ? '▼' : '►'}</span> 📁 ${cat}
-                </div>
-                <div class="folder-content" style="display: ${isOpen ? 'flex' : 'none'};">
-            `;
+            let html = `<div class="folder-header" onclick="toggleFolder('${cat}')"><span class="chevron">${isOpen ? '▼' : '►'}</span> 📁 ${cat}</div><div class="folder-content" style="display: ${isOpen ? 'flex' : 'none'};">`;
             categories[cat].forEach(char => {
-                html += `<div class="char-list-item" onclick="openCharacter('${char.id}')"><span>${char.name}</span></div>`;
+                html += `<div class="char-list-item" onclick="openCharacter('${char.id}')"><span>${char.av} ${char.name}</span></div>`;
             });
             html += `</div>`;
             container.innerHTML += html;
@@ -114,7 +110,7 @@ window.renderCharacterList = function() {
 
 window.createNewCharacter = function() {
     const newId = 'char_' + Date.now();
-    characters[newId] = { name: "Novo Personagem", category: "Jogadores", classe: "Plebeu", skills: {}, inventory: [], spells: [], photo: "", color: "#d4af37", mov: 30, runas: 0, activeRunes: [], alloc: {f:0, m:0, a:0, s:0} };
+    characters[newId] = { name: "Novo Personagem", avatar: "🧙‍♂️", category: "Jogadores", classe: "Plebeu", skills: {}, inventory: [], spells: [], photo: "", color: "#d4af37", mov: 30, runas: 0, activeRunes: [], alloc: {f:0, m:0, a:0, s:0} };
     currentCharId = newId;
     window.saveData(); 
     window.openCharacter(newId);
@@ -125,11 +121,7 @@ window.deleteCharacter = async function() {
         const idToDelete = currentCharId;
         delete characters[idToDelete]; 
         try { localStorage.setItem('fatesheet_db', JSON.stringify(characters)); } catch(e){}
-        if (OBR.isAvailable) {
-            let metaUpdate = {};
-            metaUpdate[`fatesheet_char_${idToDelete}`] = undefined; 
-            await OBR.room.setMetadata(metaUpdate);
-        }
+        if (OBR.isAvailable) await OBR.room.setMetadata({ [`fatesheet_char_${idToDelete}`]: undefined });
         window.backToList();
     }
 }
@@ -190,8 +182,8 @@ window.changeGrimoire = function() {
 window.openCharacter = function(id) {
     currentCharId = id;
     const c = characters[id] || {};
-    currentIsMine = true;
     
+    safeSetVal('char-avatar', c.avatar || '🧙‍♂️');
     safeSetVal('char-name', c.name || '');
     safeSetVal('char-color', c.color || '#d4af37');
     document.documentElement.style.setProperty('--accent-gold', c.color || '#d4af37');
@@ -211,7 +203,6 @@ window.openCharacter = function(id) {
     safeSetVal('attr-agilidade', c.agilidade || 1);
     safeSetVal('attr-sorte', c.sorte || 1);
     
-    // CARREGA O GRIMÓRIO E O DT
     safeSetVal('grimoire-select', c.grimoireSelect || '');
     safeSetVal('grimoire-dt', c.grimoireDT || 10);
     safeSetVal('mana-zone', c.mana || '');
@@ -228,10 +219,8 @@ window.openCharacter = function(id) {
     playerSkills = c.skills || {};
     playerInventory = c.inventory || [];
     playerSpells = c.spells || []; 
-    currentPhoto = c.photo || '';
     
     window.updateCategoryUI();
-    window.setPhotoPreview(currentPhoto);
     window.renderSkills();
     window.renderInventory();
     window.renderGlobalRunes();
@@ -283,7 +272,6 @@ window.updateAlloc = function() {
     let m = parseInt(document.getElementById('alloc-magia').value) || 0;
     let a = parseInt(document.getElementById('alloc-agilidade').value) || 0;
     let s = parseInt(document.getElementById('alloc-sorte').value) || 0;
-    
     let maxF = parseInt(document.getElementById('attr-forca').value) || 0;
     let maxM = parseInt(document.getElementById('attr-magia').value) || 0;
     let maxA = parseInt(document.getElementById('attr-agilidade').value) || 0;
@@ -296,8 +284,7 @@ window.updateAlloc = function() {
 
     if (f + m + a + s > 3) {
         alert("Você só pode alocar até 3 dados por turno!");
-        safeSetVal('alloc-forca', 0); safeSetVal('alloc-magia', 0);
-        safeSetVal('alloc-agilidade', 0); safeSetVal('alloc-sorte', 0);
+        safeSetVal('alloc-forca', 0); safeSetVal('alloc-magia', 0); safeSetVal('alloc-agilidade', 0); safeSetVal('alloc-sorte', 0);
     }
     window.saveData();
 }
@@ -307,6 +294,29 @@ const getMultFromRoll = (val) => {
     if(val <= 11) return 0.5;
     return 1;
 };
+
+window.addCombatLog = async function(data) {
+    combatLog.unshift(data);
+    if(combatLog.length > 30) combatLog.pop(); 
+    if (OBR.isAvailable) await OBR.room.setMetadata({ "fatesheet_combat_log": combatLog });
+}
+
+// ------ NOVO: ABRIR LOG EM JANELA FLUTUANTE ------
+window.abrirJanelaDeLog = function() {
+    if (OBR.isAvailable) {
+        OBR.popover.open({
+            id: "fatesheet-log-popover",
+            url: `https://seediam.github.io/FateSheet/log.html`, 
+            width: 300,
+            height: 450,
+            disableClickAway: true, 
+            anchorOrigin: { horizontal: "RIGHT", vertical: "BOTTOM" },
+            transformOrigin: { horizontal: "RIGHT", vertical: "BOTTOM" }
+        });
+    } else {
+        alert("Log só funciona dentro da mesa do Owlbear!");
+    }
+}
 
 window.rollAttributes = function() {
     let f = parseInt(document.getElementById('alloc-forca').value) || 0;
@@ -337,15 +347,14 @@ window.rollAttributes = function() {
 
     const payload = {
         t: "attr", 
+        av: document.getElementById('char-avatar').value,
         c: document.getElementById('char-name').value || 'Desconhecido',
         col: document.getElementById('char-color').value || '#d4af37',
-        rF: rolls.f.join(','),
-        rM: rolls.m.join(','),
-        rA: rolls.a.join(','),
-        sorte: s
+        rF: rolls.f.join(','), rM: rolls.m.join(','), rA: rolls.a.join(','), sorte: s
     };
 
     window.abrirModalCentral(payload);
+    window.addCombatLog(payload);
     if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", payload);
 
     window.saveData();
@@ -361,7 +370,6 @@ window.checkRuneLimits = function(typeToAdd) {
         alert(`Limite atingido! Você tem apenas ${maxRunes} runa(s) na ficha.`);
         return false;
     }
-
     let tCount = c.activeRunes.filter(r => r.type === typeToAdd).length;
     let m = parseInt(document.getElementById('attr-magia').value) || 0;
     let f = parseInt(document.getElementById('attr-forca').value) || 0;
@@ -380,41 +388,21 @@ window.addGlobalRune = function(type) {
 }
 
 window.updateGlobalRune = function(idx, field, val) {
-    characters[currentCharId].activeRunes[idx][field] = val;
-    window.saveData(); window.renderGlobalRunes();
+    characters[currentCharId].activeRunes[idx][field] = val; window.saveData(); window.renderGlobalRunes();
 }
 
 window.removeGlobalRune = function(idx) {
-    characters[currentCharId].activeRunes.splice(idx, 1);
-    window.saveData(); window.renderGlobalRunes();
+    characters[currentCharId].activeRunes.splice(idx, 1); window.saveData(); window.renderGlobalRunes();
 }
 
 window.renderGlobalRunes = function() {
-    const container = document.getElementById('global-runes-container');
-    container.innerHTML = '';
+    const container = document.getElementById('global-runes-container'); container.innerHTML = '';
     let c = characters[currentCharId];
     if(!c || !c.activeRunes || c.activeRunes.length === 0) {
-        container.innerHTML = `
-            <div style="display:flex; gap:8px;">
-                <button class="btn-rune b-alpha" onclick="addGlobalRune('alpha')">+ α Azul</button>
-                <button class="btn-rune b-delta" onclick="addGlobalRune('delta')">+ δ Verm</button>
-                <button class="btn-rune b-beta" onclick="addGlobalRune('beta')">+ β Roxo</button>
-                <button class="btn-rune b-arma" onclick="addGlobalRune('arma')">+ ⚔️ Arma</button>
-            </div>
-        `;
-        return;
+        container.innerHTML = `<div style="display:flex; gap:8px;"><button class="btn-rune b-alpha" onclick="addGlobalRune('alpha')">+ α Azul</button><button class="btn-rune b-delta" onclick="addGlobalRune('delta')">+ δ Verm</button><button class="btn-rune b-beta" onclick="addGlobalRune('beta')">+ β Roxo</button><button class="btn-rune b-arma" onclick="addGlobalRune('arma')">+ ⚔️ Arma</button></div>`; return;
     }
 
-    let html = `<div class="dice-config-row" style="border-color: var(--accent-gold); background: #111;">`;
-    html += `<div style="width:100%; display:flex; justify-content:space-between; align-items:center;">
-                <span style="color:var(--accent-gold); font-size:12px; font-weight:bold;">Runas Ativas do Turno</span>
-                <div style="display:flex; gap:4px;">
-                    <button class="btn-rune b-alpha" style="padding: 2px 6px;" onclick="addGlobalRune('alpha')">+ α</button>
-                    <button class="btn-rune b-delta" style="padding: 2px 6px;" onclick="addGlobalRune('delta')">+ δ</button>
-                    <button class="btn-rune b-beta" style="padding: 2px 6px;" onclick="addGlobalRune('beta')">+ β</button>
-                    <button class="btn-rune b-arma" style="padding: 2px 6px;" onclick="addGlobalRune('arma')">+ ⚔️</button>
-                </div>
-            </div>`;
+    let html = `<div class="dice-config-row" style="border-color: var(--accent-gold); background: #111;"><div style="width:100%; display:flex; justify-content:space-between; align-items:center;"><span style="color:var(--accent-gold); font-size:12px; font-weight:bold;">Runas Ativas do Turno</span><div style="display:flex; gap:4px;"><button class="btn-rune b-alpha" style="padding: 2px 6px;" onclick="addGlobalRune('alpha')">+ α</button><button class="btn-rune b-delta" style="padding: 2px 6px;" onclick="addGlobalRune('delta')">+ δ</button><button class="btn-rune b-beta" style="padding: 2px 6px;" onclick="addGlobalRune('beta')">+ β</button><button class="btn-rune b-arma" style="padding: 2px 6px;" onclick="addGlobalRune('arma')">+ ⚔️</button></div></div>`;
 
     c.activeRunes.forEach((r, idx) => {
         let cHex = '#ccc', sym = '⚔️';
@@ -423,203 +411,83 @@ window.renderGlobalRunes = function() {
         if(r.type === 'beta')  { cHex = '#a855f7'; sym = 'β'; }
 
         let dis = r.locked ? "pointer-events:none; opacity:0.5;" : "";
-        let redA = r.mult === 0 ? "active" : "";
-        let whiA = r.mult === 0.5 ? "active" : "";
-        let greA = r.mult === 1 ? "active" : "";
+        let redA = r.mult === 0 ? "active" : ""; let whiA = r.mult === 0.5 ? "active" : ""; let greA = r.mult === 1 ? "active" : "";
 
-        html += `
-        <div class="dice-group" style="border-color:${cHex}; margin-top:5px;">
-            <span class="lbl" style="color:${cHex}; text-align:center;">${sym}</span>
-            <select class="inv-input dice-sel" onchange="updateGlobalRune(${idx}, 'face', this.value)">
-                <option value="d4" ${r.face==='d4'?'selected':''}>d4</option><option value="d6" ${r.face==='d6'?'selected':''}>d6</option><option value="d8" ${r.face==='d8'?'selected':''}>d8</option><option value="d10" ${r.face==='d10'?'selected':''}>d10</option><option value="d12" ${r.face==='d12'?'selected':''}>d12</option><option value="d20" ${r.face==='d20'?'selected':''}>d20</option><option value="d100" ${r.face==='d100'?'selected':''}>d100</option>
-            </select>
-            ${r.type === 'arma' ? `<span style="color:#ccc; font-weight:bold;">+</span><input type="number" class="inv-input dice-qty" placeholder="Fixo" value="${r.fixo || 0}" onchange="updateGlobalRune(${idx}, 'fixo', this.value)" style="width: 35px !important;">` : ''}
-            
-            <div class="mult-group" style="${dis}">
-                <span class="mult-btn m-red ${redA}" onclick="updateGlobalRune(${idx}, 'mult', 0)">X</span>
-                <span class="mult-btn m-white ${whiA}" onclick="updateGlobalRune(${idx}, 'mult', 0.5)">X</span>
-                <span class="mult-btn m-green ${greA}" onclick="updateGlobalRune(${idx}, 'mult', 1)">X</span>
-            </div>
-            <span style="color:#666; cursor:pointer; font-weight:bold; margin-left:5px; padding: 2px;" onclick="removeGlobalRune(${idx})">✖</span>
-        </div>`;
+        html += `<div class="dice-group" style="border-color:${cHex}; margin-top:5px;"><span class="lbl" style="color:${cHex}; text-align:center;">${sym}</span><select class="inv-input dice-sel" onchange="updateGlobalRune(${idx}, 'face', this.value)"><option value="d4" ${r.face==='d4'?'selected':''}>d4</option><option value="d6" ${r.face==='d6'?'selected':''}>d6</option><option value="d8" ${r.face==='d8'?'selected':''}>d8</option><option value="d10" ${r.face==='d10'?'selected':''}>d10</option><option value="d12" ${r.face==='d12'?'selected':''}>d12</option><option value="d20" ${r.face==='d20'?'selected':''}>d20</option><option value="d100" ${r.face==='d100'?'selected':''}>d100</option></select>${r.type === 'arma' ? `<span style="color:#ccc; font-weight:bold;">+</span><input type="number" class="inv-input dice-qty" placeholder="Fixo" value="${r.fixo || 0}" onchange="updateGlobalRune(${idx}, 'fixo', this.value)" style="width: 35px !important;">` : ''}<div class="mult-group" style="${dis}"><span class="mult-btn m-red ${redA}" onclick="updateGlobalRune(${idx}, 'mult', 0)">X</span><span class="mult-btn m-white ${whiA}" onclick="updateGlobalRune(${idx}, 'mult', 0.5)">X</span><span class="mult-btn m-green ${greA}" onclick="updateGlobalRune(${idx}, 'mult', 1)">X</span></div><span style="color:#666; cursor:pointer; font-weight:bold; margin-left:5px; padding: 2px;" onclick="removeGlobalRune(${idx})">✖</span></div>`;
     });
-    html += `</div>`;
-    container.innerHTML = html;
+    html += `</div>`; container.innerHTML = html;
 }
 
-window.toggleSpellInfo = function(index) {
-    playerSpells[index].isOpen = !playerSpells[index].isOpen;
-    window.renderSpells();
-    window.saveData();
-}
+window.toggleSpellInfo = function(index) { playerSpells[index].isOpen = !playerSpells[index].isOpen; window.renderSpells(); window.saveData(); }
 
 window.renderSpells = function() {
-    const container = document.getElementById('spells-container');
-    container.innerHTML = '';
+    const container = document.getElementById('spells-container'); container.innerHTML = '';
     playerSpells.forEach((spell, index) => {
         if(spell.isOpen === undefined) spell.isOpen = true;
-        spell.tipo = spell.tipo || "Dano"; 
-        spell.bQtd = spell.bQtd || 1; spell.bD = spell.bD || "d20"; spell.bMult = spell.bMult !== undefined ? spell.bMult : 1;
-        spell.isCrit = spell.isCrit || false;
-        spell.statusName = spell.statusName || ""; spell.statusDT = spell.statusDT || "";
+        spell.tipo = spell.tipo || "Dano"; spell.bQtd = spell.bQtd || 1; spell.bD = spell.bD || "d20"; spell.bMult = spell.bMult !== undefined ? spell.bMult : 1;
+        spell.isCrit = spell.isCrit || false; spell.statusName = spell.statusName || ""; spell.statusDT = spell.statusDT || ""; spell.audioUrl = spell.audioUrl || "";
 
         let isSelf = spell.tipo === "Self";
-
         let row = document.createElement('div'); row.className = 'spell-item';
-        let headerHtml = `
-            <div class="spell-header" onclick="toggleSpellInfo(${index})">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                   <button class="btn-roll-spell" onclick="event.stopPropagation(); rollSpellMagic(${index})" title="Rolar Magia">🎲</button>
-                   <span style="font-weight: bold; color: var(--accent-gold); font-size: 16px;">${spell.nome || 'Nova Magia'}</span>
-                </div>
-                <div style="display:flex; align-items:center; gap: 10px;">
-                   <button class="btn-danger" style="padding: 4px 8px;" onclick="event.stopPropagation(); removeSpell(${index})">X</button>
-                   <span class="chevron">${spell.isOpen ? '▼' : '►'}</span>
-                </div>
-            </div>`;
+        let headerHtml = `<div class="spell-header" onclick="toggleSpellInfo(${index})"><div style="display: flex; align-items: center; gap: 10px;"><button class="btn-roll-spell" onclick="event.stopPropagation(); rollSpellMagic(${index})" title="Rolar Magia">🎲</button><span style="font-weight: bold; color: var(--accent-gold); font-size: 16px;">${spell.nome || 'Nova Magia'}</span></div><div style="display:flex; align-items:center; gap: 10px;"><button class="btn-danger" style="padding: 4px 8px;" onclick="event.stopPropagation(); removeSpell(${index})">X</button><span class="chevron">${spell.isOpen ? '▼' : '►'}</span></div></div>`;
 
-        let bodyHtml = `
-            <div style="display: ${spell.isOpen ? 'flex' : 'none'}; flex-direction: column; gap: 5px; margin-top: 10px;">
-                <div class="inv-row">
-                    <input type="text" class="inv-input" style="flex: 2; font-weight: bold;" placeholder="Habilidade" value="${spell.nome}" onchange="updateSpell(${index}, 'nome', this.value)">
-                    <input type="text" class="inv-input" style="flex: 1;" placeholder="Mana" value="${spell.custo}" onchange="updateSpell(${index}, 'custo', this.value)">
-                    <input type="text" class="inv-input" style="flex: 1;" placeholder="Alcance" value="${spell.alcance}" onchange="updateSpell(${index}, 'alcance', this.value)">
-                </div>
-                <div class="inv-row" style="margin-top: 5px;"><textarea class="inv-input" style="flex: 1; resize: vertical;" rows="1" placeholder="Descrição e Efeitos..." onchange="updateSpell(${index}, 'desc', this.value)">${spell.desc}</textarea></div>
-                <div class="dice-config-row">
-                    <select class="inv-input dice-sel" style="width:100% !important;" onchange="updateSpell(${index}, 'tipo', this.value); window.renderSpells();">
-                        <option value="Dano" ${spell.tipo==='Dano'?'selected':''}>Dano (Base + Runas Globais)</option>
-                        <option value="Controle" ${spell.tipo==='Controle'?'selected':''}>Controle (Base + Runas Globais)</option>
-                        <option value="Locomoção" ${spell.tipo==='Locomoção'?'selected':''}>Locomoção (Base + Runas Globais)</option>
-                        <option value="Self" ${spell.tipo==='Self'?'selected':''}>Self (Apenas Efeito)</option>
-                    </select>
-                    
-                    ${(!isSelf) ? `
-                    <div class="dice-group"><span class="lbl" style="color:#fff">Base</span>
-                        <input type="number" class="inv-input dice-qty" min="1" value="${spell.bQtd}" onchange="updateSpell(${index}, 'bQtd', this.value)">
-                        <select class="inv-input dice-sel" onchange="updateSpell(${index}, 'bD', this.value)">
-                            <option value="d4" ${spell.bD==='d4'?'selected':''}>d4</option><option value="d6" ${spell.bD==='d6'?'selected':''}>d6</option><option value="d8" ${spell.bD==='d8'?'selected':''}>d8</option><option value="d10" ${spell.bD==='d10'?'selected':''}>d10</option><option value="d12" ${spell.bD==='d12'?'selected':''}>d12</option><option value="d20" ${spell.bD==='d20'?'selected':''}>d20</option><option value="d100" ${spell.bD==='d100'?'selected':''}>d100</option>
-                        </select>
-                        <div class="mult-group">
-                            <span class="mult-btn m-red ${spell.bMult===0?'active':''}" onclick="updateSpell(${index}, 'bMult', 0)">X</span>
-                            <span class="mult-btn m-white ${spell.bMult===0.5?'active':''}" onclick="updateSpell(${index}, 'bMult', 0.5)">X</span>
-                            <span class="mult-btn m-green ${spell.bMult===1?'active':''}" onclick="updateSpell(${index}, 'bMult', 1)">X</span>
-                        </div>
-                    </div>
-                    <div style="display:flex; align-items:center; gap:5px; margin-left: auto; width: 100%; justify-content: flex-end; margin-top: 5px;">
-                        <input type="checkbox" id="crit-${index}" ${spell.isCrit ? 'checked' : ''} onchange="updateSpell(${index}, 'isCrit', this.checked)">
-                        <label for="crit-${index}" style="color:#ffd700; margin:0; cursor:pointer;">Crítico (Base Máx x3)</label>
-                    </div>` : ''}
-                </div>
-
-                <div class="dice-config-row" style="margin-top: 5px; border-color: #a855f7;">
-                    <div style="display: flex; width: 100%; align-items: center; gap: 5px;">
-                        <span style="color:#a855f7; font-size: 11px; font-weight: bold; white-space: nowrap;">⚡ Status/Efeito</span>
-                        <input type="text" class="inv-input" style="flex: 2;" placeholder="Ex: Queimar" value="${spell.statusName}" onchange="updateSpell(${index}, 'statusName', this.value)">
-                        <span style="color:#fff; font-size: 11px; font-weight: bold;">DT:</span>
-                        <input type="number" class="inv-input dice-qty" placeholder="15" value="${spell.statusDT}" onchange="updateSpell(${index}, 'statusDT', this.value)">
-                    </div>
-                </div>
-            </div>`;
-        row.innerHTML = headerHtml + bodyHtml;
-        container.appendChild(row);
+        let bodyHtml = `<div style="display: ${spell.isOpen ? 'flex' : 'none'}; flex-direction: column; gap: 5px; margin-top: 10px;"><div class="inv-row"><input type="text" class="inv-input" style="flex: 2; font-weight: bold;" placeholder="Habilidade" value="${spell.nome}" onchange="updateSpell(${index}, 'nome', this.value)"><input type="text" class="inv-input" style="flex: 1;" placeholder="Mana" value="${spell.custo}" onchange="updateSpell(${index}, 'custo', this.value)"><input type="text" class="inv-input" style="flex: 1;" placeholder="Alcance" value="${spell.alcance}" onchange="updateSpell(${index}, 'alcance', this.value)"></div><div class="inv-row" style="margin-top: 5px;"><textarea class="inv-input" style="flex: 1; resize: vertical;" rows="1" placeholder="Descrição e Efeitos..." onchange="updateSpell(${index}, 'desc', this.value)">${spell.desc}</textarea></div><div class="inv-row"><span style="font-size:16px;">🎵</span><input type="text" class="inv-input" style="flex: 1; border-color: #555;" placeholder="URL de Áudio Customizado (Discord Link .mp3)" value="${spell.audioUrl}" onchange="updateSpell(${index}, 'audioUrl', this.value)"></div><div class="dice-config-row"><select class="inv-input dice-sel" style="width:100% !important;" onchange="updateSpell(${index}, 'tipo', this.value); window.renderSpells();"><option value="Dano" ${spell.tipo==='Dano'?'selected':''}>Dano (Base + Runas Globais)</option><option value="Controle" ${spell.tipo==='Controle'?'selected':''}>Controle (Base + Runas Globais)</option><option value="Locomoção" ${spell.tipo==='Locomoção'?'selected':''}>Locomoção (Base + Runas Globais)</option><option value="Self" ${spell.tipo==='Self'?'selected':''}>Self (Apenas Efeito)</option></select>${(!isSelf) ? `<div class="dice-group"><span class="lbl" style="color:#fff">Base</span><input type="number" class="inv-input dice-qty" min="1" value="${spell.bQtd}" onchange="updateSpell(${index}, 'bQtd', this.value)"><select class="inv-input dice-sel" onchange="updateSpell(${index}, 'bD', this.value)"><option value="d4" ${spell.bD==='d4'?'selected':''}>d4</option><option value="d6" ${spell.bD==='d6'?'selected':''}>d6</option><option value="d8" ${spell.bD==='d8'?'selected':''}>d8</option><option value="d10" ${spell.bD==='d10'?'selected':''}>d10</option><option value="d12" ${spell.bD==='d12'?'selected':''}>d12</option><option value="d20" ${spell.bD==='d20'?'selected':''}>d20</option><option value="d100" ${spell.bD==='d100'?'selected':''}>d100</option></select><div class="mult-group"><span class="mult-btn m-red ${spell.bMult===0?'active':''}" onclick="updateSpell(${index}, 'bMult', 0)">X</span><span class="mult-btn m-white ${spell.bMult===0.5?'active':''}" onclick="updateSpell(${index}, 'bMult', 0.5)">X</span><span class="mult-btn m-green ${spell.bMult===1?'active':''}" onclick="updateSpell(${index}, 'bMult', 1)">X</span></div></div><div style="display:flex; align-items:center; gap:5px; margin-left: auto; width: 100%; justify-content: flex-end; margin-top: 5px;"><input type="checkbox" id="crit-${index}" ${spell.isCrit ? 'checked' : ''} onchange="updateSpell(${index}, 'isCrit', this.checked)"><label for="crit-${index}" style="color:#ffd700; margin:0; cursor:pointer;">Crítico (Base Máx x3)</label></div>` : ''}</div><div class="dice-config-row" style="margin-top: 5px; border-color: #a855f7;"><div style="display: flex; width: 100%; align-items: center; gap: 5px;"><span style="color:#a855f7; font-size: 11px; font-weight: bold; white-space: nowrap;">⚡ Status/Efeito</span><input type="text" class="inv-input" style="flex: 2;" placeholder="Ex: Queimar" value="${spell.statusName}" onchange="updateSpell(${index}, 'statusName', this.value)"><span style="color:#fff; font-size: 11px; font-weight: bold;">DT:</span><input type="number" class="inv-input dice-qty" placeholder="15" value="${spell.statusDT}" onchange="updateSpell(${index}, 'statusDT', this.value)"></div></div></div>`;
+        row.innerHTML = headerHtml + bodyHtml; container.appendChild(row);
     });
 }
-
-window.addSpell = function() {
-    playerSpells.push({ nome: "", desc: "", custo: "", alcance: "", tipo: "Dano", bQtd: 1, bD: "d20", bMult: 1, isOpen: true, isCrit: false, statusName: "", statusDT: "" });
-    window.renderSpells(); window.saveData();
-}
-
+window.addSpell = function() { playerSpells.push({ nome: "", desc: "", custo: "", alcance: "", tipo: "Dano", bQtd: 1, bD: "d20", bMult: 1, isOpen: true, isCrit: false, statusName: "", statusDT: "", audioUrl: "" }); window.renderSpells(); window.saveData(); }
 window.updateSpell = function(index, field, value) { playerSpells[index][field] = value; window.saveData(); window.renderSpells(); }
 window.removeSpell = function(index) { if(confirm("Remover magia?")) { playerSpells.splice(index, 1); window.renderSpells(); window.saveData(); } }
 
 window.rollSpellMagic = function(index) {
     const spell = playerSpells[index];
     if(!spell) return;
-
     const charName = document.getElementById('char-name').value || 'Desconhecido';
     const charColor = document.getElementById('char-color') ? document.getElementById('char-color').value : '#d4af37';
     let c = characters[currentCharId];
-
     const rolar = (qtd, tDado) => {
-        if (!qtd || qtd <= 0 || !tDado) return [];
-        let faces = parseInt(tDado.replace('d', ''));
-        let res = []; for(let i=0; i<qtd; i++) res.push(Math.floor(Math.random() * faces) + 1);
-        return res;
+        if (!qtd || qtd <= 0 || !tDado) return []; let faces = parseInt(tDado.replace('d', ''));
+        let res = []; for(let i=0; i<qtd; i++) res.push(Math.floor(Math.random() * faces) + 1); return res;
     }
-
     let bRolls = [], bTot = 0;
     if(spell.tipo !== 'Self') {
-        if(spell.isCrit) {
-            let faces = parseInt(spell.bD.replace('d', ''));
-            bRolls = [faces * parseInt(spell.bQtd) * 3]; 
-        } else {
-            bRolls = rolar(spell.bQtd, spell.bD);
-        }
+        if(spell.isCrit) { let faces = parseInt(spell.bD.replace('d', '')); bRolls = [faces * parseInt(spell.bQtd) * 3]; } else { bRolls = rolar(spell.bQtd, spell.bD); }
         bTot = Math.floor(bRolls.reduce((a,b)=>a+b, 0) * spell.bMult);
     }
-
     let runesPack = [];
     if(spell.tipo !== 'Self' && c.activeRunes) {
         runesPack = c.activeRunes.map(r => {
-            let rl = rolar(1, r.face); 
-            let somaDados = rl.reduce((a,b)=>a+b, 0);
-            let fixo = parseInt(r.fixo) || 0;
-            let tot = Math.floor((somaDados + fixo) * r.mult);
-            return { t: r.type, f: r.face, m: r.mult, r: rl, fixo: fixo, tot: tot };
+            let rl = rolar(1, r.face); let somaDados = rl.reduce((a,b)=>a+b, 0); let fixo = parseInt(r.fixo) || 0;
+            return { t: r.type, f: r.face, m: r.mult, r: rl, fixo: fixo, tot: Math.floor((somaDados + fixo) * r.mult) };
         });
     }
-
     let stRoll = (spell.statusName && spell.statusDT > 0) ? Math.floor(Math.random() * 20) + 1 : 0;
 
     const payload = {
-        t: "spell", c: charName, col: charColor,
-        sn: spell.nome || "Habilidade", cost: spell.custo || "0", rg: spell.alcance || "Self", desc: spell.desc || "", st: spell.tipo || "Dano",
-        b: { f: spell.bD, m: spell.bMult, r: bRolls, tot: bTot },
-        ru: runesPack, 
-        crit: spell.isCrit ? "true" : "false",
-        stName: spell.statusName || "", stDT: spell.statusDT || "0", stRoll: stRoll
+        t: "spell", av: document.getElementById('char-avatar').value, c: charName, col: charColor, sn: spell.nome || "Habilidade", cost: spell.custo || "0", rg: spell.alcance || "Self", desc: spell.desc || "", st: spell.tipo || "Dano",
+        b: { f: spell.bD, m: spell.bMult, r: bRolls, tot: bTot }, ru: runesPack, crit: spell.isCrit ? "true" : "false", stName: spell.statusName || "", stDT: spell.statusDT || "0", stRoll: stRoll, audio: spell.audioUrl || ""
     };
 
     window.abrirModalCentral(payload);
+    window.addCombatLog(payload);
     if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", payload);
     
-    // MAGIA UTILIZADA: RESETA O TURNO
     if(spell.isCrit) spell.isCrit = false;
-    c.activeRunes = []; 
-    c.alloc = {f:0, m:0, a:0, s:0};
+    c.activeRunes = []; c.alloc = {f:0, m:0, a:0, s:0};
     safeSetVal('alloc-forca', 0); safeSetVal('alloc-magia', 0); safeSetVal('alloc-agilidade', 0); safeSetVal('alloc-sorte', 0);
-    
-    window.renderGlobalRunes();
-    window.renderSpells();
-    window.saveData();
+    window.renderGlobalRunes(); window.renderSpells(); window.saveData();
 }
 
 window.renderInventory = function() {
-    const container = document.getElementById('inventory-container');
-    container.innerHTML = '';
+    const container = document.getElementById('inventory-container'); container.innerHTML = '';
     playerInventory.forEach((item, index) => {
         let row = document.createElement('div'); row.className = 'inv-item';
-        row.innerHTML = `
-            <div class="inv-row">
-                <input type="text" class="inv-input" style="flex: 2;" placeholder="Item" value="${item.nome}" onchange="updateInv(${index}, 'nome', this.value)">
-                <input type="number" class="inv-input" style="flex: 1;" placeholder="Peso" value="${item.peso}" onchange="updateInv(${index}, 'peso', this.value)">
-                <input type="number" class="inv-input" style="flex: 1;" placeholder="Qtd" value="${item.qtd}" onchange="updateInv(${index}, 'qtd', this.value)">
-                <button class="btn-danger" onclick="removeInv(${index})">X</button>
-            </div>
-            <div class="inv-row" style="margin-top: 5px;"><input type="text" class="inv-input" style="flex: 1;" placeholder="Descrição..." value="${item.desc}" onchange="updateInv(${index}, 'desc', this.value)"></div>
-        `;
+        row.innerHTML = `<div class="inv-row"><input type="text" class="inv-input" style="flex: 2;" placeholder="Item" value="${item.nome}" onchange="updateInv(${index}, 'nome', this.value)"><input type="number" class="inv-input" style="flex: 1;" placeholder="Peso" value="${item.peso}" onchange="updateInv(${index}, 'peso', this.value)"><input type="number" class="inv-input" style="flex: 1;" placeholder="Qtd" value="${item.qtd}" onchange="updateInv(${index}, 'qtd', this.value)"><button class="btn-danger" onclick="removeInv(${index})">X</button></div><div class="inv-row" style="margin-top: 5px;"><input type="text" class="inv-input" style="flex: 1;" placeholder="Descrição..." value="${item.desc}" onchange="updateInv(${index}, 'desc', this.value)"></div>`;
         container.appendChild(row);
     });
     window.calcVitals();
 }
-
-window.addInventoryItem = function() {
-    if(isOverweight) return alert("Sua mochila está muito pesada!");
-    playerInventory.push({ nome: "", desc: "", peso: 0, qtd: 1 });
-    window.renderInventory(); window.saveData();
-}
+window.addInventoryItem = function() { if(isOverweight) return alert("Sua mochila está pesada!"); playerInventory.push({ nome: "", desc: "", peso: 0, qtd: 1 }); window.renderInventory(); window.saveData(); }
 window.updateInv = function(index, field, value) { playerInventory[index][field] = value; window.renderInventory(); window.saveData(); }
 window.removeInv = function(index) { playerInventory.splice(index, 1); window.renderInventory(); window.saveData(); }
 
@@ -627,34 +495,20 @@ window.saveData = async function() {
     if (!currentCharId) return; 
     let isMonster = document.getElementById('char-category')?.value === 'Monstros';
     
-    let al = {
-        f: parseInt(document.getElementById('alloc-forca').value)||0, m: parseInt(document.getElementById('alloc-magia').value)||0,
-        a: parseInt(document.getElementById('alloc-agilidade').value)||0, s: parseInt(document.getElementById('alloc-sorte').value)||0
-    };
-
+    let al = { f: parseInt(document.getElementById('alloc-forca').value)||0, m: parseInt(document.getElementById('alloc-magia').value)||0, a: parseInt(document.getElementById('alloc-agilidade').value)||0, s: parseInt(document.getElementById('alloc-sorte').value)||0 };
     const sheetData = {
-        name: document.getElementById('char-name')?.value || "Sem Nome", color: document.getElementById('char-color')?.value || "#d4af37", category: document.getElementById('char-category')?.value || "Jogadores",
+        name: document.getElementById('char-name')?.value || "Sem Nome", avatar: document.getElementById('char-avatar')?.value || "🧙‍♂️", color: document.getElementById('char-color')?.value || "#d4af37", category: document.getElementById('char-category')?.value || "Jogadores",
         age: document.getElementById('char-age')?.value || "", race: isMonster ? document.getElementById('char-race-monster').value : document.getElementById('char-race-player').value,
         classe: document.getElementById('char-class')?.value || "Plebeu", prof: document.getElementById('char-prof')?.value || "", profDesc: document.getElementById('char-prof-desc')?.value || "",
         vidaMonster: document.getElementById('val-vida-monster')?.value || 100, forca: document.getElementById('attr-forca')?.value || 1, magia: document.getElementById('attr-magia')?.value || 1, agilidade: document.getElementById('attr-agilidade')?.value || 1, sorte: document.getElementById('attr-sorte')?.value || 1,
-        
-        // GRIMÓRIO SALVANDO AQUI!
-        grimoireSelect: document.getElementById('grimoire-select')?.value || "", grimoireDT: document.getElementById('grimoire-dt')?.value || 10,
-        mana: document.getElementById('mana-zone')?.value || "", passiva: document.getElementById('passiva')?.value || "", 
+        grimoireSelect: document.getElementById('grimoire-select')?.value || "", grimoireDT: document.getElementById('grimoire-dt')?.value || 10, mana: document.getElementById('mana-zone')?.value || "", passiva: document.getElementById('passiva')?.value || "", 
         mov: document.getElementById('char-mov')?.value || 30, runas: document.getElementById('char-runas')?.value || 0,
-        
-        skills: playerSkills, inventory: playerInventory, spells: playerSpells, photo: currentPhoto,
-        activeRunes: characters[currentCharId] ? characters[currentCharId].activeRunes : [], alloc: al
+        skills: playerSkills, inventory: playerInventory, spells: playerSpells, photo: currentPhoto, activeRunes: characters[currentCharId] ? characters[currentCharId].activeRunes : [], alloc: al
     };
-
     characters[currentCharId] = sheetData;
     try { localStorage.setItem('fatesheet_db', JSON.stringify(characters)); } catch(e){}
 
-    if (OBR.isAvailable) {
-        let metaUpdate = {};
-        metaUpdate[`fatesheet_char_${currentCharId}`] = sheetData;
-        await OBR.room.setMetadata(metaUpdate);
-    }
+    if (OBR.isAvailable) await OBR.room.setMetadata({ [`fatesheet_char_${currentCharId}`]: sheetData });
 }
 
 window.renderSkills = function() {
@@ -670,10 +524,8 @@ window.renderSkills = function() {
 window.updateSkill = function(skillName, change, event) { event.stopPropagation(); playerSkills[skillName] += change; if (playerSkills[skillName] < 0) playerSkills[skillName] = 0; window.renderSkills(); window.saveData(); }
 
 window.rollSkill = function(skillName, attrName) {
-    let idMapped = attrName.toLowerCase().replace('ç', 'c');
-    let baseAttr = parseInt(document.getElementById(`attr-${idMapped}`).value) || 1;
-    let classe = document.getElementById('char-class').value;
-    let isMonster = document.getElementById('char-category').value === 'Monstros';
+    let idMapped = attrName.toLowerCase().replace('ç', 'c'); let baseAttr = parseInt(document.getElementById(`attr-${idMapped}`).value) || 1;
+    let classe = document.getElementById('char-class').value; let isMonster = document.getElementById('char-category').value === 'Monstros';
     
     if(!isMonster) {
         if (classe === 'Plebeu') { if(attrName === 'Força') baseAttr += 1; if(attrName === 'Magia') baseAttr -= 1; }
@@ -682,21 +534,12 @@ window.rollSkill = function(skillName, attrName) {
         if (classe === 'Nobre' && attrName === 'Magia') baseAttr += 1;
     }
     if(baseAttr < 1) baseAttr = 1;
-
-    let results = [];
-    for (let i = 0; i < baseAttr; i++) {
-        let die = Math.floor(Math.random() * 20) + 1;
-        if (isOverweight) die -= 5;
-        results.push(die);
-    }
-
-    const charName = document.getElementById('char-name').value || 'Desconhecido';
-    const charColor = document.getElementById('char-color') ? document.getElementById('char-color').value : '#d4af37';
-    let skillMod = playerSkills[skillName] || 0;
+    let results = []; for (let i = 0; i < baseAttr; i++) { let die = Math.floor(Math.random() * 20) + 1; if (isOverweight) die -= 5; results.push(die); }
     
-    const payload = { t: "skill", c: charName, s: skillName, a: attrName, r: results.join(','), pen: isOverweight ? "true" : "false", col: charColor, mod: skillMod };
+    const payload = { t: "skill", av: document.getElementById('char-avatar').value, c: document.getElementById('char-name').value || 'Desconhecido', s: skillName, a: attrName, r: results.join(','), pen: isOverweight ? "true" : "false", col: document.getElementById('char-color').value || '#d4af37', mod: playerSkills[skillName] || 0 };
 
     window.abrirModalCentral(payload);
+    window.addCombatLog(payload);
     if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", payload);
 }
 
@@ -706,24 +549,6 @@ window.abrirModalCentral = function(data) {
         OBR.modal.open({ id: "fate-roll-modal", url: `https://seediam.github.io/FateSheet/resultado.html?data=${dataUrl}`, width: 450, height: (data.t === "spell" || data.t === "attr") ? 550 : 250 });
     }
 }
-
-window.setPhotoPreview = function(base64Str) {
-    const preview = document.getElementById('photo-preview'); const text = document.getElementById('photo-text');
-    if(!preview) return;
-    if (base64Str) { preview.style.backgroundImage = `url("${base64Str}")`; preview.style.border = 'none'; text.style.display = 'none';
-    } else { preview.style.backgroundImage = 'none'; preview.style.border = '1px dashed var(--accent-gold)'; text.style.display = 'block'; }
-}
-
-document.getElementById('photo-upload').addEventListener('change', function(e) {
-    const file = e.target.files[0];
-    if (file) {
-        const reader = new FileReader();
-        reader.onload = function(event) { currentPhoto = event.target.result; window.setPhotoPreview(currentPhoto); window.saveData(); };
-        reader.readAsDataURL(file);
-    }
-});
-
-document.addEventListener('input', () => { if(currentCharId) window.saveData(); });
 
 function processRoomData(metadata) {
     let mudouAlgo = false;
