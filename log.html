@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Log de Combate</title>
+    <style>
+        body { margin:0; background: rgba(20, 20, 30, 0.95); color: white; font-family: 'Segoe UI', Tahoma, sans-serif; overflow-y: auto; overflow-x: hidden; height: 100vh; padding: 10px; box-sizing: border-box; border: 2px solid #d4af37; border-radius: 8px;}
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #d4af37; border-radius: 4px; }
+        
+        .title { text-align: center; color: #d4af37; font-weight: bold; margin-top: 5px; margin-bottom: 15px; font-size: 14px; text-transform: uppercase; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        .btn-close { position: absolute; top: 10px; right: 10px; background: #ff4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; padding: 4px 8px; transition: 0.2s;}
+        .btn-close:hover { background: #fff; color: #000; }
+        
+        .log-entry { background: #1a1a24; border-left: 3px solid #d4af37; padding: 10px; margin-bottom: 10px; border-radius: 4px; font-size: 13px; box-shadow: 0 4px 6px rgba(0,0,0,0.5); animation: fadeIn 0.3s ease;}
+        .log-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; border-bottom: 1px solid #333; padding-bottom: 5px;}
+        .log-name { font-weight: bold; color: #d4af37; font-size: 14px; }
+        .log-action { color: #888; font-size: 11px; }
+        .log-result { color: #fff; margin-top: 5px;}
+        
+        @keyframes fadeIn { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: translateX(0); } }
+    </style>
+</head>
+<body>
+    <button class="btn-close" onclick="fecharLog()">X</button>
+    <div class="title">📜 Histórico de Combate</div>
+    <div id="log-container"></div>
+    
+    <script type="module">
+        import OBR from "https://esm.sh/@owlbear-rodeo/sdk";
+        
+        window.fecharLog = () => { OBR.popover.close("fatesheet-log-popover"); }
+
+        function render(logData) {
+            const container = document.getElementById('log-container');
+            container.innerHTML = '';
+            logData.forEach(log => {
+                let div = document.createElement('div'); div.className = 'log-entry';
+                let act = log.t === "spell" ? `Magia: ${log.sn}` : (log.t === "attr" ? `Atributos` : `Perícia: ${log.s}`);
+                let res = "";
+                
+                if (log.t === "spell") {
+                    let totalDano = log.b.tot || 0;
+                    if(log.ru) log.ru.forEach(r => totalDano += r.tot);
+                    if(log.beta && log.beta.r) totalDano += log.beta.r.reduce((a,b)=>a+b, 0);
+                    res = `<span style="color:${log.col}; font-weight:bold; font-size:16px;">Resultado: ${totalDano}</span>`;
+                } else if (log.t === "attr") {
+                    res = `<span style="color:#888;">Preparou as Runas do Turno</span>`;
+                } else {
+                    let r = log.r ? log.r.split(',') : [0];
+                    let v = parseInt(r[0]) + (log.mod || 0);
+                    res = `Tirou <b style="color:${log.col}">${v}</b>`;
+                }
+                div.innerHTML = `<div class="log-header"><span class="log-name">${log.av || '🧙‍♂️'} ${log.c}</span><span class="log-action">${act}</span></div><div class="log-result">${res}</div>`;
+                container.appendChild(div);
+            });
+        }
+
+        OBR.onReady(async () => {
+            let meta = await OBR.room.getMetadata();
+            if(meta && meta["fatesheet_combat_log"]) render(meta["fatesheet_combat_log"]);
+
+            OBR.room.onMetadataChange((metadata) => {
+                if (metadata["fatesheet_combat_log"]) {
+                    render(metadata["fatesheet_combat_log"]);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
