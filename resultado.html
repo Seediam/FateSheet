@@ -29,7 +29,8 @@
         .roll-box { font-size: 32px; font-weight: bold; background: #111; padding: 15px; border-radius: 6px; border: 1px dashed var(--aura-color); margin: 15px 0; text-shadow: 0 0 15px rgba(255, 255, 255, 0.5); letter-spacing: 2px;}
         .penalty { color: #ff4444; font-size: 12px; font-weight: bold; margin-bottom: 10px; display: none;}
         
-        .crit-anim { animation: camera-shake 0.4s both; border-color: var(--aura-color) !important; box-shadow: 0 0 50px var(--aura-color); }
+        .crit-anim { animation: camera-shake 0.4s both; border-color: #ffd700 !important; box-shadow: 0 0 50px #ffd700; }
+        .crit-text { color: #ffd700 !important; text-shadow: 0 0 15px #ffd700; }
     </style>
 </head>
 <body>
@@ -57,9 +58,14 @@
 
                 // --------- MODO MAGIA ---------
                 if(data.type === "spell") {
+                    let isCrit = data.isCrit === "true";
+                    if(isCrit) document.getElementById('popup-box').classList.add('crit-anim');
+
                     document.getElementById('c-name').innerText = data.c;
+                    let critBadge = isCrit ? `<span style="color:#ffd700; border: 1px solid #ffd700; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 5px;">CRÍTICO</span>` : "";
+                    
                     document.getElementById('c-action').innerHTML = `
-                        <span style="font-size:18px; color:#fff; font-weight:bold;">- ${data.sName} -</span><br>
+                        <span style="font-size:18px; color:#fff; font-weight:bold;">- ${data.sName} -</span> ${critBadge}<br>
                         <span style="font-size:11px; color:#888;">Custo: ${data.cost} Mana | Alcance: ${data.range} | Tipo: ${data.sType}</span>
                     `;
 
@@ -69,15 +75,18 @@
                     const arrB = formatArr(data.rB);
                     const arrA = formatArr(data.rA);
                     const arrF = formatArr(data.rF);
+                    const arrBeta = formatArr(data.rBeta);
 
-                    const buildRollRow = (arr, diceType, label, color) => {
+                    const buildRollRow = (arr, diceType, label, color, isBaseCrit = false) => {
                         if(arr.length === 0) return "";
                         let total = arr.reduce((a,b)=>a+parseInt(b), 0);
-                        let textArr = arr.map(v => `<span style="color:#fff;">${v}</span>`).join(" + ");
+                        let textTotal = isBaseCrit ? `<span class="crit-text">${total}</span>` : `<b style="color:${color};">${total}</b>`;
+                        
+                        let textArr = arr.map(v => `<span style="${isBaseCrit ? 'color:#ffd700;' : 'color:#fff;'}">${v}</span>`).join(" + ");
                         return `<div style="margin-top:8px; font-size:14px; text-align:left; border-bottom:1px solid #333; padding-bottom:6px;">
                                     <span style="color:${color}; font-weight:bold; display:inline-block; width:45px;">${label}</span> 
-                                    <span style="font-size:10px; color:#666;">(${arr.length}${diceType})</span>: 
-                                    [ ${textArr} ] = <b style="font-size:18px; color:${color};">${total}</b>
+                                    <span style="font-size:10px; color:#666;">(${isBaseCrit ? 'MÁX' : arr.length+diceType})</span>: 
+                                    [ ${textArr} ] = <span style="font-size:18px;">${textTotal}</span>
                                 </div>`;
                     };
 
@@ -85,19 +94,24 @@
                     if(arrB.length > 0) sumTotal += arrB.reduce((a,b)=>a+parseInt(b), 0);
                     if(arrA.length > 0) sumTotal += arrA.reduce((a,b)=>a+parseInt(b), 0);
                     if(arrF.length > 0) sumTotal += arrF.reduce((a,b)=>a+parseInt(b), 0);
+                    if(arrBeta.length > 0) sumTotal += arrBeta.reduce((a,b)=>a+parseInt(b), 0);
 
                     let rollsHtml = "";
-                    rollsHtml += buildRollRow(arrB, data.dB, "Base", "var(--aura-color)");
-                    rollsHtml += buildRollRow(arrA, data.dA, "Alpha", "#44aaff");
-                    rollsHtml += buildRollRow(arrF, data.dF, "Delta", "#ff4444");
+                    rollsHtml += buildRollRow(arrB, data.dB, "Base", "var(--aura-color)", isCrit);
+                    rollsHtml += buildRollRow(arrA, data.dA, "αlpha", "#44aaff");
+                    rollsHtml += buildRollRow(arrBeta, data.dBeta, "βeta", "#a855f7"); // Roxo
+                    rollsHtml += buildRollRow(arrF, data.dF, "δelta", "#ff4444");
 
-                    let totalHtml = `<div style="margin-top:15px; font-size:22px; font-weight:bold; color:#fff;">Total do Efeito: <span style="color:var(--aura-color);">${sumTotal}</span></div>`;
-                    if(data.sType === "Dano") totalHtml = `<div style="margin-top:15px; font-size:24px; font-weight:bold; color:#fff;">Dano Total: <span style="color:var(--aura-color);">${sumTotal}</span></div>`;
+                    let corFinal = isCrit ? "#ffd700" : "var(--aura-color)";
+                    let classFinal = isCrit ? "crit-text" : "";
+
+                    let totalHtml = `<div style="margin-top:15px; font-size:22px; font-weight:bold; color:#fff;">Total do Efeito: <span style="color:${corFinal};" class="${classFinal}">${sumTotal}</span></div>`;
+                    if(data.sType === "Dano") totalHtml = `<div style="margin-top:15px; font-size:24px; font-weight:bold; color:#fff;">Dano Total: <span style="color:${corFinal};" class="${classFinal}">${sumTotal}</span></div>`;
+                    if(data.sType === "Locomoção") totalHtml = `<div style="margin-top:15px; font-size:22px; font-weight:bold; color:#fff;">Movimento: <span style="color:${corFinal};" class="${classFinal}">+${sumTotal} ft</span></div>`;
 
                     document.getElementById('c-roll').innerHTML = descHtml + rollsHtml + totalHtml;
-                    document.getElementById('c-roll').style.fontSize = "16px"; // Ajusta para não estourar a tela
-                    document.getElementById('c-pen').style.display = "none"; // Magia não sofre o peso físico
-
+                    document.getElementById('c-roll').style.fontSize = "16px"; 
+                    document.getElementById('c-pen').style.display = "none"; 
                 } 
                 // --------- MODO PERÍCIA NORMAL ---------
                 else {
@@ -129,7 +143,7 @@
                 }
             }
 
-            // O modal de magia dá mais tempo para o jogador ler o efeito
+            // Magia tem muito texto, fica mais tempo na tela
             let tempo = dataStr && JSON.parse(decodeURIComponent(dataStr)).type === "spell" ? 7000 : 4500;
             setTimeout(() => { OBR.modal.close('fate-roll-modal'); }, tempo);
         });
