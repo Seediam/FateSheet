@@ -10,6 +10,7 @@ const skillsData = [
 
 let characters = {}; 
 let currentCharId = null;
+let currentIsMine = true; 
 let playerSkills = {}; 
 let playerInventory = [];
 let playerSpells = []; 
@@ -45,6 +46,7 @@ window.renderCharacterList = function() {
     const container = document.getElementById('character-folders');
     if(!container) return;
     container.innerHTML = '';
+
     const categories = { "Jogadores": [], "NPCs": [], "Monstros": [] };
 
     for (let id in characters) {
@@ -59,9 +61,12 @@ window.renderCharacterList = function() {
         if (categories[cat].length > 0) {
             hasAny = true;
             let isOpen = folderState[cat];
-            let html = `<div class="folder-header" onclick="toggleFolder('${cat}')">
+            let html = `
+                <div class="folder-header" onclick="toggleFolder('${cat}')">
                     <span class="chevron">${isOpen ? '▼' : '►'}</span> 📁 ${cat}
-                </div><div class="folder-content" style="display: ${isOpen ? 'flex' : 'none'};">`;
+                </div>
+                <div class="folder-content" style="display: ${isOpen ? 'flex' : 'none'};">
+            `;
             categories[cat].forEach(char => {
                 html += `<div class="char-list-item" onclick="openCharacter('${char.id}')"><span>${char.name}</span></div>`;
             });
@@ -69,29 +74,26 @@ window.renderCharacterList = function() {
             container.innerHTML += html;
         }
     }
+
     if(!hasAny) container.innerHTML = '<div style="text-align:center; color:#666; margin-top: 20px;">A Mesa está vazia.</div>';
 }
 
 window.createNewCharacter = function() {
     const newId = 'char_' + Date.now();
-    characters[newId] = { name: "Novo Personagem", category: "Jogadores", classe: "Plebeu", skills: {}, inventory: [], spells: [], photo: "", color: "#d4af37", mov: 30 };
+    characters[newId] = { name: "Novo Personagem", category: "Jogadores", classe: "Plebeu", skills: {}, inventory: [], spells: [], photo: "", color: "#d4af37", mov: 30, runas: 0 };
     currentCharId = newId;
     window.saveData(); 
     window.openCharacter(newId);
 }
 
-// CORREÇÃO DO DELETE GLOBAL QUE FICA VOLTANDO:
 window.deleteCharacter = async function() {
     if(confirm("Apagar esta ficha permanentemente para TODOS na mesa?")) {
         const idToDelete = currentCharId;
-        delete characters[idToDelete]; // Apaga do objeto local
-        
-        // Atualiza a memoria local pra nao puxar o zumbi
+        delete characters[idToDelete]; 
         try { localStorage.setItem('fatesheet_db', JSON.stringify(characters)); } catch(e){}
-        
         if (OBR.isAvailable) {
             let metaUpdate = {};
-            metaUpdate[`fatesheet_char_${idToDelete}`] = undefined; // Força exclusão na rede do Owlbear
+            metaUpdate[`fatesheet_char_${idToDelete}`] = undefined; 
             await OBR.room.setMetadata(metaUpdate);
         }
         window.backToList();
@@ -148,6 +150,7 @@ window.updateCategoryUI = function() {
 window.openCharacter = function(id) {
     currentCharId = id;
     const c = characters[id] || {};
+    currentIsMine = true;
     
     safeSetVal('char-name', c.name || '');
     safeSetVal('char-color', c.color || '#d4af37');
@@ -171,6 +174,7 @@ window.openCharacter = function(id) {
     safeSetVal('mana-zone', c.mana || '');
     safeSetVal('passiva', c.passiva || ''); 
     safeSetVal('char-mov', c.mov || 30);
+    safeSetVal('char-runas', c.runas || 0); // NOVO
     
     playerSkills = c.skills || {};
     playerInventory = c.inventory || [];
@@ -224,6 +228,7 @@ window.calcVitals = function() {
     }
 }
 
+// ------ NOVO CONSTRUTOR DE MAGIAS COM RUNAS DINÂMICAS ------
 window.toggleSpellInfo = function(index) {
     playerSpells[index].isOpen = !playerSpells[index].isOpen;
     window.renderSpells();
@@ -235,12 +240,15 @@ window.renderSpells = function() {
     container.innerHTML = '';
     playerSpells.forEach((spell, index) => {
         if(spell.isOpen === undefined) spell.isOpen = true;
-        spell.tipo = spell.tipo || "Dano"; spell.bQtd = spell.bQtd || 1; spell.bD = spell.bD || "d20";
-        spell.aQtd = spell.aQtd || 0; spell.aD = spell.aD || ""; spell.fQtd = spell.fQtd || 0; spell.fD = spell.fD || "";
-        spell.betaQtd = spell.betaQtd || 0; spell.betaD = spell.betaD || ""; spell.isCrit = spell.isCrit || false;
-        spell.statusName = spell.statusName || ""; spell.statusDT = spell.statusDT || "";
+        spell.tipo = spell.tipo || "Dano"; 
+        spell.bQtd = spell.bQtd || 1; spell.bD = spell.bD || "d20"; spell.bMult = spell.bMult !== undefined ? spell.bMult : 1;
+        spell.runes = spell.runes || [];
+        spell.betaQtd = spell.betaQtd || 0; spell.betaD = spell.betaD || ""; 
+        spell.isCrit = spell.isCrit || false;
 
-        let isSelf = spell.tipo === "Self", isLoc = spell.tipo === "Locomoção";
+        let isSelf = spell.tipo === "Self";
+        let isLoc = spell.tipo === "Locomoção";
+
         let row = document.createElement('div');
         row.className = 'spell-item';
         
@@ -256,6 +264,28 @@ window.renderSpells = function() {
                 </div>
             </div>`;
 
+        let runesHtml = '';
+        if(!isSelf && !isLoc) {
+            spell.runes.forEach((r, rIdx) => {
+                let cHex = r.type === 'alpha' ? '#44aaff' : '#ff4444';
+                let sym = r.type === 'alpha' ? 'α' : 'δ';
+                runesHtml += `
+                    <div class="dice-group" style="border-color:${cHex}; margin-top:5px;">
+                        <span class="lbl" style="color:${cHex}">${sym}</span>
+                        <input type="number" class="inv-input dice-qty" min="1" value="${r.qtd}" onchange="updateRune(${index}, ${rIdx}, 'qtd', this.value)">
+                        <select class="inv-input dice-sel" onchange="updateRune(${index}, ${rIdx}, 'face', this.value)">
+                            <option value="d4" ${r.face==='d4'?'selected':''}>d4</option><option value="d6" ${r.face==='d6'?'selected':''}>d6</option><option value="d8" ${r.face==='d8'?'selected':''}>d8</option><option value="d10" ${r.face==='d10'?'selected':''}>d10</option><option value="d12" ${r.face==='d12'?'selected':''}>d12</option><option value="d20" ${r.face==='d20'?'selected':''}>d20</option><option value="d100" ${r.face==='d100'?'selected':''}>d100</option>
+                        </select>
+                        <div class="mult-group">
+                            <span class="mult-btn m-red ${r.mult===0?'active':''}" onclick="updateRune(${index}, ${rIdx}, 'mult', 0)">X</span>
+                            <span class="mult-btn m-white ${r.mult===0.5?'active':''}" onclick="updateRune(${index}, ${rIdx}, 'mult', 0.5)">X</span>
+                            <span class="mult-btn m-green ${r.mult===1?'active':''}" onclick="updateRune(${index}, ${rIdx}, 'mult', 1)">X</span>
+                        </div>
+                        <span style="color:#666; cursor:pointer; font-weight:bold; margin-left:5px;" onclick="removeRune(${index}, ${rIdx})">✖</span>
+                    </div>`;
+            });
+        }
+
         let bodyHtml = `
             <div style="display: ${spell.isOpen ? 'flex' : 'none'}; flex-direction: column; gap: 5px; margin-top: 10px;">
                 <div class="inv-row">
@@ -263,46 +293,47 @@ window.renderSpells = function() {
                     <input type="text" class="inv-input" style="flex: 1;" placeholder="Mana" value="${spell.custo}" onchange="updateSpell(${index}, 'custo', this.value)">
                     <input type="text" class="inv-input" style="flex: 1;" placeholder="Alcance" value="${spell.alcance}" onchange="updateSpell(${index}, 'alcance', this.value)">
                 </div>
-                <div class="inv-row" style="margin-top: 5px;">
-                    <textarea class="inv-input" style="flex: 1; resize: vertical;" rows="1" placeholder="Descrição e Efeitos..." onchange="updateSpell(${index}, 'desc', this.value)">${spell.desc}</textarea>
-                </div>
+                <div class="inv-row" style="margin-top: 5px;"><textarea class="inv-input" style="flex: 1; resize: vertical;" rows="1" placeholder="Descrição e Efeitos..." onchange="updateSpell(${index}, 'desc', this.value)">${spell.desc}</textarea></div>
                 <div class="dice-config-row">
-                    <select class="inv-input dice-sel" onchange="updateSpell(${index}, 'tipo', this.value); window.renderSpells();">
-                        <option value="Dano" ${spell.tipo==='Dano'?'selected':''}>Dano</option><option value="Controle" ${spell.tipo==='Controle'?'selected':''}>Controle</option>
-                        <option value="Self" ${spell.tipo==='Self'?'selected':''}>Self</option><option value="Locomoção" ${spell.tipo==='Locomoção'?'selected':''}>Locomoção</option>
+                    <select class="inv-input dice-sel" style="width:100% !important;" onchange="updateSpell(${index}, 'tipo', this.value); window.renderSpells();">
+                        <option value="Dano" ${spell.tipo==='Dano'?'selected':''}>Dano (Base + Runas)</option>
+                        <option value="Controle" ${spell.tipo==='Controle'?'selected':''}>Controle (Base + Runas)</option>
+                        <option value="Self" ${spell.tipo==='Self'?'selected':''}>Self (Só Base)</option>
+                        <option value="Locomoção" ${spell.tipo==='Locomoção'?'selected':''}>Locomoção (Base + Beta)</option>
                     </select>
-                    <div class="dice-group"><span style="color:#fff">Base</span>
+                    
+                    <div class="dice-group"><span class="lbl" style="color:#fff">Base</span>
                         <input type="number" class="inv-input dice-qty" min="1" value="${spell.bQtd}" onchange="updateSpell(${index}, 'bQtd', this.value)">
                         <select class="inv-input dice-sel" onchange="updateSpell(${index}, 'bD', this.value)">
                             <option value="d4" ${spell.bD==='d4'?'selected':''}>d4</option><option value="d6" ${spell.bD==='d6'?'selected':''}>d6</option><option value="d8" ${spell.bD==='d8'?'selected':''}>d8</option><option value="d10" ${spell.bD==='d10'?'selected':''}>d10</option><option value="d12" ${spell.bD==='d12'?'selected':''}>d12</option><option value="d20" ${spell.bD==='d20'?'selected':''}>d20</option><option value="d100" ${spell.bD==='d100'?'selected':''}>d100</option>
                         </select>
+                        ${(!isSelf && !isLoc) ? `
+                        <div class="mult-group">
+                            <span class="mult-btn m-red ${spell.bMult===0?'active':''}" onclick="updateSpell(${index}, 'bMult', 0)">X</span>
+                            <span class="mult-btn m-white ${spell.bMult===0.5?'active':''}" onclick="updateSpell(${index}, 'bMult', 0.5)">X</span>
+                            <span class="mult-btn m-green ${spell.bMult===1?'active':''}" onclick="updateSpell(${index}, 'bMult', 1)">X</span>
+                        </div>` : ''}
                     </div>
+
+                    ${runesHtml}
+
                     ${(!isSelf && !isLoc) ? `
-                    <div class="dice-group" style="border-color:#1e3a8a"><span style="color:#44aaff">α</span>
-                        <input type="number" class="inv-input dice-qty" min="0" value="${spell.aQtd}" onchange="updateSpell(${index}, 'aQtd', this.value)">
-                        <select class="inv-input dice-sel" onchange="updateSpell(${index}, 'aD', this.value)"><option value="" ${spell.aD===''?'selected':''}>--</option><option value="d4" ${spell.aD==='d4'?'selected':''}>d4</option><option value="d6" ${spell.aD==='d6'?'selected':''}>d6</option><option value="d8" ${spell.aD==='d8'?'selected':''}>d8</option><option value="d10" ${spell.aD==='d10'?'selected':''}>d10</option><option value="d12" ${spell.aD==='d12'?'selected':''}>d12</option><option value="d20" ${spell.aD==='d20'?'selected':''}>d20</option><option value="d100" ${spell.aD==='d100'?'selected':''}>d100</option></select>
-                    </div>
-                    <div class="dice-group" style="border-color:#7f1d1d"><span style="color:#ff4444">δ</span>
-                        <input type="number" class="inv-input dice-qty" min="0" value="${spell.fQtd}" onchange="updateSpell(${index}, 'fQtd', this.value)">
-                        <select class="inv-input dice-sel" onchange="updateSpell(${index}, 'fD', this.value)"><option value="" ${spell.fD===''?'selected':''}>--</option><option value="d4" ${spell.fD==='d4'?'selected':''}>d4</option><option value="d6" ${spell.fD==='d6'?'selected':''}>d6</option><option value="d8" ${spell.fD==='d8'?'selected':''}>d8</option><option value="d10" ${spell.fD==='d10'?'selected':''}>d10</option><option value="d12" ${spell.fD==='d12'?'selected':''}>d12</option><option value="d20" ${spell.fD==='d20'?'selected':''}>d20</option><option value="d100" ${spell.fD==='d100'?'selected':''}>d100</option></select>
+                    <div style="display:flex; gap: 8px; margin-top: 5px; width: 100%;">
+                        <button class="btn-rune b-alpha" onclick="addRune(${index}, 'alpha')">+ α Azul</button>
+                        <button class="btn-rune b-delta" onclick="addRune(${index}, 'delta')">+ δ Verm</button>
                     </div>` : ''}
+
                     ${isLoc ? `
-                    <div class="dice-group" style="border-color:#7e22ce"><span style="color:#a855f7">β</span>
+                    <div class="dice-group" style="border-color:#7e22ce"><span class="lbl" style="color:#a855f7">βeta</span>
                         <input type="number" class="inv-input dice-qty" min="0" value="${spell.betaQtd}" onchange="updateSpell(${index}, 'betaQtd', this.value)">
                         <select class="inv-input dice-sel" onchange="updateSpell(${index}, 'betaD', this.value)"><option value="" ${spell.betaD===''?'selected':''}>--</option><option value="d4" ${spell.betaD==='d4'?'selected':''}>d4</option><option value="d6" ${spell.betaD==='d6'?'selected':''}>d6</option><option value="d8" ${spell.betaD==='d8'?'selected':''}>d8</option><option value="d10" ${spell.betaD==='d10'?'selected':''}>d10</option><option value="d12" ${spell.betaD==='d12'?'selected':''}>d12</option><option value="d20" ${spell.betaD==='d20'?'selected':''}>d20</option><option value="d100" ${spell.betaD==='d100'?'selected':''}>d100</option></select>
                     </div>` : ''}
-                    <div style="display:flex; align-items:center; gap:5px; margin-left: auto;">
+
+                    ${(!isSelf) ? `
+                    <div style="display:flex; align-items:center; gap:5px; margin-left: auto; width: 100%; justify-content: flex-end; margin-top: 5px;">
                         <input type="checkbox" id="crit-${index}" ${spell.isCrit ? 'checked' : ''} onchange="updateSpell(${index}, 'isCrit', this.checked)">
-                        <label for="crit-${index}" style="color:#ffd700; margin:0; cursor:pointer;">Crítico</label>
-                    </div>
-                </div>
-                <div class="dice-config-row" style="margin-top: 5px; border-color: #a855f7;">
-                    <div style="display: flex; width: 100%; align-items: center; gap: 5px;">
-                        <span style="color:#a855f7; font-size: 11px; font-weight: bold; white-space: nowrap;">⚡ Status/Efeito</span>
-                        <input type="text" class="inv-input" style="flex: 2;" placeholder="Ex: Queimar" value="${spell.statusName}" onchange="updateSpell(${index}, 'statusName', this.value)">
-                        <span style="color:#fff; font-size: 11px; font-weight: bold;">DT:</span>
-                        <input type="number" class="inv-input dice-qty" placeholder="15" value="${spell.statusDT}" onchange="updateSpell(${index}, 'statusDT', this.value)">
-                    </div>
+                        <label for="crit-${index}" style="color:#ffd700; margin:0; cursor:pointer;">Crítico (Máx x3)</label>
+                    </div>` : ''}
                 </div>
             </div>`;
         row.innerHTML = headerHtml + bodyHtml;
@@ -311,16 +342,28 @@ window.renderSpells = function() {
 }
 
 window.addSpell = function() {
-    playerSpells.push({ nome: "", desc: "", custo: "", alcance: "", tipo: "Dano", bQtd: 1, bD: "d20", isOpen: true, isCrit: false, statusName: "", statusDT: "" });
+    playerSpells.push({ nome: "", desc: "", custo: "", alcance: "", tipo: "Dano", bQtd: 1, bD: "d20", bMult: 1, runes: [], isOpen: true, isCrit: false });
     window.renderSpells(); window.saveData();
 }
-
-window.updateSpell = function(index, field, value) {
-    playerSpells[index][field] = value; window.saveData(); 
-}
-
+window.updateSpell = function(index, field, value) { playerSpells[index][field] = value; window.renderSpells(); window.saveData(); }
 window.removeSpell = function(index) {
     if(confirm("Remover magia?")) { playerSpells.splice(index, 1); window.renderSpells(); window.saveData(); }
+}
+
+window.addRune = function(spellIndex, type) {
+    let maxRunes = parseInt(document.getElementById('char-runas').value) || 0;
+    if (playerSpells[spellIndex].runes.length >= maxRunes) {
+        alert(`Limite atingido! Você tem apenas ${maxRunes} runa(s) disponíveis.`);
+        return;
+    }
+    playerSpells[spellIndex].runes.push({ type: type, qtd: 1, face: "d4", mult: 1 });
+    window.renderSpells(); window.saveData();
+}
+window.updateRune = function(sIdx, rIdx, field, val) {
+    playerSpells[sIdx].runes[rIdx][field] = val; window.renderSpells(); window.saveData();
+}
+window.removeRune = function(sIdx, rIdx) {
+    playerSpells[sIdx].runes.splice(rIdx, 1); window.renderSpells(); window.saveData();
 }
 
 window.rollSpellMagic = function(index) {
@@ -337,31 +380,44 @@ window.rollSpellMagic = function(index) {
         return res;
     }
 
-    let rBase = [];
-    if(spell.isCrit) {
+    let bRolls = [];
+    if(spell.isCrit && spell.tipo !== 'Self') {
         let faces = parseInt(spell.bD.replace('d', ''));
-        rBase = [faces * parseInt(spell.bQtd) * 3]; 
+        bRolls = [faces * parseInt(spell.bQtd) * 3]; 
     } else {
-        rBase = rolar(spell.bQtd, spell.bD);
+        bRolls = rolar(spell.bQtd, spell.bD);
+    }
+    let bTot = Math.floor(bRolls.reduce((a,b)=>a+b, 0) * (spell.tipo==='Self' || spell.tipo==='Locomoção' ? 1 : spell.bMult));
+
+    let runesPack = [];
+    if(spell.tipo !== 'Self' && spell.tipo !== 'Locomoção') {
+        runesPack = spell.runes.map(r => {
+            let rl = rolar(r.qtd, r.face);
+            let tot = Math.floor(rl.reduce((a,b)=>a+b, 0) * r.mult);
+            return { t: r.type, f: r.face, m: r.mult, r: rl, tot: tot };
+        });
     }
 
-    let rAlpha = [], rDelta = [], rBeta = [];
-    if(spell.tipo !== 'Self' && spell.tipo !== 'Locomoção') { rAlpha = rolar(spell.aQtd, spell.aD); rDelta = rolar(spell.fQtd, spell.fD); }
-    if(spell.tipo === 'Locomoção') { rBeta = rolar(spell.betaQtd, spell.betaD); }
+    let rBeta = [];
+    if(spell.tipo === 'Locomoção') rBeta = rolar(spell.betaQtd, spell.betaD);
 
-    let stRoll = (spell.statusName && spell.statusDT > 0) ? Math.floor(Math.random() * 20) + 1 : 0;
-
-    const rollData = {
-        type: "spell", c: charName, color: charColor,
-        sName: spell.nome || "Habilidade", cost: spell.custo || "0", range: spell.alcance || "Self", desc: spell.desc || "", sType: spell.tipo || "Dano",
-        isCrit: spell.isCrit ? "true" : "false",
-        rB: rBase.join(','), dB: spell.bD, rA: rAlpha.join(','), dA: spell.aD, rF: rDelta.join(','), dF: spell.fD, rBeta: rBeta.join(','), dBeta: spell.betaD,
-        stName: spell.statusName || "", stDT: spell.statusDT || "0", stRoll: stRoll
+    const payload = {
+        t: "spell", c: charName, col: charColor,
+        sn: spell.nome || "Habilidade", cost: spell.custo || "0", rg: spell.alcance || "Self", desc: spell.desc || "", st: spell.tipo || "Dano",
+        b: { f: spell.bD, m: spell.bMult, r: bRolls, tot: bTot },
+        ru: runesPack, 
+        crit: spell.isCrit ? "true" : "false",
+        beta: { f: spell.betaD, r: rBeta }
     };
 
-    window.abrirModalCentral(rollData);
-    if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", rollData);
-    if(spell.isCrit) { spell.isCrit = false; window.renderSpells(); window.saveData(); }
+    window.abrirModalCentral(payload);
+    if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", payload);
+    
+    // Reseta o turno da magia automaticamente
+    if(spell.isCrit) spell.isCrit = false;
+    spell.runes = []; // APAGA AS RUNAS DINÂMICAS APÓS O USO
+    window.renderSpells();
+    window.saveData();
 }
 
 window.renderInventory = function() {
@@ -400,7 +456,8 @@ window.saveData = async function() {
         age: document.getElementById('char-age')?.value || "", race: isMonster ? document.getElementById('char-race-monster').value : document.getElementById('char-race-player').value,
         classe: document.getElementById('char-class')?.value || "Plebeu", prof: document.getElementById('char-prof')?.value || "", profDesc: document.getElementById('char-prof-desc')?.value || "",
         vidaMonster: document.getElementById('val-vida-monster')?.value || 100, forca: document.getElementById('attr-forca')?.value || 1, magia: document.getElementById('attr-magia')?.value || 1, agilidade: document.getElementById('attr-agilidade')?.value || 1, sorte: document.getElementById('attr-sorte')?.value || 1,
-        grimoire: document.getElementById('grimoire-name')?.value || "", mana: document.getElementById('mana-zone')?.value || "", passiva: document.getElementById('passiva')?.value || "", mov: document.getElementById('char-mov')?.value || 30,
+        grimoire: document.getElementById('grimoire-name')?.value || "", mana: document.getElementById('mana-zone')?.value || "", passiva: document.getElementById('passiva')?.value || "", 
+        mov: document.getElementById('char-mov')?.value || 30, runas: document.getElementById('char-runas')?.value || 0,
         skills: playerSkills, inventory: playerInventory, spells: playerSpells, photo: currentPhoto 
     };
 
@@ -418,22 +475,13 @@ window.renderSkills = function() {
     const container = document.getElementById('skills-container'); container.innerHTML = '';
     skillsData.forEach(skill => {
         if (playerSkills[skill.name] === undefined) playerSkills[skill.name] = 0;
-        let controls = `
-            <button class="btn-ctrl" onclick="updateSkill('${skill.name}', -1, event)">-</button>
-            <span style="width: 20px; text-align: center;">${playerSkills[skill.name]}</span>
-            <button class="btn-ctrl" onclick="updateSkill('${skill.name}', 1, event)">+</button>
-        `;
+        let controls = `<button class="btn-ctrl" onclick="updateSkill('${skill.name}', -1, event)">-</button><span style="width: 20px; text-align: center;">${playerSkills[skill.name]}</span><button class="btn-ctrl" onclick="updateSkill('${skill.name}', 1, event)">+</button>`;
         let div = document.createElement('div'); div.className = 'skill-item';
         div.innerHTML = `<div onclick="rollSkill('${skill.name}', '${skill.attr}')" style="flex:1;"><strong>${skill.name}</strong> <span style="font-size: 10px; color: var(--text-muted);">(${skill.attr})</span></div><div class="skill-controls">${controls}</div>`;
         container.appendChild(div);
     });
 }
-
-window.updateSkill = function(skillName, change, event) {
-    event.stopPropagation(); playerSkills[skillName] += change;
-    if (playerSkills[skillName] < 0) playerSkills[skillName] = 0;
-    window.renderSkills(); window.saveData();
-}
+window.updateSkill = function(skillName, change, event) { event.stopPropagation(); playerSkills[skillName] += change; if (playerSkills[skillName] < 0) playerSkills[skillName] = 0; window.renderSkills(); window.saveData(); }
 
 window.rollSkill = function(skillName, attrName) {
     let idMapped = attrName.toLowerCase().replace('ç', 'c');
@@ -460,20 +508,16 @@ window.rollSkill = function(skillName, attrName) {
     const charColor = document.getElementById('char-color') ? document.getElementById('char-color').value : '#d4af37';
     let skillMod = playerSkills[skillName] || 0;
     
-    const rollData = { type: "skill", c: charName, s: skillName, a: attrName, r: results.join(','), pen: isOverweight ? "true" : "false", color: charColor, mod: skillMod };
+    const payload = { t: "skill", c: charName, s: skillName, a: attrName, r: results.join(','), pen: isOverweight ? "true" : "false", col: charColor, mod: skillMod };
 
-    window.abrirModalCentral(rollData);
-    if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", rollData);
+    window.abrirModalCentral(payload);
+    if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", payload);
 }
 
 window.abrirModalCentral = function(data) {
     if (OBR.isAvailable) {
         const dataUrl = encodeURIComponent(JSON.stringify(data));
-        OBR.modal.open({
-            id: "fate-roll-modal",
-            url: `https://seediam.github.io/FateSheet/resultado.html?data=${dataUrl}`, 
-            width: 450, height: data.type === "spell" ? 420 : 250
-        });
+        OBR.modal.open({ id: "fate-roll-modal", url: `https://seediam.github.io/FateSheet/resultado.html?data=${dataUrl}`, width: 450, height: data.t === "spell" ? 450 : 250 });
     }
 }
 
