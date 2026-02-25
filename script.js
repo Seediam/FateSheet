@@ -45,7 +45,7 @@ const grimoiresDb = {
 };
 
 let characters = {}; 
-let combatLog = []; // Onde guardamos a vida do log
+let combatLog = []; 
 let currentCharId = null;
 let currentIsMine = true; 
 let playerSkills = {}; 
@@ -182,7 +182,6 @@ window.changeGrimoire = function() {
 window.openCharacter = function(id) {
     currentCharId = id;
     const c = characters[id] || {};
-    currentIsMine = true;
     
     safeSetVal('char-avatar', c.avatar || '🧙‍♂️');
     safeSetVal('char-name', c.name || '');
@@ -296,18 +295,20 @@ const getMultFromRoll = (val) => {
     return 1;
 };
 
+// ------ ATUALIZADO: Log usa o v2 para não puxar lixo antigo ------
 window.addCombatLog = async function(data) {
     combatLog.unshift(data);
-    if(combatLog.length > 30) combatLog.pop(); 
-    if (OBR.isAvailable) await OBR.room.setMetadata({ "fatesheet_combat_log": combatLog });
+    if(combatLog.length > 40) combatLog.pop(); 
+    if (OBR.isAvailable) await OBR.room.setMetadata({ "fatesheet_log_v2": combatLog });
 }
 
 window.abrirJanelaDeLog = function() {
     if (OBR.isAvailable) {
+        // O Date.now() mata o cache do Log para ele nunca ficar com a tela preta
         OBR.popover.open({
             id: "fatesheet-log-popover",
-            url: `https://seediam.github.io/FateSheet/log.html`, 
-            width: 320,
+            url: `https://seediam.github.io/FateSheet/log.html?v=${Date.now()}`, 
+            width: 360,
             height: 450,
             disableClickAway: true, 
             anchorOrigin: { horizontal: "RIGHT", vertical: "BOTTOM" },
@@ -551,8 +552,9 @@ window.abrirModalCentral = function(data) {
 function processRoomData(metadata) {
     let mudouAlgo = false;
     
-    if (metadata["fatesheet_combat_log"] !== undefined) {
-        combatLog = metadata["fatesheet_combat_log"];
+    // --- NOVO BANCO DE LOG (v2) PRA LIMPAR O CORROMPIDO ---
+    if (metadata["fatesheet_log_v2"] !== undefined) {
+        combatLog = metadata["fatesheet_log_v2"];
     }
 
     for (let key in metadata) {
@@ -579,7 +581,6 @@ function initExtension() {
                 const meta = await OBR.room.getMetadata();
                 processRoomData(meta);
                 OBR.room.onMetadataChange((metadata) => processRoomData(metadata));
-                OBR.broadcast.onMessage("fatesheet-rolls", (event) => { window.abrirModalCentral(event.data); });
             } catch(e) {}
         });
     }
