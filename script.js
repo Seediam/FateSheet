@@ -45,7 +45,7 @@ const grimoiresDb = {
 };
 
 let characters = {}; 
-let combatLog = []; // Onde guardamos a vida do log
+let combatLog = []; 
 let currentCharId = null;
 let currentIsMine = true; 
 let playerSkills = {}; 
@@ -110,7 +110,7 @@ window.renderCharacterList = function() {
 
 window.createNewCharacter = function() {
     const newId = 'char_' + Date.now();
-    characters[newId] = { name: "Novo Personagem", avatar: "🧙‍♂️", category: "Jogadores", classe: "Plebeu", skills: {}, inventory: [], spells: [], photo: "", color: "#d4af37", mov: 30, runas: 0, activeRunes: [], alloc: {f:0, m:0, a:0, s:0} };
+    characters[newId] = { name: "Novo Personagem", avatar: "🧙‍♂️", category: "Jogadores", classe: "Plebeu", skills: {}, inventory: [], spells: [], photo: "", color: "#d4af37", mov: 30, runas: 0, activeRunes: [], alloc: {f:0, m:0, a:0, s:0}, foraCombate: false };
     currentCharId = newId;
     window.saveData(); 
     window.openCharacter(newId);
@@ -154,6 +154,7 @@ window.importCharacter = function(event) {
 }
 
 const safeSetVal = (id, val) => { const el = document.getElementById(id); if(el) el.value = val; };
+const safeSetCheck = (id, val) => { const el = document.getElementById(id); if(el) el.checked = val; };
 
 window.updateSheetColor = function() {
     let color = document.getElementById('char-color').value;
@@ -210,6 +211,7 @@ window.openCharacter = function(id) {
     safeSetVal('passiva', c.passiva || ''); 
     safeSetVal('char-mov', c.mov || 30);
     safeSetVal('char-runas', c.runas || 0); 
+    safeSetCheck('fora-combate', c.foraCombate || false);
     
     let al = c.alloc || {f:0, m:0, a:0, s:0};
     safeSetVal('alloc-forca', al.f);
@@ -268,11 +270,16 @@ window.calcVitals = function() {
     }
 }
 
+// ------ NOVO REGRA DE LIMITES ------
 window.updateAlloc = function() {
+    let isFora = document.getElementById('fora-combate') ? document.getElementById('fora-combate').checked : false;
+    let maxRunes = parseInt(document.getElementById('char-runas').value) || 0;
+
     let f = parseInt(document.getElementById('alloc-forca').value) || 0;
     let m = parseInt(document.getElementById('alloc-magia').value) || 0;
     let a = parseInt(document.getElementById('alloc-agilidade').value) || 0;
     let s = parseInt(document.getElementById('alloc-sorte').value) || 0;
+
     let maxF = parseInt(document.getElementById('attr-forca').value) || 0;
     let maxM = parseInt(document.getElementById('attr-magia').value) || 0;
     let maxA = parseInt(document.getElementById('attr-agilidade').value) || 0;
@@ -283,8 +290,11 @@ window.updateAlloc = function() {
     if(a > maxA) { a = maxA; safeSetVal('alloc-agilidade', a); }
     if(s > maxS) { s = maxS; safeSetVal('alloc-sorte', s); }
 
-    if (f + m + a + s > 3) {
-        alert("Você só pode alocar até 3 dados por turno!");
+    let totalAlloc = f + m + a + s;
+
+    // Se estiver em combate, trava pelo limite de Runas
+    if (!isFora && totalAlloc > maxRunes) {
+        alert(`EM COMBATE: Você só pode alocar dados até o limite das suas Runas (${maxRunes})!`);
         safeSetVal('alloc-forca', 0); safeSetVal('alloc-magia', 0); safeSetVal('alloc-agilidade', 0); safeSetVal('alloc-sorte', 0);
     }
     window.saveData();
@@ -296,11 +306,15 @@ const getMultFromRoll = (val) => {
     return 1;
 };
 
-// ------ MUDADO PARA SALVAR NA CHAVE v3 ------
+// ------ MUDADO PARA v4 E LIMITADO A 15 LOGS (NUNCA MAIS TRAVA) ------
 window.addCombatLog = async function(data) {
     combatLog.unshift(data);
-    if(combatLog.length > 40) combatLog.pop(); 
-    if (OBR.isAvailable) await OBR.room.setMetadata({ "fatesheet_log_v3": combatLog });
+    if(combatLog.length > 15) combatLog.pop(); 
+    if (OBR.isAvailable) {
+        await OBR.room.setMetadata({ "fatesheet_log_v4": combatLog });
+        // OBR Broadcast avisa o Log instantaneamente, para não esperar a nuvem sincronizar
+        OBR.broadcast.sendMessage("fatesheet-log-update", combatLog);
+    }
 }
 
 window.abrirJanelaDeLog = function() {
@@ -308,7 +322,7 @@ window.abrirJanelaDeLog = function() {
         OBR.popover.open({
             id: "fatesheet-log-popover",
             url: `https://seediam.github.io/FateSheet/log.html?v=${Date.now()}`, 
-            width: 360,
+            width: 320,
             height: 450,
             disableClickAway: true, 
             anchorOrigin: { horizontal: "RIGHT", vertical: "BOTTOM" },
@@ -318,12 +332,13 @@ window.abrirJanelaDeLog = function() {
 }
 
 window.rollAttributes = function() {
+    let isFora = document.getElementById('fora-combate') ? document.getElementById('fora-combate').checked : false;
     let f = parseInt(document.getElementById('alloc-forca').value) || 0;
     let m = parseInt(document.getElementById('alloc-magia').value) || 0;
     let a = parseInt(document.getElementById('alloc-agilidade').value) || 0;
     let s = parseInt(document.getElementById('alloc-sorte').value) || 0;
 
-    if(f+m+a+s === 0) return alert("Aloque algum dado antes de rolar o turno!");
+    if(f+m+a+s === 0) return alert("Aloque algum dado antes de rolar!");
 
     let rolls = { f: [], m: [], a: [] };
     let c = characters[currentCharId];
@@ -333,15 +348,16 @@ window.rollAttributes = function() {
 
     for(let i=0; i<f; i++) {
         let v = rollD20() + s; rolls.f.push(v);
-        c.activeRunes.push({ type: 'delta', face: 'd4', mult: getMultFromRoll(v), locked: true, fixo: 0, raw: v });
+        // Só cria Runa se estiver Em Combate
+        if(!isFora) c.activeRunes.push({ type: 'delta', face: 'd4', mult: getMultFromRoll(v), locked: true, fixo: 0, raw: v });
     }
     for(let i=0; i<m; i++) {
         let v = rollD20() + s; rolls.m.push(v);
-        c.activeRunes.push({ type: 'alpha', face: 'd4', mult: getMultFromRoll(v), locked: true, fixo: 0, raw: v });
+        if(!isFora) c.activeRunes.push({ type: 'alpha', face: 'd4', mult: getMultFromRoll(v), locked: true, fixo: 0, raw: v });
     }
     for(let i=0; i<a; i++) {
         let v = rollD20() + s; rolls.a.push(v);
-        c.activeRunes.push({ type: 'beta', face: 'd4', mult: getMultFromRoll(v), locked: true, fixo: 0, raw: v });
+        if(!isFora) c.activeRunes.push({ type: 'beta', face: 'd4', mult: getMultFromRoll(v), locked: true, fixo: 0, raw: v });
     }
 
     const payload = {
@@ -502,6 +518,7 @@ window.saveData = async function() {
         vidaMonster: document.getElementById('val-vida-monster')?.value || 100, forca: document.getElementById('attr-forca')?.value || 1, magia: document.getElementById('attr-magia')?.value || 1, agilidade: document.getElementById('attr-agilidade')?.value || 1, sorte: document.getElementById('attr-sorte')?.value || 1,
         grimoireSelect: document.getElementById('grimoire-select')?.value || "", grimoireDT: document.getElementById('grimoire-dt')?.value || 10, mana: document.getElementById('mana-zone')?.value || "", passiva: document.getElementById('passiva')?.value || "", 
         mov: document.getElementById('char-mov')?.value || 30, runas: document.getElementById('char-runas')?.value || 0,
+        foraCombate: document.getElementById('fora-combate')?.checked || false, // SALVA A CHECKBOX
         skills: playerSkills, inventory: playerInventory, spells: playerSpells, photo: currentPhoto, activeRunes: characters[currentCharId] ? characters[currentCharId].activeRunes : [], alloc: al
     };
     characters[currentCharId] = sheetData;
@@ -552,9 +569,9 @@ window.abrirModalCentral = function(data) {
 function processRoomData(metadata) {
     let mudouAlgo = false;
     
-    // MUDADO PARA A CHAVE v3
-    if (metadata["fatesheet_log_v3"] !== undefined) {
-        combatLog = metadata["fatesheet_log_v3"];
+    // MUDADO PARA A CHAVE v4
+    if (metadata["fatesheet_log_v4"] !== undefined) {
+        combatLog = metadata["fatesheet_log_v4"];
     }
 
     for (let key in metadata) {
@@ -581,6 +598,12 @@ function initExtension() {
                 const meta = await OBR.room.getMetadata();
                 processRoomData(meta);
                 OBR.room.onMetadataChange((metadata) => processRoomData(metadata));
+                
+                // O LOG AGORA SE ATUALIZA INSTANTANEAMENTE AQUI TAMBÉM:
+                OBR.broadcast.onMessage("fatesheet-log-update", (event) => {
+                    combatLog = event.data;
+                });
+                
                 OBR.broadcast.onMessage("fatesheet-rolls", (event) => { window.abrirModalCentral(event.data); });
             } catch(e) {}
         });
