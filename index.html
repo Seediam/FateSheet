@@ -13,6 +13,11 @@
         .screen { display: none; animation: fadeIn 0.3s ease; }
         .screen.active { display: block; }
         
+        /* SCROLLBAR CUSTOMIZADA PARA O LOG */
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-thumb { background: var(--accent-gold); border-radius: 4px; }
+        ::-webkit-scrollbar-track { background: var(--bg-panel); }
+
         .top-bar { display: flex; justify-content: space-between; margin-bottom: 15px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px;}
         .btn-new { width: 100%; padding: 12px; background: rgba(212, 175, 55, 0.05); border: 1px dashed var(--accent-gold); color: var(--accent-gold); font-weight: bold; font-size: 14px; border-radius: 6px; cursor: pointer; transition: 0.2s; margin-bottom: 10px;}
         .btn-new:hover { background: var(--accent-gold); color: #000; }
@@ -298,13 +303,13 @@
                     Histórico da Mesa
                     <button class="btn-ctrl" style="width:auto; padding: 2px 10px; background:#5a1a1a;" onclick="clearMiniLog()" title="Apagar Histórico de Todos">🗑️</button>
                 </h4>
-                <div id="mini-log-container" style="display: flex; flex-direction: column; gap: 8px;"></div>
+                <div id="mini-log-container" style="display: flex; flex-direction: column; gap: 8px; max-height: 400px; overflow-y: auto; padding-right: 5px;"></div>
             </div>
 
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@2/lib/index.js"></script>
-    <script type="module" src="script.js?v=88123"></script>
+    <script type="module" src="script.js?v=525000"></script>
 </body>
 </html>
