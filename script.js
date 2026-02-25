@@ -12,6 +12,7 @@ let characters = {};
 let currentCharId = null;
 let playerSkills = {}; 
 let playerInventory = [];
+let playerSpells = []; // NOVA LISTA DE MAGIAS
 let currentPhoto = "";
 let folderState = { "Jogadores": true, "NPCs": true, "Monstros": true };
 let isOverweight = false;
@@ -73,18 +74,19 @@ window.renderCharacterList = function() {
         }
     }
 
-    if(!hasAny) container.innerHTML = '<div style="text-align:center; color:#666; margin-top: 20px;">A Mesa está vazia.</div>';
+    if(!hasAny) {
+        container.innerHTML = '<div style="text-align:center; color:#666; margin-top: 20px;">A Mesa está vazia.</div>';
+    }
 }
 
 window.createNewCharacter = function() {
     const newId = 'char_' + Date.now();
-    characters[newId] = { name: "Novo Personagem", category: "Jogadores", classe: "Plebeu", skills: {}, inventory: [], photo: "", color: "#d4af37" };
+    characters[newId] = { name: "Novo Personagem", category: "Jogadores", classe: "Plebeu", skills: {}, inventory: [], spells: [], photo: "", color: "#d4af37" };
     currentCharId = newId;
     window.saveData(); 
     window.openCharacter(newId);
 }
 
-// CORREÇÃO DO DELETE GLOBAL: Define como undefined na nuvem pra apagar pra valer
 window.deleteCharacter = async function() {
     if(confirm("Apagar esta ficha permanentemente para TODOS na mesa?")) {
         const idToDelete = currentCharId;
@@ -170,19 +172,28 @@ window.openCharacter = function(id) {
     safeSetVal('attr-sorte', charData.sorte || 1);
     safeSetVal('grimoire-name', charData.grimoire || '');
     safeSetVal('mana-zone', charData.mana || '');
-    safeSetVal('hab-1', charData.hab1 || '');
-    safeSetVal('hab-2', charData.hab2 || '');
-    safeSetVal('hab-3', charData.hab3 || '');
-    safeSetVal('hab-4', charData.hab4 || '');
     
     playerSkills = charData.skills || {};
     playerInventory = charData.inventory || [];
+    playerSpells = charData.spells || []; // CARREGA AS MAGIAS DA FICHA
     currentPhoto = charData.photo || '';
     
+    // Migração de segurança: se for uma ficha antiga que usava hab1, hab2... passa pra lista nova
+    if (charData.hab1 || charData.hab2 || charData.hab3 || charData.hab4) {
+        if(charData.hab1) playerSpells.push({nome: charData.hab1, desc: "", custo: "", alcance: ""});
+        if(charData.hab2) playerSpells.push({nome: charData.hab2, desc: "", custo: "", alcance: ""});
+        if(charData.hab3) playerSpells.push({nome: charData.hab3, desc: "", custo: "", alcance: ""});
+        if(charData.hab4) playerSpells.push({nome: charData.hab4, desc: "", custo: "", alcance: ""});
+        // Deleta as antigas do objeto para não recarregar no futuro
+        delete characters[id].hab1; delete characters[id].hab2; delete characters[id].hab3; delete characters[id].hab4;
+    }
+
     window.updateCategoryUI();
     window.setPhotoPreview(currentPhoto);
     window.renderSkills();
     window.renderInventory();
+    window.renderSpells(); // RENDERIZA A LISTA INFINITA DE MAGIAS
+    window.calcVitals();
 
     document.getElementById('screen-list').classList.remove('active');
     document.getElementById('screen-sheet').classList.add('active');
@@ -221,6 +232,47 @@ window.calcVitals = function() {
     }
 }
 
+// ------ SISTEMA DE MAGIAS INFINITAS ------
+window.renderSpells = function() {
+    const container = document.getElementById('spells-container');
+    container.innerHTML = '';
+    playerSpells.forEach((spell, index) => {
+        let row = document.createElement('div');
+        row.className = 'spell-item';
+        row.innerHTML = `
+            <div class="inv-row">
+                <input type="text" class="inv-input" style="flex: 2; font-weight: bold; color: var(--accent-gold);" placeholder="Nome da Habilidade" value="${spell.nome}" onchange="updateSpell(${index}, 'nome', this.value)">
+                <input type="text" class="inv-input" style="flex: 1;" placeholder="Custo" value="${spell.custo}" onchange="updateSpell(${index}, 'custo', this.value)">
+                <input type="text" class="inv-input" style="flex: 1;" placeholder="Alcance" value="${spell.alcance}" onchange="updateSpell(${index}, 'alcance', this.value)">
+                <button class="btn-danger" onclick="removeSpell(${index})">X</button>
+            </div>
+            <div class="inv-row" style="margin-top: 5px;">
+                <textarea class="inv-input" style="flex: 1; resize: vertical;" rows="1" placeholder="Descrição e Efeitos..." onchange="updateSpell(${index}, 'desc', this.value)">${spell.desc}</textarea>
+            </div>
+        `;
+        container.appendChild(row);
+    });
+}
+
+window.addSpell = function() {
+    playerSpells.push({ nome: "", desc: "", custo: "", alcance: "" });
+    window.renderSpells();
+    window.saveData();
+}
+
+window.updateSpell = function(index, field, value) {
+    playerSpells[index][field] = value;
+    window.saveData(); // Auto salva em tempo real igual o inv
+}
+
+window.removeSpell = function(index) {
+    if(confirm("Remover esta magia do seu grimório?")) {
+        playerSpells.splice(index, 1);
+        window.renderSpells();
+        window.saveData();
+    }
+}
+
 window.renderInventory = function() {
     const container = document.getElementById('inventory-container');
     container.innerHTML = '';
@@ -243,7 +295,6 @@ window.renderInventory = function() {
     window.calcVitals();
 }
 
-// TRAVA PARA NÃO CRIAR ITENS SE ESTIVER PESADO DEMAIS
 window.addInventoryItem = function() {
     if(isOverweight) {
         alert("Mochila cheia! Você está muito pesado para carregar novos itens.");
@@ -286,12 +337,9 @@ window.saveData = async function() {
         sorte: document.getElementById('attr-sorte')?.value || 1,
         grimoire: document.getElementById('grimoire-name')?.value || "",
         mana: document.getElementById('mana-zone')?.value || "",
-        hab1: document.getElementById('hab-1')?.value || "",
-        hab2: document.getElementById('hab-2')?.value || "",
-        hab3: document.getElementById('hab-3')?.value || "",
-        hab4: document.getElementById('hab-4')?.value || "",
         skills: playerSkills,
         inventory: playerInventory,
+        spells: playerSpells, // SALVANDO A LISTA NOVA
         photo: currentPhoto 
     };
 
@@ -334,7 +382,6 @@ window.updateSkill = function(skillName, change, event) {
 }
 
 window.rollSkill = function(skillName, attrName) {
-    // RESOLVE O BUG DA FORÇA
     let idMapped = attrName.toLowerCase().replace('ç', 'c');
     let baseAttr = parseInt(document.getElementById(`attr-${idMapped}`).value) || 1;
     let classe = document.getElementById('char-class').value;
@@ -351,7 +398,7 @@ window.rollSkill = function(skillName, attrName) {
     let results = [];
     for (let i = 0; i < baseAttr; i++) {
         let die = Math.floor(Math.random() * 20) + 1;
-        if (isOverweight) die -= 5; // -5 EM TODAS AS ROLAGENS AGORA!
+        if (isOverweight) die -= 5;
         results.push(die);
     }
 
@@ -366,7 +413,7 @@ window.rollSkill = function(skillName, attrName) {
         r: results.join(','),
         pen: isOverweight ? "true" : "false",
         color: charColor,
-        mod: skillMod // PASSA O MÓDULO DA PERÍCIA (ex: +2)
+        mod: skillMod 
     };
 
     window.abrirModalCentral(rollData);
@@ -379,7 +426,7 @@ window.abrirModalCentral = function(data) {
         OBR.modal.open({
             id: "fate-roll-modal",
             url: `https://seediam.github.io/FateSheet/resultado.html?data=${dataUrl}`, 
-            width: 450, // Um pouco mais largo para os expoentes caberem
+            width: 450, 
             height: 250
         });
     }
@@ -411,7 +458,6 @@ document.getElementById('photo-upload').addEventListener('change', function(e) {
 
 document.addEventListener('input', () => { if(currentCharId) window.saveData(); });
 
-// BANCO DE DADOS GLOBAL COM AS CORREÇÕES
 function processRoomData(metadata) {
     let mudouAlgo = false;
     for (let key in metadata) {
