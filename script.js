@@ -295,27 +295,25 @@ const getMultFromRoll = (val) => {
     return 1;
 };
 
+// O Segredo do Log: Manda pro servidor pra todos verem
 window.addCombatLog = async function(data) {
     combatLog.unshift(data);
     if(combatLog.length > 30) combatLog.pop(); 
     if (OBR.isAvailable) await OBR.room.setMetadata({ "fatesheet_combat_log": combatLog });
 }
 
-// ------ NOVO: ABRIR LOG EM JANELA FLUTUANTE ------
 window.abrirJanelaDeLog = function() {
     if (OBR.isAvailable) {
         OBR.popover.open({
             id: "fatesheet-log-popover",
             url: `https://seediam.github.io/FateSheet/log.html`, 
-            width: 300,
+            width: 320,
             height: 450,
             disableClickAway: true, 
             anchorOrigin: { horizontal: "RIGHT", vertical: "BOTTOM" },
             transformOrigin: { horizontal: "RIGHT", vertical: "BOTTOM" }
         });
-    } else {
-        alert("Log só funciona dentro da mesa do Owlbear!");
-    }
+    } else { alert("Log só funciona dentro da mesa do Owlbear!"); }
 }
 
 window.rollAttributes = function() {
@@ -470,6 +468,8 @@ window.rollSpellMagic = function(index) {
 
     window.abrirModalCentral(payload);
     window.addCombatLog(payload);
+    
+    // SOMENTE QUEM ROLA MANDA PARA O SERVIDOR E PARA OS OUTROS VEREM! (Evita logs vazios/duplicados)
     if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", payload);
     
     if(spell.isCrit) spell.isCrit = false;
@@ -550,8 +550,15 @@ window.abrirModalCentral = function(data) {
     }
 }
 
+// O Segredo da Sincronização Perfeita (Puxa os logs antigos quando você abre a sala)
 function processRoomData(metadata) {
     let mudouAlgo = false;
+    
+    // Sincroniza o Log se ele existir no servidor
+    if (metadata["fatesheet_combat_log"] !== undefined) {
+        combatLog = metadata["fatesheet_combat_log"];
+    }
+
     for (let key in metadata) {
         if (key.startsWith('fatesheet_char_')) {
             const id = key.replace('fatesheet_char_', '');
@@ -575,8 +582,13 @@ function initExtension() {
             try {
                 const meta = await OBR.room.getMetadata();
                 processRoomData(meta);
+                
                 OBR.room.onMetadataChange((metadata) => processRoomData(metadata));
-                OBR.broadcast.onMessage("fatesheet-rolls", (event) => { window.abrirModalCentral(event.data); });
+                
+                OBR.broadcast.onMessage("fatesheet-rolls", (event) => { 
+                    window.abrirModalCentral(event.data); 
+                    // NÃO CHAMA addCombatLog AQUI! Apenas quem ROLOU que manda o log pra nuvem, isso evita bugar o histórico.
+                });
             } catch(e) {}
         });
     }
