@@ -30,8 +30,8 @@
         .char-list-item { display: flex; width: 100%; box-sizing: border-box; align-items: center; justify-content: space-between; background: var(--bg-panel); padding: 10px 15px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; transition: 0.2s; font-weight: bold; border-left: 4px solid var(--accent-gold);}
         .char-list-item:hover { background: #23232d; border-color: var(--border-subtle); transform: translateX(3px); }
 
-        .tabs { display: flex; gap: 15px; margin-bottom: 20px; border-bottom: 2px solid var(--border-subtle); padding-bottom: 5px; }
-        .tab-btn { background: none; border: none; color: var(--text-muted); font-size: 15px; font-weight: 600; cursor: pointer; padding: 8px 10px; transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 1px; }
+        .tabs { display: flex; gap: 15px; margin-bottom: 20px; border-bottom: 2px solid var(--border-subtle); padding-bottom: 5px; overflow-x: auto; }
+        .tab-btn { background: none; border: none; color: var(--text-muted); font-size: 14px; font-weight: 600; cursor: pointer; padding: 8px 10px; transition: all 0.3s ease; text-transform: uppercase; letter-spacing: 1px; white-space: nowrap;}
         .tab-btn:hover { color: var(--text-main); }
         .tab-btn.active { color: var(--accent-gold); border-bottom: 2px solid var(--accent-gold); text-shadow: 0 0 8px var(--accent-gold); }
 
@@ -39,7 +39,7 @@
         .tab-content.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
-        .form-group { margin-bottom: 12px; }
+        .form-group { margin-bottom: 12px; position: relative; }
         label { display: block; font-size: 10px; color: var(--text-muted); text-transform: uppercase; margin-bottom: 4px; letter-spacing: 0.5px; font-weight: bold;}
         input[type="text"], input[type="number"], select, textarea, input[type="color"] { width: 100%; background: var(--bg-panel); border: 1px solid var(--border-subtle); color: var(--text-main); padding: 10px; border-radius: 6px; box-sizing: border-box; transition: 0.2s; font-family: inherit;}
         input:focus, select:focus, textarea:focus { border-color: var(--accent-gold); outline: none; box-shadow: 0 0 5px var(--accent-gold); }
@@ -75,6 +75,7 @@
         .inv-input { padding: 8px !important; font-size: 12px; }
         .btn-danger { background: #3a1c1c; border: none; color: #fff; cursor: pointer; border-radius: 4px; padding: 6px 10px; transition: 0.2s; font-weight: bold;}
         .btn-danger:hover { background: var(--danger); }
+        .overweight { border-color: var(--danger) !important; color: var(--danger) !important; }
 
         .spell-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding: 2px 0;}
         .dice-config-row { display: flex; flex-direction: column; gap: 5px; margin-top: 5px; background: #15151e; padding: 8px; border-radius: 4px; border: 1px dashed var(--border-subtle);}
@@ -103,6 +104,13 @@
         .b-beta:hover { background: #a855f7; color: #000; }
         .b-arma { color: #ccc; border-color: #ccc; }
         .b-arma:hover { background: #ccc; color: #000; }
+
+        /* Estilo do Log Interno */
+        .log-entry { background: #15151e; border-left: 3px solid #d4af37; padding: 8px 10px; margin-bottom: 8px; border-radius: 4px; font-size: 13px; box-shadow: 0 2px 4px rgba(0,0,0,0.3); animation: fadeIn 0.3s ease;}
+        .log-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px; border-bottom: 1px dashed #333; padding-bottom: 4px;}
+        .log-name { font-weight: bold; color: #d4af37; font-size: 14px; }
+        .log-action { color: #888; font-size: 11px; text-align: right;}
+        .log-result { color: #fff; margin-top: 4px; font-size: 12px;}
     </style>
 </head>
 <body>
@@ -111,11 +119,7 @@
 
     <div class="app-container" id="app">
         <div id="screen-list" class="screen active">
-            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px; margin-bottom: 15px;">
-                <h3 class="section-title" style="margin: 0; border: none;">Mesa Global</h3>
-                <button class="btn-ctrl" style="width:auto; padding: 6px 12px; background:#1a1a24; color:#44aaff; font-size:12px; border: 1px solid #44aaff;" onclick="abrirJanelaDeLog()">📜 Abrir Log</button>
-            </div>
-            
+            <h3 class="section-title" style="text-align: center; margin-top: 5px; border:none;">Mesa Global</h3>
             <button class="btn-new" onclick="createNewCharacter()">+ Criar Novo Personagem</button>
             <input type="file" id="import-file" accept=".json" style="display: none;" onchange="importCharacter(event)">
             <button class="btn-import" onclick="document.getElementById('import-file').click()">📥 Importar Ficha (JSON)</button>
@@ -135,6 +139,7 @@
                 <button class="tab-btn active" onclick="openTab('personagem', event)">Ficha</button>
                 <button class="tab-btn" onclick="openTab('pericias', event)">Perícias</button>
                 <button class="tab-btn" onclick="openTab('mochila', event)">Mochila</button>
+                <button class="tab-btn" onclick="openTab('mini-log', event)">📜 Histórico</button>
             </div>
 
             <div id="personagem" class="tab-content active">
@@ -164,15 +169,17 @@
                     </div>
 
                     <div style="flex: 1;">
-                        <div class="form-group"><label>Nome</label><input type="text" id="char-name" onchange="saveData()"></div>
+                        <div class="form-group" style="position: relative;">
+                            <label>Nome</label>
+                            <input type="text" id="char-name" onchange="saveData()">
+                            <div id="char-fc-badge" style="display:none; color:#888; font-size:10px; font-weight:bold; position:absolute; top: 0; right: 0;">[ Fora de Combate ]</div>
+                        </div>
                         <div style="display: flex; gap: 5px;">
                             <div class="form-group" style="flex: 2;">
                                 <label>Raça</label>
                                 <input type="text" id="char-race-player" value="Humano" onchange="saveData()">
                                 <select id="char-race-monster" style="display: none;" onchange="saveData()">
-                                    <option value="Terrestres">Terrestres</option>
-                                    <option value="Voadores">Voadores</option>
-                                    <option value="Aquáticos">Aquáticos</option>
+                                    <option value="Terrestres">Terrestres</option><option value="Voadores">Voadores</option><option value="Aquáticos">Aquáticos</option>
                                 </select>
                             </div>
                             <div class="form-group" style="flex: 1;">
@@ -286,10 +293,18 @@
                 <div id="inventory-container"></div>
             </div>
 
+            <div id="mini-log" class="tab-content">
+                <h4 class="section-title" style="display: flex; justify-content: space-between; align-items: center; margin-top:0;">
+                    Histórico da Mesa
+                    <button class="btn-ctrl" style="width:auto; padding: 2px 10px; background:#5a1a1a;" onclick="clearMiniLog()" title="Apagar Histórico de Todos">🗑️</button>
+                </h4>
+                <div id="mini-log-container" style="display: flex; flex-direction: column; gap: 8px;"></div>
+            </div>
+
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@2/lib/index.js"></script>
-    <script type="module" src="script.js?v=990920"></script>
+    <script type="module" src="script.js?v=88123"></script>
 </body>
 </html>
