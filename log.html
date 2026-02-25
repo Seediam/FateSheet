@@ -10,7 +10,6 @@
         
         .title { text-align: center; color: #d4af37; font-weight: bold; margin-top: 5px; margin-bottom: 15px; font-size: 14px; text-transform: uppercase; border-bottom: 1px solid #333; padding-bottom: 10px; }
         
-        /* Botões do topo */
         .btn-close { position: absolute; top: 10px; right: 10px; background: #ff4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; padding: 4px 8px; transition: 0.2s;}
         .btn-close:hover { background: #fff; color: #000; }
         .btn-clear { position: absolute; top: 10px; left: 10px; background: #1a1a24; color: #888; border: 1px solid #333; border-radius: 4px; cursor: pointer; font-size: 12px; padding: 4px 8px; transition: 0.2s; }
@@ -36,10 +35,10 @@
         
         window.fecharLog = () => { OBR.popover.close("fatesheet-log-popover"); }
 
-        // Botão para resetar o log quando ficar cheio de teste velho
+        // MUDADO PARA A CHAVE v3
         document.getElementById('btn-clear').addEventListener('click', async () => {
             if(confirm('Tem certeza que deseja apagar o histórico de combate para toda a mesa?')) {
-                await OBR.room.setMetadata({ "fatesheet_combat_log": [] });
+                await OBR.room.setMetadata({ "fatesheet_log_v3": [] });
                 document.getElementById('log-container').innerHTML = '';
             }
         });
@@ -48,7 +47,7 @@
             const container = document.getElementById('log-container');
             container.innerHTML = '';
             
-            if (!Array.isArray(logData)) return; // Trava de segurança
+            if (!Array.isArray(logData)) return; 
             
             logData.forEach(log => {
                 try {
@@ -59,7 +58,6 @@
                     let actHtml = "";
                     let resHtml = "";
                     
-                    // --- MODO MAGIA ---
                     if (log.t === "spell") {
                         actHtml = `Rolou <b style="color:${log.col}">[ ${log.sn} ]</b>`;
                         
@@ -89,10 +87,9 @@
                             let critCor = log.crit === 'true' ? '#ffd700' : log.col;
                             resHtml = `${strParts} <b style="color:${critCor}">=> ${totalDano}</b>`;
                         } else {
-                            resHtml = `<span style="color:#888;">Efeito conjurado.</span>`;
+                            resHtml = `<span style="color:#888;">Efeito conjurado em si mesmo.</span>`;
                         }
                         
-                        // Status/Efeito
                         if (log.stName && log.stDT > 0) {
                             let stRoll = parseInt(log.stRoll); let dt = parseInt(log.stDT);
                             let stCor = stRoll >= dt ? "#44aaff" : "#ff4444";
@@ -100,7 +97,6 @@
                         }
                         
                     } 
-                    // --- MODO ATRIBUTOS DE TURNO ---
                     else if (log.t === "attr") {
                         actHtml = `Rolou <b>Atributos</b>`;
                         let parts = [];
@@ -126,12 +122,11 @@
                         
                         resHtml = parts.join(" | ");
                     } 
-                    // --- MODO PERÍCIA NORMAL ---
                     else {
                         actHtml = `Rolou <b>${log.s}</b>`;
                         let r = (log.r && typeof log.r === 'string') ? log.r.split(',') : [0];
                         let v = parseInt(r[0]) + (log.mod || 0);
-                        resHtml = `Tirou <b style="color:${log.col}; font-size: 14px;">${v}</b>`;
+                        resHtml = `Resultado: <b style="color:${log.col}">${v}</b>`;
                     }
 
                     div.innerHTML = `
@@ -143,19 +138,18 @@
                     `;
                     container.appendChild(div);
                     
-                } catch (e) {
-                    console.log("Ignorando log antigo quebrado.");
-                }
+                } catch (e) {}
             });
         }
 
         OBR.onReady(async () => {
+            // MUDADO PARA A CHAVE v3 AQUI TAMBÉM
             let meta = await OBR.room.getMetadata();
-            if(meta && meta["fatesheet_combat_log"]) render(meta["fatesheet_combat_log"]);
+            if(meta && meta["fatesheet_log_v3"]) render(meta["fatesheet_log_v3"]);
 
             OBR.room.onMetadataChange((metadata) => {
-                if (metadata["fatesheet_combat_log"] !== undefined) {
-                    render(metadata["fatesheet_combat_log"]);
+                if (metadata["fatesheet_log_v3"] !== undefined) {
+                    render(metadata["fatesheet_log_v3"]);
                 }
             });
         });
