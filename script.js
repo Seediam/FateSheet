@@ -196,13 +196,13 @@ window.calcVitals = function() {
 
     if (cat !== 'Monstros') {
         let extraMana = 0;
-        if(classe === 'Andarilho') extraMana = 50;
-        if(classe === 'Estrangeiro') extraMana = 100;
-        if(classe === 'Nobre') extraMana = 150;
-        document.getElementById('val-vida-player').innerText = `${100 + (sorteBase * 50)} / ${100 + (sorteBase * 50)}`;
-        document.getElementById('val-mana').innerText = `${50 + extraMana} / ${50 + extraMana}`;
+        if(classe === 'Andarilho') extraMana = 25;
+        if(classe === 'Estrangeiro') extraMana = 50;
+        if(classe === 'Nobre') extraMana = 75;
+        document.getElementById('val-vida-player').innerText = `${40 + (sorteBase * 5)} / ${40 + (sorteBase * 5)}`;
+        document.getElementById('val-mana').innerText = `${25 + extraMana} / ${25 + extraMana}`;
     } else {
-        document.getElementById('val-mana').innerText = `50 / 50`;
+        document.getElementById('val-mana').innerText = `25 / 25`;
     }
 
     let maxWeight = forcaBase * 5;
