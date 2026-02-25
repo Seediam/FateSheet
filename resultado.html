@@ -7,6 +7,7 @@
         @keyframes camera-shake { 0%{transform:translate(1px, 1px) rotate(0deg)} 10%{transform:translate(-2px, -2px) rotate(-1deg)} 20%{transform:translate(-3px, 0px) rotate(1deg)} 30%{transform:translate(3px, 2px) rotate(0deg)} 40%{transform:translate(1px, -1px) rotate(1deg)} 50%{transform:translate(-1px, 2px) rotate(-1deg)} 60%{transform:translate(-3px, 1px) rotate(0deg)} 70%{transform:translate(3px, 1px) rotate(-1deg)} 80%{transform:translate(-1px, -1px) rotate(1deg)} 90%{transform:translate(1px, 2px) rotate(0deg)} 100%{transform:translate(0px, 0px) rotate(0deg)} }
         body { margin: 0; background: transparent; display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; font-family: 'Segoe UI', Tahoma, sans-serif; }
         .popup { background: rgba(15, 15, 20, 0.98); box-shadow: 0 0 30px rgba(0,0,0,0.9); border: 2px solid var(--aura-color); padding: 20px; border-radius: 8px; width: 90%; max-width: 400px; text-align: center; color: white;}
+        .avatar { font-size: 50px; margin-top: -10px; margin-bottom: -15px; filter: drop-shadow(0 0 10px rgba(0,0,0,0.5)); }
         .char-name { color: var(--aura-color); font-weight: 900; font-size: 20px; text-transform: uppercase; letter-spacing: 2px; text-shadow: 0 0 10px rgba(0,0,0,0.5);}
         .action { font-size: 14px; color: #8a8a9e; margin: 5px 0 15px 0; text-transform: uppercase;}
         .roll-box { font-size: 32px; font-weight: bold; background: #111; padding: 15px; border-radius: 6px; border: 1px dashed var(--aura-color); margin: 15px 0; text-shadow: 0 0 15px rgba(255, 255, 255, 0.5); letter-spacing: 2px;}
@@ -18,6 +19,7 @@
 <body>
     
     <div id="popup-box" class="popup">
+        <div class="avatar" id="c-av">🧙‍♂️</div>
         <div class="char-name" id="c-name">Rolando...</div>
         <div class="action" id="c-action">...</div>
         <div class="penalty" id="c-pen">⚠️ SOBREPESO: -5 APLICADO</div>
@@ -27,6 +29,23 @@
     <script type="module">
         import OBR from "https://esm.sh/@owlbear-rodeo/sdk";
 
+        function tocarAudio(isCrit, spellAudioUrl) {
+            try {
+                const baseUrl = "https://seediam.github.io/FateSheet/";
+                let diceSfx = new Audio(isCrit ? baseUrl + "critico.mp3" : baseUrl + "dado.mp3");
+                diceSfx.volume = 0.5;
+                diceSfx.play().catch(e => console.log("Áudio bloqueado pelo navegador"));
+
+                if (spellAudioUrl && spellAudioUrl.trim() !== "") {
+                    setTimeout(() => {
+                        let spellSfx = new Audio(spellAudioUrl);
+                        spellSfx.volume = 0.4;
+                        spellSfx.play().catch(e => console.log("Áudio da magia bloqueado"));
+                    }, 400); 
+                }
+            } catch(e) {}
+        }
+
         OBR.onReady(() => {
             const params = new URLSearchParams(window.location.search);
             const dataStr = params.get('data');
@@ -34,15 +53,32 @@
             if (dataStr) {
                 const data = JSON.parse(decodeURIComponent(dataStr));
                 if(data.col) document.documentElement.style.setProperty('--aura-color', data.col);
+                
+                document.getElementById('c-av').innerText = data.av || "🧙‍♂️";
+                let isGlobalCrit = false;
 
-                // --- MODO: ROLAGEM DE ATRIBUTOS ---
-                if (data.t === "attr") {
+                // --- DUELO DE COMBATE DIRETO ---
+                if (data.t === "clash") {
+                    document.getElementById('c-name').innerText = `${data.attacker} ⚔️ ${data.target}`;
+                    document.getElementById('c-action').innerHTML = `<span style="font-size:18px; color:#fff; font-weight:bold;">ATAQUE RESOLVIDO!</span><br><span style="font-size:11px; color:#888;">Magia: ${data.spell}</span>`;
+                    
+                    let html = `<div style="text-align:left; font-size:16px;">
+                        <div style="color:#ff4444; border-bottom:1px solid #333; padding-bottom:5px;">Dano Bruto: <b>${data.gross}</b></div>
+                        <div style="color:#44aaff; margin-top:5px; border-bottom:1px solid #333; padding-bottom:5px;">Defesa (Bloqueio): <b>${data.blocked}</b></div>
+                        <div style="color:var(--aura-color); font-size:22px; margin-top:15px; text-align:center;">Dano Real: <span style="font-weight:900;">${data.net}</span></div>
+                    </div>`;
+                    
+                    document.getElementById('c-roll').innerHTML = html;
+                    document.getElementById('c-roll').style.fontSize = "16px";
+                    document.getElementById('popup-box').classList.add('crit-anim'); // Trepida a tela no duelo!
+                    tocarAudio(true, null); // Faz som de critico na hora do duelo
+                }
+                else if (data.t === "attr") {
                     document.getElementById('c-name').innerText = data.c;
-                    document.getElementById('c-action').innerHTML = `<span style="font-size:18px; color:#fff; font-weight:bold;">🎲 ROLOU OS ATRIBUTOS DE TURNO</span>`;
+                    let pref = data.fc ? "[FC] " : "⚔️ ";
+                    document.getElementById('c-action').innerHTML = `<span style="font-size:18px; color:#fff; font-weight:bold;">${pref}ROLOU OS ATRIBUTOS</span>`;
                     
-                    let hasCrit = false;
                     let hasAgility = false;
-                    
                     const formatAttr = (label, arrStr, color) => {
                         if(!arrStr) return "";
                         let arr = arrStr.split(',');
@@ -52,37 +88,30 @@
                         let textArr = arr.map(v => {
                             let raw = parseInt(v);
                             let sBadge = data.sorte > 0 ? `<sup style="color:#39ff14; font-size:0.6em; text-shadow:none;">${data.sorte}</sup>` : "";
-                            let finalCol = "#fff"; // Branco
-                            if (raw >= 20) { finalCol = "#ffd700"; hasCrit = true; } // Crítico
-                            else if (raw >= 12) { finalCol = "#39ff14"; } // Verde Lima
-                            else if (raw <= 4) { finalCol = "#ff4444"; } // Falha
+                            let finalCol = "#fff"; 
+                            if (raw >= 20) { finalCol = "#ffd700"; isGlobalCrit = true; } 
+                            else if (raw >= 12) { finalCol = "#39ff14"; } 
+                            else if (raw <= 4) { finalCol = "#ff4444"; } 
                             return `<span style="color:${finalCol};">${raw}${sBadge}</span>`;
                         }).join(" | ");
-
-                        return `<div style="font-size:16px; margin-top:8px; border-bottom:1px solid #333; padding-bottom:5px; text-align:left;">
-                                    <span style="color:${color}; font-weight:bold; display:inline-block; width:80px;">${label}:</span> 
-                                    [ ${textArr} ]
-                                </div>`;
+                        return `<div style="font-size:16px; margin-top:8px; border-bottom:1px solid #333; padding-bottom:5px; text-align:left;"><span style="color:${color}; font-weight:bold; display:inline-block; width:80px;">${label}:</span> [ ${textArr} ]</div>`;
                     };
 
                     let html = "";
                     html += formatAttr("Força", data.rF, "#ff4444");
                     html += formatAttr("Magia", data.rM, "#44aaff");
                     html += formatAttr("Agilidade", data.rA, "#a855f7");
-
-                    if(hasAgility) {
-                        html += `<div style="color:#a855f7; font-weight:bold; font-size:14px; margin-top:15px; text-shadow:0 0 5px #a855f7;">⚡ VOCÊ ATACARÁ ANTES DE QUEM NÃO TEM AGILIDADE! ⚡</div>`;
-                    }
+                    if(hasAgility && !data.fc) html += `<div style="color:#a855f7; font-weight:bold; font-size:14px; margin-top:15px; text-shadow:0 0 5px #a855f7;">⚡ VOCÊ ATACARÁ ANTES DE QUEM NÃO TEM AGILIDADE! ⚡</div>`;
 
                     document.getElementById('c-roll').innerHTML = html;
                     document.getElementById('c-roll').style.fontSize = "16px";
-                    if (hasCrit) document.getElementById('popup-box').classList.add('crit-anim');
+                    if (isGlobalCrit) document.getElementById('popup-box').classList.add('crit-anim');
+                    
+                    tocarAudio(isGlobalCrit, null);
                 }
-
-                // --- MODO: MAGIA ---
                 else if(data.t === "spell") {
                     let isCrit = data.crit === "true";
-                    if(isCrit && data.st !== "Self") document.getElementById('popup-box').classList.add('crit-anim');
+                    if(isCrit && data.st !== "Self") { document.getElementById('popup-box').classList.add('crit-anim'); isGlobalCrit = true; }
 
                     document.getElementById('c-name').innerText = data.c;
                     let critBadge = (isCrit && data.st !== "Self") ? `<span style="color:#ffd700; border: 1px solid #ffd700; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 5px;">CRÍTICO</span>` : "";
@@ -97,36 +126,25 @@
                         return '<span style="color:#39ff14; font-size:10px;">(Cheio)</span>';
                     };
 
-                    const renderRow = (label, color, face, rollsArr, mult, tot, isCrit = false, fixo = 0) => {
+                    const renderRow = (label, color, face, rollsArr, mult, tot, isBaseCrit = false, fixo = 0) => {
                         if(!rollsArr || rollsArr.length === 0) return "";
-                        let valTexts = rollsArr.map(v => `<span style="${isCrit?'color:#ffd700;':'color:#fff;'}">${v}</span>`).join(" + ");
+                        let valTexts = rollsArr.map(v => `<span style="${isBaseCrit?'color:#ffd700;':'color:#fff;'}">${v}</span>`).join(" + ");
                         let fixoText = fixo > 0 ? ` + <span style="color:#ccc;">${fixo}</span>` : (fixo < 0 ? ` - <span style="color:#ccc;">${Math.abs(fixo)}</span>` : '');
-                        let tHtml = isCrit ? `<span class="crit-text">${tot}</span>` : `<b style="color:${color};">${tot}</b>`;
+                        let tHtml = isBaseCrit ? `<span class="crit-text">${tot}</span>` : `<b style="color:${color};">${tot}</b>`;
                         let mHtml = getMultText(mult);
-                        return `<div style="margin-top:8px; font-size:14px; text-align:left; border-bottom:1px solid #333; padding-bottom:6px;">
-                                    <span style="color:${color}; font-weight:bold; display:inline-block; width:45px;">${label}</span> 
-                                    <span style="font-size:10px; color:#666;">(${isCrit ? 'MÁX x3' : rollsArr.length+face})</span>: 
-                                    [ ${valTexts} ]${fixoText} ${mHtml} = <span style="font-size:18px;">${tHtml}</span>
-                                </div>`;
+                        return `<div style="margin-top:8px; font-size:14px; text-align:left; border-bottom:1px solid #333; padding-bottom:6px;"><span style="color:${color}; font-weight:bold; display:inline-block; width:45px;">${label}</span> <span style="font-size:10px; color:#666;">(${isBaseCrit ? 'MÁX x3' : rollsArr.length+face})</span>: [ ${valTexts} ]${fixoText} ${mHtml} = <span style="font-size:18px;">${tHtml}</span></div>`;
                     };
 
-                    let sumTotal = 0;
-                    let rollsHtml = "";
-
-                    if(data.st !== "Self") {
-                        if(data.b && data.b.r.length > 0) {
-                            rollsHtml += renderRow("Base", "var(--aura-color)", data.b.f, data.b.r, data.b.m, data.b.tot, isCrit);
-                            sumTotal += data.b.tot;
-                        }
-
+                    let sumTotal = 0; let rollsHtml = "";
+                    if(data.st !== "Self" && data.st !== "Cura") {
+                        if(data.b && data.b.r.length > 0) { rollsHtml += renderRow("Base", "var(--aura-color)", data.b.f, data.b.r, data.b.m, data.b.tot, isCrit); sumTotal += data.b.tot; }
                         if(data.ru && data.ru.length > 0) {
                             data.ru.forEach(r => {
                                 let label = '⚔️ Arma'; let col = '#ccc';
                                 if(r.t === 'alpha') { label = 'αlpha'; col = '#44aaff'; }
                                 if(r.t === 'delta') { label = 'δelta'; col = '#ff4444'; }
                                 if(r.t === 'beta') { label = 'βeta'; col = '#a855f7'; }
-                                rollsHtml += renderRow(label, col, r.f, r.r, r.m, r.tot, false, r.fixo);
-                                sumTotal += r.tot;
+                                rollsHtml += renderRow(label, col, r.f, r.r, r.m, r.tot, false, r.fixo); sumTotal += r.tot;
                             });
                         }
                     }
@@ -136,49 +154,42 @@
                         let stRoll = parseInt(data.stRoll); let dt = parseInt(data.stDT);
                         let stCor = stRoll >= dt ? "#44aaff" : "#ff4444";
                         let stText = stRoll >= dt ? "SUCESSO" : "FALHOU";
-                        statusHtml = `<div style="margin-top:10px; padding:8px; background:#111; border:1px dashed ${stCor}; border-radius:6px; font-size:14px;">
-                            <div style="color:#a855f7; font-weight:bold; margin-bottom:5px;">⚡ Efeito: ${data.stName} (DT ${dt})</div>
-                            Dado: [<span style="color:${stCor}; font-weight:bold; font-size:18px;">${stRoll}</span>] ➔ <b style="color:${stCor};">${stText}</b>
-                        </div>`;
+                        if(stRoll >= 20) isGlobalCrit = true; 
+                        statusHtml = `<div style="margin-top:10px; padding:8px; background:#111; border:1px dashed ${stCor}; border-radius:6px; font-size:14px;"><div style="color:#a855f7; font-weight:bold; margin-bottom:5px;">⚡ Efeito: ${data.stName} (DT ${dt})</div>Dado: [<span style="color:${stCor}; font-weight:bold; font-size:18px;">${stRoll}</span>] ➔ <b style="color:${stCor};">${stText}</b></div>`;
                     }
 
-                    let corFinal = isCrit ? "#ffd700" : "var(--aura-color)"; 
-                    let classFinal = isCrit ? "crit-text" : "";
+                    let corFinal = isCrit ? "#ffd700" : "var(--aura-color)"; let classFinal = isCrit ? "crit-text" : "";
+                    let totalHtml = `<div style="margin-top:15px; font-size:22px; font-weight:bold; color:#fff;">Total: <span style="color:${corFinal};" class="${classFinal}">${sumTotal}</span></div>`;
                     
-                    let totalHtml = "";
-                    if(data.st !== "Self") {
-                        if(data.st === "Locomoção") totalHtml = `<div style="margin-top:15px; font-size:22px; font-weight:bold; color:#fff;">Movimento: <span style="color:${corFinal};" class="${classFinal}">+${sumTotal} ft</span></div>`;
-                        else totalHtml = `<div style="margin-top:15px; font-size:24px; font-weight:bold; color:#fff;">Dano Total: <span style="color:${corFinal};" class="${classFinal}">${sumTotal}</span></div>`;
-                    }
+                    if(data.st === "Dano" || data.st === "Controle") totalHtml = `<div style="margin-top:15px; font-size:24px; font-weight:bold; color:#fff;">Dano Total: <span style="color:${corFinal};" class="${classFinal}">${sumTotal}</span></div>`;
+                    if(data.st === "Cura") totalHtml = `<div style="margin-top:15px; font-size:24px; font-weight:bold; color:#39ff14;">💚 Cura: <span style="color:#39ff14;" class="${classFinal}">${data.healed||sumTotal}</span></div>`;
+                    if(data.st === "Locomoção") totalHtml = `<div style="margin-top:15px; font-size:22px; font-weight:bold; color:#fff;">Movimento: <span style="color:${corFinal};" class="${classFinal}">+${sumTotal} ft</span></div>`;
 
                     document.getElementById('c-roll').innerHTML = descHtml + rollsHtml + statusHtml + totalHtml;
-                    document.getElementById('c-roll').style.fontSize = "16px"; 
-                    document.getElementById('c-pen').style.display = "none"; 
+                    document.getElementById('c-roll').style.fontSize = "16px"; document.getElementById('c-pen').style.display = "none"; 
+                    
+                    tocarAudio(isGlobalCrit, data.audio);
                 } 
-                // --- MODO: PERÍCIA NORMAL ---
                 else {
                     document.getElementById('c-name').innerText = data.c;
-                    document.getElementById('c-action').innerHTML = `ROLOU <b>${data.s}</b> <span style="font-size:11px;">(${data.a})</span>`;
+                    let pref = data.fc ? "[FC] " : "⚔️ ";
+                    document.getElementById('c-action').innerHTML = `<span style="font-size:16px;">${pref}ROLOU <b>${data.s}</b></span> <span style="font-size:11px;">(${data.a})</span>`;
                     
-                    const resArray = data.r ? data.r.split(',') : [];
-                    const skillMod = parseInt(data.mod) || 0;
-                    let temCritico = false;
-
+                    const resArray = data.r ? data.r.split(',') : []; const skillMod = parseInt(data.mod) || 0;
                     const formattedResults = resArray.map(v => {
-                        let raw = parseInt(v);
-                        let total = raw + skillMod;
+                        let raw = parseInt(v); let total = raw + skillMod;
                         let modStr = skillMod !== 0 ? `<sup style="font-size: 0.6em; opacity: 0.8; font-weight: bold;">${skillMod > 0 ? '+'+skillMod : skillMod}</sup>` : '';
                         let textDisplay = `${total}${modStr}`;
-
-                        if (raw >= 20) { temCritico = true; return `<span style="color:#ffd700;">${textDisplay}</span>`; }
+                        if (raw >= 20) { isGlobalCrit = true; return `<span style="color:#ffd700;">${textDisplay}</span>`; }
                         if (raw <= 4) return `<span style="color:#ff4444;">${textDisplay}</span>`;
                         return textDisplay;
                     }).join(' <span style="color:#666;">|</span> ');
 
                     document.getElementById('c-roll').innerHTML = `[ ${formattedResults} ]`;
-
                     if(data.pen === "true") document.getElementById('c-pen').style.display = "block";
-                    if (temCritico) document.getElementById('popup-box').classList.add('crit-anim');
+                    if (isGlobalCrit) document.getElementById('popup-box').classList.add('crit-anim');
+                    
+                    tocarAudio(isGlobalCrit, null);
                 }
             }
             setTimeout(() => { OBR.modal.close('fate-roll-modal'); }, 7000);
