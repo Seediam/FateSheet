@@ -57,21 +57,20 @@
                 document.getElementById('c-av').innerText = data.av || "🧙‍♂️";
                 let isGlobalCrit = false;
 
-                // --- DUELO DE COMBATE DIRETO ---
                 if (data.t === "clash") {
-                    document.getElementById('c-name').innerText = `${data.attacker} ⚔️ ${data.target}`;
-                    document.getElementById('c-action').innerHTML = `<span style="font-size:18px; color:#fff; font-weight:bold;">ATAQUE RESOLVIDO!</span><br><span style="font-size:11px; color:#888;">Magia: ${data.spell}</span>`;
+                    document.getElementById('c-name').innerText = `⚔️ ${data.c} atacou ${data.targetName} ⚔️`;
+                    document.getElementById('c-action').innerHTML = `<span style="font-size:18px; color:#fff; font-weight:bold;">RESOLUÇÃO DO DUELO!</span><br><span style="font-size:11px; color:#888;">Magia: ${data.sn}</span>`;
                     
                     let html = `<div style="text-align:left; font-size:16px;">
                         <div style="color:#ff4444; border-bottom:1px solid #333; padding-bottom:5px;">Dano Bruto: <b>${data.gross}</b></div>
-                        <div style="color:#44aaff; margin-top:5px; border-bottom:1px solid #333; padding-bottom:5px;">Defesa (Bloqueio): <b>${data.blocked}</b></div>
-                        <div style="color:var(--aura-color); font-size:22px; margin-top:15px; text-align:center;">Dano Real: <span style="font-weight:900;">${data.net}</span></div>
+                        <div style="color:#44aaff; margin-top:5px; border-bottom:1px solid #333; padding-bottom:5px;">Defesa Usada: <b>${data.blocked}</b></div>
+                        <div style="color:var(--aura-color); font-size:22px; margin-top:15px; text-align:center;">Dano Recebido: <span style="font-weight:900;">${data.net}</span></div>
                     </div>`;
                     
                     document.getElementById('c-roll').innerHTML = html;
                     document.getElementById('c-roll').style.fontSize = "16px";
-                    document.getElementById('popup-box').classList.add('crit-anim'); // Trepida a tela no duelo!
-                    tocarAudio(true, null); // Faz som de critico na hora do duelo
+                    document.getElementById('popup-box').classList.add('crit-anim'); 
+                    tocarAudio(true, data.audio); 
                 }
                 else if (data.t === "attr") {
                     document.getElementById('c-name').innerText = data.c;
