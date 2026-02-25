@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fate Sheet</title>
     <style>
-        :root { --bg-dark: #0f0f13; --bg-panel: #1c1c24; --accent-gold: #d4af37; --text-main: #eaeaef; --text-muted: #8a8a9e; --border-subtle: #2a2a35; --danger: #ff4444; }
+        :root { --bg-dark: #0f0f13; --bg-panel: #1c1c24; --accent-gold: #d4af37; --text-main: #eaeaef; --text-muted: #8a8a9e; --border-subtle: #2a2a35; --danger: #ff4444; --success: #39ff14; }
         body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg-dark); color: var(--text-main); padding: 15px; margin: 0; overflow-x: hidden; }
         #loading { text-align: center; color: var(--accent-gold); margin-top: 50px; font-weight: bold; font-size: 18px; animation: pulse 1.5s infinite;}
         @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
@@ -16,6 +16,8 @@
         .top-bar { display: flex; justify-content: space-between; margin-bottom: 15px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px;}
         .btn-new { width: 100%; padding: 12px; background: rgba(212, 175, 55, 0.05); border: 1px dashed var(--accent-gold); color: var(--accent-gold); font-weight: bold; font-size: 14px; border-radius: 6px; cursor: pointer; transition: 0.2s; margin-bottom: 10px;}
         .btn-new:hover { background: var(--accent-gold); color: #000; }
+        .btn-roll-attr { width: 100%; padding: 12px; background: #1a1a24; border: 1px solid var(--accent-gold); color: var(--accent-gold); font-size: 14px; font-weight: bold; border-radius: 6px; cursor: pointer; transition: 0.2s; margin-top: 10px; box-shadow: 0 0 10px rgba(212,175,55,0.1);}
+        .btn-roll-attr:hover { background: var(--accent-gold); color: #000; transform: scale(1.02); }
         
         .btn-import { width: 100%; padding: 10px; background: #1a1a24; border: 1px solid var(--border-subtle); color: var(--text-muted); font-size: 12px; border-radius: 6px; cursor: pointer; transition: 0.2s; margin-bottom: 20px;}
         .btn-import:hover { border-color: var(--accent-gold); color: var(--accent-gold); }
@@ -23,8 +25,6 @@
         .folder-header { display: flex; align-items: center; cursor: pointer; color: var(--accent-gold); font-size: 13px; font-weight: bold; text-transform: uppercase; letter-spacing: 1px; margin: 15px 0 8px 0; border-bottom: 1px solid var(--border-subtle); padding-bottom: 5px; transition: 0.2s;}
         .folder-header:hover { color: #fff; }
         .chevron { display: inline-block; width: 15px; transition: transform 0.3s ease; }
-        
-        /* CORREÇÃO DEFINITIVA DA LISTA EMBOLADA */
         .folder-content { display: none; flex-direction: column; width: 100%; margin-bottom: 15px; gap: 8px; }
         .folder-content.open { display: flex; }
         .char-list-item { display: flex; width: 100%; box-sizing: border-box; align-items: center; justify-content: space-between; background: var(--bg-panel); padding: 10px 15px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; transition: 0.2s; font-weight: bold; border-left: 4px solid var(--accent-gold);}
@@ -58,8 +58,9 @@
         .shield-box label { display: block; font-size: 10px; text-transform: uppercase; margin-bottom: 5px; font-weight: bold; color: inherit; }
         .shield-box span { font-size: 24px; font-weight: bold; color: #fff; text-shadow: 0 0 5px rgba(255,255,255,0.3); }
 
-        .attr-box { display: flex; justify-content: space-between; align-items: center; background: linear-gradient(90deg, var(--bg-panel) 0%, var(--bg-dark) 100%); padding: 12px 15px; margin-bottom: 8px; border-radius: 6px; border-left: 4px solid var(--accent-gold); font-weight: bold; }
-        .attr-input { width: 50px !important; text-align: center; font-size: 16px; font-weight: bold;}
+        .attr-box { display: flex; justify-content: space-between; align-items: center; background: linear-gradient(90deg, var(--bg-panel) 0%, var(--bg-dark) 100%); padding: 10px 15px; margin-bottom: 8px; border-radius: 6px; border-left: 4px solid var(--accent-gold); font-weight: bold; }
+        .attr-input { width: 45px !important; text-align: center; font-size: 14px; font-weight: bold; padding: 6px !important;}
+        .alloc-input { width: 40px !important; text-align: center; font-size: 14px; font-weight: bold; padding: 6px !important; background: #000 !important; border-color: #555 !important; color: var(--accent-gold) !important;}
 
         .skill-item { display: flex; justify-content: space-between; align-items: center; background: var(--bg-panel); padding: 10px 15px; margin-bottom: 8px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; transition: 0.2s; }
         .skill-item:hover { background: #23232d; border-color: var(--border-subtle); transform: translateX(3px); }
@@ -74,7 +75,6 @@
         .inv-input { padding: 8px !important; font-size: 12px; }
         .btn-danger { background: #3a1c1c; border: none; color: #fff; cursor: pointer; border-radius: 4px; padding: 6px 10px; transition: 0.2s; font-weight: bold;}
         .btn-danger:hover { background: var(--danger); }
-        .overweight { border-color: var(--danger) !important; color: var(--danger) !important; }
 
         .spell-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding: 2px 0;}
         .dice-config-row { display: flex; flex-direction: column; gap: 5px; margin-top: 5px; background: #15151e; padding: 8px; border-radius: 4px; border: 1px dashed var(--border-subtle);}
@@ -87,18 +87,20 @@
 
         .mult-group { display: flex; gap: 2px; background: #000; padding: 3px; border-radius: 4px; margin-left: auto; }
         .mult-btn { cursor: pointer; padding: 2px 8px; font-size: 10px; font-weight: bold; border-radius: 3px; opacity: 0.3; transition: 0.2s; text-align: center;}
-        .m-red { color: #ff4444; border: 1px solid #ff4444; }
-        .m-red.active, .m-red:hover { background: #ff4444; color: #000; opacity: 1; }
+        .m-red { color: var(--danger); border: 1px solid var(--danger); }
+        .m-red.active, .m-red:hover { background: var(--danger); color: #000; opacity: 1; }
         .m-white { color: #fff; border: 1px solid #fff; }
         .m-white.active, .m-white:hover { background: #fff; color: #000; opacity: 1; }
-        .m-green { color: #00ff00; border: 1px solid #00ff00; }
-        .m-green.active, .m-green:hover { background: #00ff00; color: #000; opacity: 1; }
+        .m-green { color: var(--success); border: 1px solid var(--success); }
+        .m-green.active, .m-green:hover { background: var(--success); color: #000; opacity: 1; }
         
         .btn-rune { background: transparent; border: 1px dashed; border-radius: 4px; font-size: 10px; padding: 6px 10px; cursor: pointer; transition: 0.2s; font-weight: bold; }
         .b-alpha { color: #44aaff; border-color: #44aaff; }
         .b-alpha:hover { background: #44aaff; color: #000; }
         .b-delta { color: #ff4444; border-color: #ff4444; }
         .b-delta:hover { background: #ff4444; color: #000; }
+        .b-beta { color: #a855f7; border-color: #a855f7; }
+        .b-beta:hover { background: #a855f7; color: #000; }
         .b-arma { color: #ccc; border-color: #ccc; }
         .b-arma:hover { background: #ccc; color: #000; }
     </style>
@@ -216,21 +218,109 @@
                     </div>
                 </div>
 
-                <h4 class="section-title">Atributos</h4>
-                <div class="attr-box"><span>Força</span><input type="number" id="attr-forca" class="attr-input" value="1" oninput="calcVitals()"></div>
-                <div class="attr-box"><span>Magia</span><input type="number" id="attr-magia" class="attr-input" value="1" oninput="calcVitals()"></div>
-                <div class="attr-box"><span>Agilidade</span><input type="number" id="attr-agilidade" class="attr-input" value="1" oninput="calcVitals()"></div>
-                <div class="attr-box"><span>Sorte</span><input type="number" id="attr-sorte" class="attr-input" value="1" oninput="calcVitals()"></div>
+                <h4 class="section-title" style="display:flex; justify-content:space-between; align-items:flex-end;">
+                    <span>Rolagem de Turno</span>
+                    <span style="font-size:10px; color:#888;">Máx 3 Dados</span>
+                </h4>
+                
+                <div class="attr-box">
+                    <span style="width: 70px;">Força</span>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <input type="number" id="alloc-forca" class="alloc-input" value="0" min="0" onchange="updateAlloc()">
+                        <span style="font-size:10px; color:#666;">MÁX</span>
+                        <input type="number" id="attr-forca" class="attr-input" value="1" oninput="calcVitals()">
+                    </div>
+                </div>
+                <div class="attr-box">
+                    <span style="width: 70px;">Magia</span>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <input type="number" id="alloc-magia" class="alloc-input" value="0" min="0" onchange="updateAlloc()">
+                        <span style="font-size:10px; color:#666;">MÁX</span>
+                        <input type="number" id="attr-magia" class="attr-input" value="1" oninput="calcVitals()">
+                    </div>
+                </div>
+                <div class="attr-box">
+                    <span style="width: 70px;">Agilidade</span>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <input type="number" id="alloc-agilidade" class="alloc-input" value="0" min="0" onchange="updateAlloc()">
+                        <span style="font-size:10px; color:#666;">MÁX</span>
+                        <input type="number" id="attr-agilidade" class="attr-input" value="1" oninput="calcVitals()">
+                    </div>
+                </div>
+                <div class="attr-box" style="border-color:#39ff14;">
+                    <span style="width: 70px; color:#39ff14;">Sorte (+1)</span>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <input type="number" id="alloc-sorte" class="alloc-input" style="color:#39ff14 !important;" value="0" min="0" onchange="updateAlloc()">
+                        <span style="font-size:10px; color:#666;">MÁX</span>
+                        <input type="number" id="attr-sorte" class="attr-input" value="1" oninput="calcVitals()">
+                    </div>
+                </div>
 
-                <h4 class="section-title">📖 Grimório</h4>
-                <div class="form-group"><input type="text" id="grimoire-name" placeholder="Nome do Grimório"></div>
+                <button class="btn-roll-attr" onclick="rollAttributes()">🎲 Rolar Atributos do Turno</button>
+
+                <h4 class="section-title" style="margin-top:30px;">📖 Grimório</h4>
+                <div style="display: flex; gap: 10px; margin-bottom: 12px;">
+                    <div class="form-group" style="flex: 2;">
+                        <label>Grimório</label>
+                        <select id="grimoire-select" onchange="changeGrimoire()">
+                            <option value="">Nenhum</option>
+                            <optgroup label="Básicos">
+                                <option value="Gelo">Gelo</option>
+                                <option value="Fogo">Fogo</option>
+                                <option value="Vento">Vento</option>
+                                <option value="Água">Água</option>
+                                <option value="Planta">Planta</option>
+                                <option value="Roseira">Roseira</option>
+                                <option value="Constrição">Constrição</option>
+                                <option value="Fumaça Arcana">Fumaça Arcana</option>
+                                <option value="Espinhos">Espinhos</option>
+                                <option value="Tecido">Tecido</option>
+                                <option value="Terra">Terra</option>
+                                <option value="Raio">Raio</option>
+                                <option value="Lama">Lama</option>
+                                <option value="Espelhos">Espelhos</option>
+                                <option value="Veneno">Veneno</option>
+                                <option value="Escudo">Escudo</option>
+                                <option value="Espada">Espada</option>
+                                <option value="Tinta">Tinta</option>
+                            </optgroup>
+                            <optgroup label="4 Folhas">
+                                <option value="Tempo">Tempo</option>
+                                <option value="Sangue">Sangue</option>
+                                <option value="Selamento">Selamento</option>
+                                <option value="Morte">Morte</option>
+                                <option value="Luz">Luz</option>
+                                <option value="Sombras">Sombras</option>
+                                <option value="Vida">Vida</option>
+                                <option value="Espaço">Espaço</option>
+                                <option value="Teleporte">Teleporte</option>
+                            </optgroup>
+                            <optgroup label="5 Folhas">
+                                <option value="Negação">Negação</option>
+                                <option value="Criação">Criação</option>
+                                <option value="Imaginação">Imaginação</option>
+                                <option value="Realidade">Realidade</option>
+                            </optgroup>
+                            <optgroup label="Especiais">
+                                <option value="Sem Grimório">Sem Grimório</option>
+                                <option value="Inumório">Inumório</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div class="form-group" style="flex: 1;">
+                        <label>DT</label>
+                        <input type="number" id="grimoire-dt" value="10" onchange="saveData()">
+                    </div>
+                </div>
                 <div class="form-group"><label>🔮 Mana Zone</label><textarea id="mana-zone" rows="2" placeholder="Descreva sua Mana Zone..."></textarea></div>
-                <div class="form-group"><label>🌟 Passiva</label><textarea id="passiva" rows="2" placeholder="Descreva a Passiva do Grimório..."></textarea></div>
+                <div class="form-group"><label>🌟 Passiva do Grimório</label><textarea id="passiva" rows="4" placeholder="A passiva será preenchida automaticamente..."></textarea></div>
                 
                 <h4 class="section-title" style="display: flex; justify-content: space-between; align-items: center; margin-top: 30px;">
-                    Habilidades / Magias
+                    Habilidades Ativas
                     <button class="btn-ctrl" style="width:auto; padding: 4px 12px; font-size: 11px;" onclick="addSpell()">+ Magia</button>
                 </h4>
+                
+                <div id="global-runes-container" style="margin-bottom: 15px;"></div>
                 <div id="spells-container"></div>
             </div>
 
@@ -239,11 +329,11 @@
             <div id="mochila" class="tab-content">
                 <div class="status-box">
                     <div class="status-item" id="box-peso">
-                        <label>Peso</label>
+                        <label>Peso do Personagem</label>
                         <span id="val-peso">0 / 5</span>
                     </div>
                 </div>
-                <p id="peso-aviso" style="color: var(--danger); font-size: 11px; text-align: center; display: none; font-weight: bold;">⚠️ SOBREPESO! -5 em TODAS as rolagens.</p>
+                <p id="peso-aviso" style="color: var(--danger); font-size: 11px; text-align: center; display: none; font-weight: bold;">⚠️ SOBREPESO! Desvantagem de -5 em TODAS as rolagens.</p>
                 <h4 class="section-title" style="display: flex; justify-content: space-between;">Itens 
                     <button class="btn-ctrl" style="width:auto; padding: 2px 10px;" onclick="addInventoryItem()">+ Item</button>
                 </h4>
@@ -253,6 +343,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@2/lib/index.js"></script>
-    <script type="module" src="script.js?v=99901"></script>
+    <script type="module" src="script.js?v=999912"></script>
 </body>
 </html>
