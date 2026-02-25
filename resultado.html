@@ -21,7 +21,7 @@
         
         body { margin: 0; background: transparent; display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; font-family: 'Segoe UI', Tahoma, sans-serif; }
         
-        .popup { background: rgba(15, 15, 20, 0.98); box-shadow: 0 0 30px rgba(0,0,0,0.9); border: 2px solid var(--aura-color); padding: 20px; border-radius: 8px; width: 90%; max-width: 350px; text-align: center; color: white;}
+        .popup { background: rgba(15, 15, 20, 0.98); box-shadow: 0 0 30px rgba(0,0,0,0.9); border: 2px solid var(--aura-color); padding: 20px; border-radius: 8px; width: 90%; max-width: 400px; text-align: center; color: white;}
         
         .char-name { color: var(--aura-color); font-weight: 900; font-size: 20px; text-transform: uppercase; letter-spacing: 2px; text-shadow: 0 0 10px rgba(0,0,0,0.5);}
         .action { font-size: 14px; color: #8a8a9e; margin: 5px 0 15px 0; text-transform: uppercase;}
@@ -55,38 +55,83 @@
                     document.documentElement.style.setProperty('--aura-color', data.color);
                 }
 
-                document.getElementById('c-name').innerText = data.c;
-                document.getElementById('c-action').innerHTML = `ROLOU <b>${data.s}</b> <span style="font-size:11px;">(${data.a})</span>`;
-                
-                const resArray = data.r.split(',');
-                const skillMod = parseInt(data.mod) || 0;
-                let temCritico = false;
+                // --------- MODO MAGIA ---------
+                if(data.type === "spell") {
+                    document.getElementById('c-name').innerText = data.c;
+                    document.getElementById('c-action').innerHTML = `
+                        <span style="font-size:18px; color:#fff; font-weight:bold;">- ${data.sName} -</span><br>
+                        <span style="font-size:11px; color:#888;">Custo: ${data.cost} Mana | Alcance: ${data.range} | Tipo: ${data.sType}</span>
+                    `;
 
-                const formattedResults = resArray.map(v => {
-                    let raw = parseInt(v);
-                    let total = raw + skillMod;
+                    let descHtml = data.desc ? `<div style="font-size:12px; color:#ccc; margin-top:10px; margin-bottom:15px; background:#111; padding:10px; border-radius:4px; text-align:left; border-left:3px solid var(--aura-color);">${data.desc}</div>` : "";
+
+                    const formatArr = (str) => str ? str.split(',') : [];
+                    const arrB = formatArr(data.rB);
+                    const arrA = formatArr(data.rA);
+                    const arrF = formatArr(data.rF);
+
+                    const buildRollRow = (arr, diceType, label, color) => {
+                        if(arr.length === 0) return "";
+                        let total = arr.reduce((a,b)=>a+parseInt(b), 0);
+                        let textArr = arr.map(v => `<span style="color:#fff;">${v}</span>`).join(" + ");
+                        return `<div style="margin-top:8px; font-size:14px; text-align:left; border-bottom:1px solid #333; padding-bottom:6px;">
+                                    <span style="color:${color}; font-weight:bold; display:inline-block; width:45px;">${label}</span> 
+                                    <span style="font-size:10px; color:#666;">(${arr.length}${diceType})</span>: 
+                                    [ ${textArr} ] = <b style="font-size:18px; color:${color};">${total}</b>
+                                </div>`;
+                    };
+
+                    let sumTotal = 0;
+                    if(arrB.length > 0) sumTotal += arrB.reduce((a,b)=>a+parseInt(b), 0);
+                    if(arrA.length > 0) sumTotal += arrA.reduce((a,b)=>a+parseInt(b), 0);
+                    if(arrF.length > 0) sumTotal += arrF.reduce((a,b)=>a+parseInt(b), 0);
+
+                    let rollsHtml = "";
+                    rollsHtml += buildRollRow(arrB, data.dB, "Base", "var(--aura-color)");
+                    rollsHtml += buildRollRow(arrA, data.dA, "Alpha", "#44aaff");
+                    rollsHtml += buildRollRow(arrF, data.dF, "Delta", "#ff4444");
+
+                    let totalHtml = `<div style="margin-top:15px; font-size:22px; font-weight:bold; color:#fff;">Total do Efeito: <span style="color:var(--aura-color);">${sumTotal}</span></div>`;
+                    if(data.sType === "Dano") totalHtml = `<div style="margin-top:15px; font-size:24px; font-weight:bold; color:#fff;">Dano Total: <span style="color:var(--aura-color);">${sumTotal}</span></div>`;
+
+                    document.getElementById('c-roll').innerHTML = descHtml + rollsHtml + totalHtml;
+                    document.getElementById('c-roll').style.fontSize = "16px"; // Ajusta para não estourar a tela
+                    document.getElementById('c-pen').style.display = "none"; // Magia não sofre o peso físico
+
+                } 
+                // --------- MODO PERÍCIA NORMAL ---------
+                else {
+                    document.getElementById('c-name').innerText = data.c;
+                    document.getElementById('c-action').innerHTML = `ROLOU <b>${data.s}</b> <span style="font-size:11px;">(${data.a})</span>`;
                     
-                    // Cria a representação da perícia (Ex: +2 que vai ficar pequeno no alto)
-                    let modStr = skillMod !== 0 ? `<sup style="font-size: 0.5em; opacity: 0.7;">${skillMod > 0 ? '+'+skillMod : skillMod}</sup>` : '';
-                    let textDisplay = `${total}${modStr}`;
+                    const resArray = data.r.split(',');
+                    const skillMod = parseInt(data.mod) || 0;
+                    let temCritico = false;
 
-                    // Regras de cor do Crítico continuam usando o DADO PURO para não haver trapaças!
-                    if (raw >= 20) { temCritico = true; return `<span style="color:#ffd700;">${textDisplay}</span>`; }
-                    if (raw <= 4) return `<span style="color:#ff4444;">${textDisplay}</span>`;
-                    return textDisplay;
+                    const formattedResults = resArray.map(v => {
+                        let raw = parseInt(v);
+                        let total = raw + skillMod;
+                        let modStr = skillMod !== 0 ? `<sup style="font-size: 0.5em; opacity: 0.7;">${skillMod > 0 ? '+'+skillMod : skillMod}</sup>` : '';
+                        let textDisplay = `${total}${modStr}`;
 
-                }).join(' <span style="color:#666;">|</span> ');
+                        if (raw >= 20) { temCritico = true; return `<span style="color:#ffd700;">${textDisplay}</span>`; }
+                        if (raw <= 4) return `<span style="color:#ff4444;">${textDisplay}</span>`;
+                        return textDisplay;
+                    }).join(' <span style="color:#666;">|</span> ');
 
-                document.getElementById('c-roll').innerHTML = `[ ${formattedResults} ]`;
+                    document.getElementById('c-roll').innerHTML = `[ ${formattedResults} ]`;
 
-                if(data.pen === "true") document.getElementById('c-pen').style.display = "block";
+                    if(data.pen === "true") document.getElementById('c-pen').style.display = "block";
 
-                if (temCritico) {
-                    document.getElementById('popup-box').classList.add('crit-anim');
+                    if (temCritico) {
+                        document.getElementById('popup-box').classList.add('crit-anim');
+                    }
                 }
             }
 
-            setTimeout(() => { OBR.modal.close('fate-roll-modal'); }, 4500);
+            // O modal de magia dá mais tempo para o jogador ler o efeito
+            let tempo = dataStr && JSON.parse(decodeURIComponent(dataStr)).type === "spell" ? 7000 : 4500;
+            setTimeout(() => { OBR.modal.close('fate-roll-modal'); }, tempo);
         });
     </script>
 </body>
