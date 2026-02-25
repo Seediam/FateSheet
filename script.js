@@ -5,7 +5,7 @@ const skillsData = [
     { name: "Intuição", attr: "Sorte" }, { name: "Medicina", attr: "Sorte" }, { name: "Percepção", attr: "Sorte" }, { name: "Sobrevivência", attr: "Sorte" },
     { name: "Atletismo", attr: "Força" }, { name: "Intimidação", attr: "Força" },
     { name: "Acrobacia", attr: "Agilidade" }, { name: "Furtividade", attr: "Agilidade" }, { name: "Prestidigitação", attr: "Agilidade" },
-    { name: "Atuação", attr: "Sorte" }, { name: "Enganação", attr: "Sorte" }, { name: "Persuasão", attr: "Sorte" }
+    { name: "Atuação", attr: "Sorte" }, { name: "Enganação", attr: "Sorte" }, { name: "Persuasão", attr: "Sorte" } , { name: "Vigor", attr: "Sorte" } , { name: "Fortitude", attr: "Força" }
 ];
 
 const grimoiresDb = {
@@ -200,7 +200,6 @@ window.openCharacter = function(id) {
     if(c.category === 'Monstros') safeSetVal('char-race-monster', c.race || 'Terrestres');
     else safeSetVal('char-race-player', c.race || 'Humano');
 
-    // Carrega HP/MP atuáveis
     safeSetVal('char-hp-atual', c.hpAtual !== undefined ? c.hpAtual : 40);
     safeSetVal('char-mp-atual', c.mpAtual !== undefined ? c.mpAtual : 25);
     safeSetVal('val-vida-monster', c.vidaMonster || 100);
@@ -239,7 +238,6 @@ window.openCharacter = function(id) {
     window.calcVitals();
     window.updateAlloc(); 
 
-    // Checa se fui atacado ao abrir a ficha
     window.checkClashStatus();
 
     document.getElementById('screen-list').classList.remove('active');
@@ -282,7 +280,6 @@ window.calcVitals = function() {
     }
 }
 
-// ------ NOVO: O TRACKER DE COMBATE ------
 window.renderCombatTracker = function() {
     const container = document.getElementById('combat-tracker-list');
     if(!container) return;
@@ -318,6 +315,7 @@ window.updateAlloc = function() {
     let m = parseInt(document.getElementById('alloc-magia').value) || 0;
     let a = parseInt(document.getElementById('alloc-agilidade').value) || 0;
     let s = parseInt(document.getElementById('alloc-sorte').value) || 0;
+
     let maxF = parseInt(document.getElementById('attr-forca').value) || 0;
     let maxM = parseInt(document.getElementById('attr-magia').value) || 0;
     let maxA = parseInt(document.getElementById('attr-agilidade').value) || 0;
@@ -344,14 +342,14 @@ window.addCombatLog = async function(data) {
             let meta = await OBR.room.getMetadata();
             let nuvemLog = meta["fatesheet_log_v5"] || [];
             nuvemLog.unshift(data);
-            if(nuvemLog.length > 15) nuvemLog.pop();
+            if(nuvemLog.length > 20) nuvemLog.pop();
             combatLog = nuvemLog;
             await OBR.room.setMetadata({ "fatesheet_log_v5": combatLog });
             OBR.broadcast.sendMessage("fatesheet-log-update", combatLog);
         } catch(e) {}
     } else {
         combatLog.unshift(data);
-        if(combatLog.length > 15) combatLog.pop();
+        if(combatLog.length > 20) combatLog.pop();
     }
     window.renderMiniLog();
 }
@@ -379,8 +377,12 @@ window.renderMiniLog = function() {
             let div = document.createElement('div'); div.className = 'log-entry'; div.style.borderLeftColor = log.col || '#d4af37';
             let prefix = log.fc ? '<span style="color:#888; font-weight:bold;">[FC]</span> ' : '⚔️ ';
             let actHtml = ""; let resHtml = "";
-            
-            if (log.t === "spell") {
+
+            if (log.t === "clash") {
+                actHtml = `⚔️ <b style="color:#ff4444">DUELO:</b> ${log.c} vs ${log.targetName}`;
+                resHtml = `Bruto: ${log.gross} | Bloqueio: <span style="color:#44aaff">${log.blocked}</span> | <b style="color:${log.col}">Real: ${log.net}</b>`;
+            }
+            else if (log.t === "spell") {
                 actHtml = `${prefix}Rolou <b style="color:${log.col}">[ ${log.sn} ]</b>`;
                 let parts = []; let totalDano = 0;
                 
@@ -408,9 +410,7 @@ window.renderMiniLog = function() {
                     let stRoll = parseInt(log.stRoll); let dt = parseInt(log.stDT); let stCor = stRoll >= dt ? "#44aaff" : "#ff4444";
                     resHtml += `<div style="font-size:11px; margin-top:4px; color:${stCor}">⚡ ${log.stName}: [${stRoll}] vs DT ${dt}</div>`;
                 }
-                if (log.targetName) {
-                    resHtml += `<div style="font-size:11px; margin-top:4px; color:#ffaa00">Alvo: ${log.targetName} ${log.blocked ? `(Bloqueou ${log.blocked})` : ''}</div>`;
-                }
+                if (log.targetName) resHtml += `<div style="font-size:11px; margin-top:4px; color:#ffaa00">Alvo: ${log.targetName}</div>`;
             } 
             else if (log.t === "attr") {
                 actHtml = `${prefix}Rolou <b>Atributos</b>`; let parts = [];
@@ -529,17 +529,13 @@ window.renderSpells = function() {
         let isSelf = spell.tipo === "Self";
         let row = document.createElement('div'); row.className = 'spell-item';
         
-        // NOVO: Select Alvo
-        let targetDrop = `<select class="inv-input" style="width:auto; font-weight:bold; padding:4px;" onchange="updateSpell(${index}, 'target', this.value)">${window.targetOptionsHTML}</select>`;
+        let targetDrop = `<select class="inv-input spell-target" style="width:auto; font-weight:bold; padding:4px;" onchange="updateSpell(${index}, 'target', this.value)">${window.targetOptionsHTML}</select>`;
         
         let headerHtml = `<div class="spell-header" onclick="toggleSpellInfo(${index})"><div style="display: flex; align-items: center; gap: 10px;"><button class="btn-roll-spell" onclick="event.stopPropagation(); rollSpellMagic(${index})" title="Rolar Magia">🎲</button><span style="font-weight: bold; color: var(--accent-gold); font-size: 16px;">${spell.nome || 'Nova Magia'}</span></div><div style="display:flex; align-items:center; gap: 10px;">${targetDrop}<button class="btn-danger" style="padding: 4px 8px;" onclick="event.stopPropagation(); removeSpell(${index})">X</button><span class="chevron">${spell.isOpen ? '▼' : '►'}</span></div></div>`;
 
-        let bodyHtml = `<div style="display: ${spell.isOpen ? 'flex' : 'none'}; flex-direction: column; gap: 5px; margin-top: 10px;"><div class="inv-row"><input type="text" class="inv-input" style="flex: 2; font-weight: bold;" placeholder="Habilidade" value="${spell.nome}" onchange="updateSpell(${index}, 'nome', this.value)"><input type="number" class="inv-input" style="flex: 1;" placeholder="Custo MP" value="${spell.custo}" onchange="updateSpell(${index}, 'custo', this.value)"><input type="text" class="inv-input" style="flex: 1;" placeholder="Alcance" value="${spell.alcance}" onchange="updateSpell(${index}, 'alcance', this.value)"></div><div class="inv-row" style="margin-top: 5px;"><textarea class="inv-input" style="flex: 1; resize: vertical;" rows="1" placeholder="Descrição e Efeitos..." onchange="updateSpell(${index}, 'desc', this.value)">${spell.desc}</textarea></div><div class="inv-row"><span style="font-size:16px;">🎵</span><input type="text" class="inv-input" style="flex: 1; border-color: #555;" placeholder="URL de Áudio Customizado (Discord Link .mp3)" value="${spell.audioUrl}" onchange="updateSpell(${index}, 'audioUrl', this.value)"></div><div class="dice-config-row"><select class="inv-input dice-sel" style="width:100% !important;" onchange="updateSpell(${index}, 'tipo', this.value); window.renderSpells();"><option value="Dano" ${spell.tipo==='Dano'?'selected':''}>Dano (Base + Runas Globais)</option><option value="Controle" ${spell.tipo==='Controle'?'selected':''}>Controle (Base + Runas Globais)</option><option value="Cura" ${spell.tipo==='Cura'?'selected':''}>Cura (Base + Runas)</option><option value="Locomoção" ${spell.tipo==='Locomoção'?'selected':''}>Locomoção (Base + Runas Globais)</option><option value="Self" ${spell.tipo==='Self'?'selected':''}>Self (Apenas Efeito)</option></select>${(!isSelf) ? `<div class="dice-group"><span class="lbl" style="color:#fff">Base</span><input type="number" class="inv-input dice-qty" min="1" value="${spell.bQtd}" onchange="updateSpell(${index}, 'bQtd', this.value)"><select class="inv-input dice-sel" onchange="updateSpell(${index}, 'bD', this.value)"><option value="d4" ${spell.bD==='d4'?'selected':''}>d4</option><option value="d6" ${spell.bD==='d6'?'selected':''}>d6</option><option value="d8" ${spell.bD==='d8'?'selected':''}>d8</option><option value="d10" ${spell.bD==='d10'?'selected':''}>d10</option><option value="d12" ${spell.bD==='d12'?'selected':''}>d12</option><option value="d20" ${spell.bD==='d20'?'selected':''}>d20</option><option value="d100" ${spell.bD==='d100'?'selected':''}>d100</option></select><div class="mult-group"><span class="mult-btn m-red ${spell.bMult===0?'active':''}" onclick="updateSpell(${index}, 'bMult', 0)">X</span><span class="mult-btn m-white ${spell.bMult===0.5?'active':''}" onclick="updateSpell(${index}, 'bMult', 0.5)">X</span><span class="mult-btn m-green ${spell.bMult===1?'active':''}" onclick="updateSpell(${index}, 'bMult', 1)">X</span></div></div><div style="display:flex; align-items:center; gap:5px; margin-left: auto; width: 100%; justify-content: flex-end; margin-top: 5px;"><input type="checkbox" id="crit-${index}" ${spell.isCrit ? 'checked' : ''} onchange="updateSpell(${index}, 'isCrit', this.checked)"><label for="crit-${index}" style="color:#ffd700; margin:0; cursor:pointer;">Crítico (Base Máx x3)</label></div>` : ''}</div><div class="dice-config-row" style="margin-top: 5px; border-color: #a855f7;"><div style="display: flex; width: 100%; align-items: center; gap: 5px;"><span style="color:#a855f7; font-size: 11px; font-weight: bold; white-space: nowrap;">⚡ Status/Efeito</span><input type="text" class="inv-input" style="flex: 2;" placeholder="Ex: Queimar" value="${spell.statusName}" onchange="updateSpell(${index}, 'statusName', this.value)"><span style="color:#fff; font-size: 11px; font-weight: bold;">DT:</span><input type="number" class="inv-input dice-qty" placeholder="15" value="${spell.statusDT}" onchange="updateSpell(${index}, 'statusDT', this.value)"></div></div></div>`;
+        let bodyHtml = `<div style="display: ${spell.isOpen ? 'flex' : 'none'}; flex-direction: column; gap: 5px; margin-top: 10px;"><div class="inv-row"><input type="text" class="inv-input" style="flex: 2; font-weight: bold;" placeholder="Habilidade" value="${spell.nome}" onchange="updateSpell(${index}, 'nome', this.value)"><input type="number" class="inv-input" style="flex: 1;" placeholder="Custo MP" value="${spell.custo}" onchange="updateSpell(${index}, 'custo', this.value)"><input type="text" class="inv-input" style="flex: 1;" placeholder="Alcance" value="${spell.alcance}" onchange="updateSpell(${index}, 'alcance', this.value)"></div><div class="inv-row" style="margin-top: 5px;"><textarea class="inv-input" style="flex: 1; resize: vertical;" rows="1" placeholder="Descrição e Efeitos..." onchange="updateSpell(${index}, 'desc', this.value)">${spell.desc}</textarea></div><div class="inv-row"><span style="font-size:16px;">🎵</span><input type="text" class="inv-input" style="flex: 1; border-color: #555;" placeholder="URL de Áudio Customizado (Discord Link .mp3)" value="${spell.audioUrl}" onchange="updateSpell(${index}, 'audioUrl', this.value)"></div><div class="dice-config-row"><select class="inv-input dice-sel" style="width:100% !important;" onchange="updateSpell(${index}, 'tipo', this.value); window.renderSpells();"><option value="Dano" ${spell.tipo==='Dano'?'selected':''}>Dano (Base + Runas Globais)</option><option value="Controle" ${spell.tipo==='Controle'?'selected':''}>Controle (Base + Runas Globais)</option><option value="Cura" ${spell.tipo==='Cura'?'selected':''}>Cura (Base + Runas Globais)</option><option value="Locomoção" ${spell.tipo==='Locomoção'?'selected':''}>Locomoção (Base + Runas Globais)</option><option value="Self" ${spell.tipo==='Self'?'selected':''}>Self (Apenas Efeito)</option></select>${(!isSelf) ? `<div class="dice-group"><span class="lbl" style="color:#fff">Base</span><input type="number" class="inv-input dice-qty" min="1" value="${spell.bQtd}" onchange="updateSpell(${index}, 'bQtd', this.value)"><select class="inv-input dice-sel" onchange="updateSpell(${index}, 'bD', this.value)"><option value="d4" ${spell.bD==='d4'?'selected':''}>d4</option><option value="d6" ${spell.bD==='d6'?'selected':''}>d6</option><option value="d8" ${spell.bD==='d8'?'selected':''}>d8</option><option value="d10" ${spell.bD==='d10'?'selected':''}>d10</option><option value="d12" ${spell.bD==='d12'?'selected':''}>d12</option><option value="d20" ${spell.bD==='d20'?'selected':''}>d20</option><option value="d100" ${spell.bD==='d100'?'selected':''}>d100</option></select><div class="mult-group"><span class="mult-btn m-red ${spell.bMult===0?'active':''}" onclick="updateSpell(${index}, 'bMult', 0)">X</span><span class="mult-btn m-white ${spell.bMult===0.5?'active':''}" onclick="updateSpell(${index}, 'bMult', 0.5)">X</span><span class="mult-btn m-green ${spell.bMult===1?'active':''}" onclick="updateSpell(${index}, 'bMult', 1)">X</span></div></div><div style="display:flex; align-items:center; gap:5px; margin-left: auto; width: 100%; justify-content: flex-end; margin-top: 5px;"><input type="checkbox" id="crit-${index}" ${spell.isCrit ? 'checked' : ''} onchange="updateSpell(${index}, 'isCrit', this.checked)"><label for="crit-${index}" style="color:#ffd700; margin:0; cursor:pointer;">Crítico (Base Máx x3)</label></div>` : ''}</div><div class="dice-config-row" style="margin-top: 5px; border-color: #a855f7;"><div style="display: flex; width: 100%; align-items: center; gap: 5px;"><span style="color:#a855f7; font-size: 11px; font-weight: bold; white-space: nowrap;">⚡ Status/Efeito</span><input type="text" class="inv-input" style="flex: 2;" placeholder="Ex: Queimar" value="${spell.statusName}" onchange="updateSpell(${index}, 'statusName', this.value)"><span style="color:#fff; font-size: 11px; font-weight: bold;">DT:</span><input type="number" class="inv-input dice-qty" placeholder="15" value="${spell.statusDT}" onchange="updateSpell(${index}, 'statusDT', this.value)"></div></div></div>`;
         row.innerHTML = headerHtml + bodyHtml; container.appendChild(row);
-        
-        // Seta o valor do Target (se houver) depois de renderizar
-        let sel = row.querySelector('.spell-target');
-        if(sel && spell.target) sel.value = spell.target;
+        let sel = row.querySelector('.spell-target'); if(sel && spell.target) sel.value = spell.target;
     });
 }
 window.addSpell = function() { playerSpells.push({ nome: "", desc: "", custo: "", alcance: "", tipo: "Dano", bQtd: 1, bD: "d20", bMult: 1, isOpen: true, isCrit: false, statusName: "", statusDT: "", audioUrl: "", target: "" }); window.renderSpells(); window.saveData(); }
@@ -555,7 +551,6 @@ window.rollSpellMagic = function(index) {
     const charColor = document.getElementById('char-color') ? document.getElementById('char-color').value : '#d4af37';
     let c = characters[currentCharId];
     
-    // DRENO DE MANA
     let manaCost = parseInt(spell.custo) || 0;
     if (manaCost > 0) {
         if (c.mpAtual < manaCost) {
@@ -584,23 +579,19 @@ window.rollSpellMagic = function(index) {
         });
     }
     let stRoll = (spell.statusName && spell.statusDT > 0) ? Math.floor(Math.random() * 20) + 1 : 0;
-
-    let grossDamage = bTot;
-    runesPack.forEach(r => grossDamage += r.tot);
+    let grossDamage = bTot; runesPack.forEach(r => grossDamage += r.tot);
 
     const payload = {
         t: "spell", av: document.getElementById('char-avatar').value, c: charName, col: charColor, sn: spell.nome || "Habilidade", cost: spell.custo || "0", rg: spell.alcance || "Self", desc: spell.desc || "", st: spell.tipo || "Dano",
         b: { f: spell.bD, m: spell.bMult, r: bRolls, tot: bTot }, ru: runesPack, crit: spell.isCrit ? "true" : "false", stName: spell.statusName || "", stDT: spell.statusDT || "0", stRoll: stRoll, audio: spell.audioUrl || "", fc: isFora
     };
 
-    // SISTEMA DE ALVO E DUELO!
     if (spell.target && spell.target !== "") {
         let tgt = characters[spell.target];
         payload.targetId = spell.target;
         payload.targetName = tgt ? tgt.name : "Desconhecido";
 
         if (spell.tipo === "Cura") {
-            // Cura direta
             if(tgt) {
                 let maxH = tgt.category==='Monstros' ? tgt.vidaMonster : (40 + (tgt.sorte||0)*5);
                 tgt.hpAtual = Math.min(maxH, (tgt.hpAtual||0) + grossDamage);
@@ -609,25 +600,19 @@ window.rollSpellMagic = function(index) {
             window.abrirModalCentral(payload); window.addCombatLog(payload);
             if (OBR.isAvailable) {
                 OBR.broadcast.sendMessage("fatesheet-rolls", payload);
-                OBR.room.setMetadata({ [`fatesheet_char_${spell.target}`]: characters[spell.target] }); // Salva a cura na nuvem do amigo
+                OBR.room.setMetadata({ [`fatesheet_char_${spell.target}`]: characters[spell.target] }); 
             }
         } else if (spell.tipo === "Dano" || spell.tipo === "Controle") {
-            // Dispara o Duelo na Nuvem e Pára!
             if (OBR.isAvailable) {
                 OBR.room.setMetadata({ fatesheet_clash: payload });
                 alert(`Ataque enviado para ${payload.targetName}! Aguardando Defesa...`);
-            } else {
-                alert("O sistema de defesa precisa estar online no Owlbear!");
-            }
+            } else { alert("O sistema precisa estar online no Owlbear!"); }
         } else {
-             // Locomoção ou Self no alvo (só envia log)
              window.abrirModalCentral(payload); window.addCombatLog(payload);
              if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", payload);
         }
     } else {
-        // Sem alvo, rola normal
-        window.abrirModalCentral(payload);
-        window.addCombatLog(payload);
+        window.abrirModalCentral(payload); window.addCombatLog(payload);
         if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", payload);
     }
     
@@ -637,11 +622,11 @@ window.rollSpellMagic = function(index) {
     window.renderGlobalRunes(); window.renderSpells(); window.saveData(); window.renderCombatTracker();
 }
 
-// ------ RESOLVER DEFESA (O Duelo) ------
 window.checkClashStatus = function() {
     if(pendingClash && pendingClash.targetId === currentCharId) {
         document.getElementById('clash-panel').style.display = 'block';
-        document.getElementById('clash-desc').innerText = `Oponente: ${pendingClash.c} | Dano Bruto: ${pendingClash.b.tot + (pendingClash.ru?pendingClash.ru.reduce((a,b)=>a+b.tot,0):0)}`;
+        let dBruto = pendingClash.b.tot + (pendingClash.ru?pendingClash.ru.reduce((a,b)=>a+b.tot,0):0);
+        document.getElementById('clash-desc').innerText = `Oponente: ${pendingClash.c} | Dano Bruto: ${dBruto}`;
     } else {
         document.getElementById('clash-panel').style.display = 'none';
     }
@@ -653,35 +638,28 @@ window.resolverDefesa = async function() {
     let usedRunes = parseInt(document.getElementById('clash-runes-used').value) || 0;
     let defType = document.getElementById('clash-def-type').value;
 
-    if (usedRunes > c.runas) return alert("Você não tem Runas suficientes para esta defesa!");
-    
-    // Desconta a runa
-    c.runas -= usedRunes;
-    safeSetVal('char-runas', c.runas);
+    if (usedRunes > c.runas) return alert("Você não tem Runas suficientes!");
+    c.runas -= usedRunes; safeSetVal('char-runas', c.runas);
 
     let defTotal = usedRunes * (defType === 'fisica' ? (c.forca * 5) : (c.magia * 5));
     let grossDamage = pendingClash.b.tot + (pendingClash.ru?pendingClash.ru.reduce((a,b)=>a+b.tot,0):0);
-    
     let netDamage = Math.max(0, grossDamage - defTotal);
     
-    // Subtrai HP do Alvo (que sou eu)
     c.hpAtual = (c.hpAtual||0) - netDamage;
     safeSetVal('char-hp-atual', c.hpAtual);
     await window.saveData();
     window.renderCombatTracker();
 
-    // Adiciona o resultado no log e lança o popup do Duelo
-    pendingClash.blocked = defTotal;
-    pendingClash.net = netDamage;
+    pendingClash.blocked = defTotal; pendingClash.net = netDamage;
+    pendingClash.gross = grossDamage; pendingClash.t = "clash"; 
 
     window.abrirModalCentral(pendingClash);
     window.addCombatLog(pendingClash);
     
     if (OBR.isAvailable) {
         OBR.broadcast.sendMessage("fatesheet-rolls", pendingClash);
-        await OBR.room.setMetadata({ fatesheet_clash: undefined }); // Limpa o clash
+        await OBR.room.setMetadata({ fatesheet_clash: undefined });
     }
-
     pendingClash = null;
     window.checkClashStatus();
 }
@@ -757,7 +735,7 @@ window.rollSkill = function(skillName, attrName) {
 window.abrirModalCentral = function(data) {
     if (OBR.isAvailable) {
         const dataUrl = encodeURIComponent(JSON.stringify(data));
-        OBR.modal.open({ id: "fate-roll-modal", url: `https://seediam.github.io/FateSheet/resultado.html?data=${dataUrl}`, width: 450, height: (data.t === "spell" || data.t === "attr") ? 550 : 250 });
+        OBR.modal.open({ id: "fate-roll-modal", url: `https://seediam.github.io/FateSheet/resultado.html?data=${dataUrl}`, width: 450, height: (data.t === "spell" || data.t === "attr" || data.t === "clash") ? 550 : 250 });
     }
 }
 
@@ -769,7 +747,6 @@ function processRoomData(metadata) {
         window.renderMiniLog();
     }
     
-    // Clash Receiver (Para Duelo de Dano)
     if (metadata["fatesheet_clash"] !== undefined) {
         pendingClash = metadata["fatesheet_clash"];
         window.checkClashStatus();
@@ -784,9 +761,8 @@ function processRoomData(metadata) {
             if (metadata[key] === undefined || metadata[key] === null) {
                 if(characters[id]) { delete characters[id]; mudouAlgo = true; }
             } else { 
-                // Evita sobrescrever o HP atual se eu estiver editando
                 if (currentCharId === id && document.activeElement && document.activeElement.id.startsWith('char-')) {
-                    // Ignora
+                    // Evita sobrescrever se tiver digitando
                 } else {
                     characters[id] = metadata[key]; mudouAlgo = true; 
                 }
@@ -796,7 +772,6 @@ function processRoomData(metadata) {
     if (mudouAlgo) {
         window.renderCharacterList();
         window.renderCombatTracker();
-        // Se eu tiver aberto, atualizo minha vida visual
         if (currentCharId) {
             safeSetVal('char-hp-atual', characters[currentCharId].hpAtual);
             safeSetVal('char-mp-atual', characters[currentCharId].mpAtual);
