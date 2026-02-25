@@ -229,7 +229,7 @@ window.openCharacter = function(id) {
     window.renderGlobalRunes();
     window.renderSpells(); 
     window.calcVitals();
-    window.updateAlloc(); // Atualiza a tag [FC] na tela
+    window.updateAlloc(); 
 
     document.getElementById('screen-list').classList.remove('active');
     document.getElementById('screen-sheet').classList.add('active');
@@ -271,13 +271,11 @@ window.calcVitals = function() {
     }
 }
 
-// ------ NOVO REGRA DE LIMITES ------
 window.updateAlloc = function() {
     let isFora = document.getElementById('fora-combate') ? document.getElementById('fora-combate').checked : false;
-    document.getElementById('char-fc-badge').style.display = isFora ? 'block' : 'none'; // Mostra a TAG [FC]
+    document.getElementById('char-fc-badge').style.display = isFora ? 'block' : 'none'; 
     
     let maxRunes = parseInt(document.getElementById('char-runas').value) || 0;
-
     let f = parseInt(document.getElementById('alloc-forca').value) || 0;
     let m = parseInt(document.getElementById('alloc-magia').value) || 0;
     let a = parseInt(document.getElementById('alloc-agilidade').value) || 0;
@@ -294,7 +292,6 @@ window.updateAlloc = function() {
     if(s > maxS) { s = maxS; safeSetVal('alloc-sorte', s); }
 
     let totalAlloc = f + m + a + s;
-
     if (!isFora && totalAlloc > maxRunes) {
         alert(`EM COMBATE: Você só pode alocar dados até o limite das suas Runas (${maxRunes})!`);
         safeSetVal('alloc-forca', 0); safeSetVal('alloc-magia', 0); safeSetVal('alloc-agilidade', 0); safeSetVal('alloc-sorte', 0);
@@ -308,13 +305,22 @@ const getMultFromRoll = (val) => {
     return 1;
 };
 
-// ------ MINI LOG DENTRO DA FICHA ------
+// ------ SOLUÇÃO SUPREMA PARA O LOG (Evita sobrescrever) ------
 window.addCombatLog = async function(data) {
-    combatLog.unshift(data);
-    if(combatLog.length > 20) combatLog.pop(); 
     if (OBR.isAvailable) {
-        await OBR.room.setMetadata({ "fatesheet_log_v5": combatLog });
-        OBR.broadcast.sendMessage("fatesheet-log-update", combatLog);
+        try {
+            let meta = await OBR.room.getMetadata();
+            let nuvemLog = meta["fatesheet_log_v5"] || [];
+            nuvemLog.unshift(data);
+            if(nuvemLog.length > 10) nuvemLog.pop(); // Mantém os 10 últimos!
+            combatLog = nuvemLog;
+            
+            await OBR.room.setMetadata({ "fatesheet_log_v5": combatLog });
+            OBR.broadcast.sendMessage("fatesheet-log-update", combatLog);
+        } catch(e) {}
+    } else {
+        combatLog.unshift(data);
+        if(combatLog.length > 10) combatLog.pop();
     }
     window.renderMiniLog();
 }
@@ -657,6 +663,7 @@ window.abrirModalCentral = function(data) {
 function processRoomData(metadata) {
     let mudouAlgo = false;
     
+    // PUXA O LOG NOVO (v5)
     if (metadata["fatesheet_log_v5"] !== undefined) {
         combatLog = metadata["fatesheet_log_v5"];
         window.renderMiniLog();
