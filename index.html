@@ -44,6 +44,8 @@
         input[type="text"], input[type="number"], select, textarea, input[type="color"] { width: 100%; background: var(--bg-panel); border: 1px solid var(--border-subtle); color: var(--text-main); padding: 10px; border-radius: 6px; box-sizing: border-box; transition: 0.2s; font-family: inherit;}
         input:focus, select:focus, textarea:focus { border-color: var(--accent-gold); outline: none; box-shadow: 0 0 5px var(--accent-gold); }
         
+        .photo-slot { width: 90px; height: 120px; background: var(--bg-panel); border: 1px dashed var(--accent-gold); border-radius: 6px; display: flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 12px; text-align: center; box-shadow: inset 0 0 10px rgba(0,0,0,0.5); cursor: pointer; background-size: cover; background-position: center; transition: 0.2s; overflow: hidden;}
+
         .section-title { color: var(--accent-gold); margin: 20px 0 10px 0; border-bottom: 1px solid var(--border-subtle); padding-bottom: 5px; font-size: 14px;}
         
         .status-box { display: flex; gap: 8px; margin-bottom: 15px; align-items: center;}
@@ -230,7 +232,10 @@
                 </div>
 
                 <h4 class="section-title" style="display:flex; justify-content:space-between; align-items:flex-end;">
-                    <span>Rolagem de Turno</span><span style="font-size:10px; color:#888;">Máx 3 Dados</span>
+                    <span>Rolagem de Turno</span>
+                    <label style="font-size:11px; color:#888; display:flex; align-items:center; gap:4px; cursor:pointer;">
+                        <input type="checkbox" id="fora-combate" onchange="updateAlloc()"> Fora de Combate
+                    </label>
                 </h4>
                 
                 <div class="attr-box"><span style="width: 70px;">Força</span><div style="display:flex; align-items:center; gap:8px;"><input type="number" id="alloc-forca" class="alloc-input" value="0" min="0" onchange="updateAlloc()"><span style="font-size:10px; color:#666;">MÁX</span><input type="number" id="attr-forca" class="attr-input" value="1" oninput="calcVitals()"></div></div>
@@ -238,7 +243,7 @@
                 <div class="attr-box"><span style="width: 70px;">Agilidade</span><div style="display:flex; align-items:center; gap:8px;"><input type="number" id="alloc-agilidade" class="alloc-input" value="0" min="0" onchange="updateAlloc()"><span style="font-size:10px; color:#666;">MÁX</span><input type="number" id="attr-agilidade" class="attr-input" value="1" oninput="calcVitals()"></div></div>
                 <div class="attr-box" style="border-color:#39ff14;"><span style="width: 70px; color:#39ff14;">Sorte (+1)</span><div style="display:flex; align-items:center; gap:8px;"><input type="number" id="alloc-sorte" class="alloc-input" style="color:#39ff14 !important;" value="0" min="0" onchange="updateAlloc()"><span style="font-size:10px; color:#666;">MÁX</span><input type="number" id="attr-sorte" class="attr-input" value="1" oninput="calcVitals()"></div></div>
 
-                <button class="btn-roll-attr" onclick="rollAttributes()">🎲 Rolar Atributos do Turno</button>
+                <button class="btn-roll-attr" onclick="rollAttributes()">🎲 Rolar Atributos</button>
 
                 <h4 class="section-title" style="margin-top:30px;">📖 Grimório</h4>
                 <div style="display: flex; gap: 10px; margin-bottom: 12px;">
@@ -284,6 +289,7 @@
         </div>
     </div>
 
-    <script type="module" src="script.js?v=999912"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@2/lib/index.js"></script>
+    <script type="module" src="script.js?v=990920"></script>
 </body>
 </html>
