@@ -9,21 +9,26 @@
         ::-webkit-scrollbar-thumb { background: #d4af37; border-radius: 4px; }
         
         .title { text-align: center; color: #d4af37; font-weight: bold; margin-top: 5px; margin-bottom: 15px; font-size: 14px; text-transform: uppercase; border-bottom: 1px solid #333; padding-bottom: 10px; }
+        
+        /* Botões do topo */
         .btn-close { position: absolute; top: 10px; right: 10px; background: #ff4444; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; padding: 4px 8px; transition: 0.2s;}
         .btn-close:hover { background: #fff; color: #000; }
+        .btn-clear { position: absolute; top: 10px; left: 10px; background: #1a1a24; color: #888; border: 1px solid #333; border-radius: 4px; cursor: pointer; font-size: 12px; padding: 4px 8px; transition: 0.2s; }
+        .btn-clear:hover { background: #ff4444; color: white; border-color: #ff4444; }
         
         .log-entry { background: #1a1a24; border-left: 3px solid #d4af37; padding: 8px 10px; margin-bottom: 8px; border-radius: 4px; font-size: 13px; box-shadow: 0 2px 4px rgba(0,0,0,0.3); animation: fadeIn 0.3s ease;}
-        .log-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px; border-bottom: 1px solid #333; padding-bottom: 4px;}
+        .log-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px; border-bottom: 1px dashed #333; padding-bottom: 4px;}
         .log-name { font-weight: bold; color: #d4af37; font-size: 14px; }
         .log-action { color: #888; font-size: 11px; text-align: right;}
-        .log-result { color: #fff; margin-top: 4px;}
+        .log-result { color: #fff; margin-top: 4px; font-size: 12px;}
         
         @keyframes fadeIn { from { opacity: 0; transform: translateX(10px); } to { opacity: 1; transform: translateX(0); } }
     </style>
 </head>
 <body>
+    <button class="btn-clear" id="btn-clear" title="Apagar Histórico">🗑️</button>
     <button class="btn-close" onclick="fecharLog()">X</button>
-    <div class="title">📜 Histórico de Combate</div>
+    <div class="title">📜 Histórico</div>
     <div id="log-container"></div>
     
     <script type="module">
@@ -31,110 +36,125 @@
         
         window.fecharLog = () => { OBR.popover.close("fatesheet-log-popover"); }
 
+        // Botão para resetar o log quando ficar cheio de teste velho
+        document.getElementById('btn-clear').addEventListener('click', async () => {
+            if(confirm('Tem certeza que deseja apagar o histórico de combate para toda a mesa?')) {
+                await OBR.room.setMetadata({ "fatesheet_combat_log": [] });
+                document.getElementById('log-container').innerHTML = '';
+            }
+        });
+
         function render(logData) {
             const container = document.getElementById('log-container');
             container.innerHTML = '';
             
+            if (!Array.isArray(logData)) return; // Trava de segurança
+            
             logData.forEach(log => {
-                let div = document.createElement('div'); 
-                div.className = 'log-entry';
-                let actHtml = "";
-                let resHtml = "";
-                
-                // MODO MAGIA
-                if (log.t === "spell") {
-                    actHtml = `Rolou <b style="color:${log.col}">${log.sn}</b>`;
+                try {
+                    let div = document.createElement('div'); 
+                    div.className = 'log-entry';
+                    div.style.borderLeftColor = log.col || '#d4af37';
                     
-                    let parts = [];
-                    let totalDano = 0;
+                    let actHtml = "";
+                    let resHtml = "";
                     
-                    if(log.st !== "Self") {
-                        if(log.b && log.b.r.length > 0) {
-                            parts.push(`<span style="color:${log.col}">Base [${log.b.tot}]</span>`);
-                            totalDano += log.b.tot;
-                        }
-                        if(log.ru && log.ru.length > 0) {
-                            log.ru.forEach(r => {
-                                if(r.t === 'alpha') parts.push(`<span style="color:#44aaff">A: ${r.tot}</span>`);
-                                if(r.t === 'delta') parts.push(`<span style="color:#ff4444">D: ${r.tot}</span>`);
-                                if(r.t === 'arma') parts.push(`<span style="color:#ccc">Arma: ${r.tot}</span>`);
-                                totalDano += r.tot;
-                            });
-                        }
-                        if(log.beta && log.beta.r && log.beta.r.length > 0) {
-                            let betTot = log.beta.r.reduce((a,b)=>a+b, 0);
-                            parts.push(`<span style="color:#a855f7">B: ${betTot}</span>`);
-                            totalDano += betTot;
+                    // --- MODO MAGIA ---
+                    if (log.t === "spell") {
+                        actHtml = `Rolou <b style="color:${log.col}">[ ${log.sn} ]</b>`;
+                        
+                        let parts = [];
+                        let totalDano = 0;
+                        
+                        if(log.st !== "Self") {
+                            if(log.b && log.b.r && log.b.r.length > 0) {
+                                parts.push(`<span style="color:${log.col}">Base [${log.b.tot}]</span>`);
+                                totalDano += log.b.tot;
+                            }
+                            if(log.ru && log.ru.length > 0) {
+                                log.ru.forEach(r => {
+                                    if(r.t === 'alpha') parts.push(`<span style="color:#44aaff">A: ${r.tot}</span>`);
+                                    if(r.t === 'delta') parts.push(`<span style="color:#ff4444">D: ${r.tot}</span>`);
+                                    if(r.t === 'arma') parts.push(`<span style="color:#ccc">Arma: ${r.tot}</span>`);
+                                    totalDano += r.tot;
+                                });
+                            }
+                            if(log.beta && log.beta.r && log.beta.r.length > 0) {
+                                let betTot = log.beta.r.reduce((a,b)=>a+b, 0);
+                                parts.push(`<span style="color:#a855f7">B: ${betTot}</span>`);
+                                totalDano += betTot;
+                            }
+                            
+                            let strParts = parts.join(" ");
+                            let critCor = log.crit === 'true' ? '#ffd700' : log.col;
+                            resHtml = `${strParts} <b style="color:${critCor}">=> ${totalDano}</b>`;
+                        } else {
+                            resHtml = `<span style="color:#888;">Efeito conjurado.</span>`;
                         }
                         
-                        let strParts = parts.join(" ");
-                        let critCor = log.crit === 'true' ? '#ffd700' : log.col;
-                        resHtml = `${strParts} <b style="color:${critCor}">=> ${totalDano}</b>`;
-                    } else {
-                        resHtml = `<span style="color:#888;">Efeito conjurado em si mesmo.</span>`;
-                    }
-                    
-                    // Adiciona Efeito se existir
-                    if (log.stName && log.stDT > 0) {
-                        let stRoll = parseInt(log.stRoll); let dt = parseInt(log.stDT);
-                        let stCor = stRoll >= dt ? "#44aaff" : "#ff4444";
-                        resHtml += `<div style="font-size:11px; margin-top:4px; color:${stCor}">⚡ ${log.stName}: [${stRoll}] vs DT ${dt}</div>`;
-                    }
-                    
-                } 
-                // MODO ATRIBUTOS DO TURNO
-                else if (log.t === "attr") {
-                    actHtml = `Rolou <b>Atributos</b>`;
-                    let parts = [];
-                    
-                    const formatAttr = (arrStr, color, prefix) => {
-                        if(!arrStr) return;
-                        let arr = arrStr.split(',');
-                        if(arr.length === 0 || arrStr === "") return;
+                        // Status/Efeito
+                        if (log.stName && log.stDT > 0) {
+                            let stRoll = parseInt(log.stRoll); let dt = parseInt(log.stDT);
+                            let stCor = stRoll >= dt ? "#44aaff" : "#ff4444";
+                            resHtml += `<div style="font-size:11px; margin-top:4px; color:${stCor}">⚡ ${log.stName}: [${stRoll}] vs DT ${dt}</div>`;
+                        }
                         
-                        let text = arr.map(v => {
-                            let val = parseInt(v);
-                            let c = val >= 20 ? '#ffd700' : (val >= 12 ? '#39ff14' : (val <= 4 ? '#ff4444' : '#fff'));
-                            let sBadge = log.sorte > 0 ? `<sup style="color:#39ff14">${log.sorte}</sup>` : "";
-                            return `<span style="color:${c}">${val}${sBadge}</span>`;
-                        }).join(", ");
+                    } 
+                    // --- MODO ATRIBUTOS DE TURNO ---
+                    else if (log.t === "attr") {
+                        actHtml = `Rolou <b>Atributos</b>`;
+                        let parts = [];
                         
-                        parts.push(`<span style="color:${color}; font-weight:bold;">${prefix} [${text}]</span>`);
-                    };
+                        const formatAttr = (arrStr, color, prefix) => {
+                            if(!arrStr) return;
+                            let arr = arrStr.split(',');
+                            if(arr.length === 0 || arrStr === "") return;
+                            
+                            let text = arr.map(v => {
+                                let val = parseInt(v);
+                                let c = val >= 20 ? '#ffd700' : (val >= 12 ? '#39ff14' : (val <= 4 ? '#ff4444' : '#fff'));
+                                let sBadge = log.sorte > 0 ? `<sup style="color:#39ff14">${log.sorte}</sup>` : "";
+                                return `<span style="color:${c}">${val}${sBadge}</span>`;
+                            }).join(", ");
+                            
+                            parts.push(`<span style="color:${color}; font-weight:bold;">${prefix} [${text}]</span>`);
+                        };
 
-                    formatAttr(log.rF, "#ff4444", "F");
-                    formatAttr(log.rM, "#44aaff", "M");
-                    formatAttr(log.rA, "#a855f7", "A");
+                        formatAttr(log.rF, "#ff4444", "F");
+                        formatAttr(log.rM, "#44aaff", "M");
+                        formatAttr(log.rA, "#a855f7", "A");
+                        
+                        resHtml = parts.join(" | ");
+                    } 
+                    // --- MODO PERÍCIA NORMAL ---
+                    else {
+                        actHtml = `Rolou <b>${log.s}</b>`;
+                        let r = (log.r && typeof log.r === 'string') ? log.r.split(',') : [0];
+                        let v = parseInt(r[0]) + (log.mod || 0);
+                        resHtml = `Tirou <b style="color:${log.col}; font-size: 14px;">${v}</b>`;
+                    }
+
+                    div.innerHTML = `
+                        <div class="log-header">
+                            <span class="log-name" style="color:${log.col || '#d4af37'}">${log.av || '🧙‍♂️'} ${log.c}</span>
+                            <span class="log-action">${actHtml}</span>
+                        </div>
+                        <div class="log-result">${resHtml}</div>
+                    `;
+                    container.appendChild(div);
                     
-                    resHtml = parts.join(" | ");
-                } 
-                // MODO PERÍCIA COMUM
-                else {
-                    actHtml = `Rolou <b>${log.s}</b>`;
-                    let r = log.r ? log.r.split(',') : [0];
-                    let v = parseInt(r[0]) + (log.mod || 0);
-                    resHtml = `Resultado: <b style="color:${log.col}">${v}</b>`;
+                } catch (e) {
+                    console.log("Ignorando log antigo quebrado.");
                 }
-
-                div.innerHTML = `
-                    <div class="log-header">
-                        <span class="log-name">${log.av || '🧙‍♂️'} ${log.c}</span>
-                        <span class="log-action">${actHtml}</span>
-                    </div>
-                    <div class="log-result">${resHtml}</div>
-                `;
-                container.appendChild(div);
             });
         }
 
         OBR.onReady(async () => {
-            // Puxa o histórico ao abrir
             let meta = await OBR.room.getMetadata();
             if(meta && meta["fatesheet_combat_log"]) render(meta["fatesheet_combat_log"]);
 
-            // Ouve as atualizações do histórico na mesa
             OBR.room.onMetadataChange((metadata) => {
-                if (metadata["fatesheet_combat_log"]) {
+                if (metadata["fatesheet_combat_log"] !== undefined) {
                     render(metadata["fatesheet_combat_log"]);
                 }
             });
