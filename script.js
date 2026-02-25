@@ -45,7 +45,7 @@ const grimoiresDb = {
 };
 
 let characters = {}; 
-let combatLog = []; 
+let combatLog = []; // Onde guardamos a vida do log
 let currentCharId = null;
 let currentIsMine = true; 
 let playerSkills = {}; 
@@ -182,6 +182,7 @@ window.changeGrimoire = function() {
 window.openCharacter = function(id) {
     currentCharId = id;
     const c = characters[id] || {};
+    currentIsMine = true;
     
     safeSetVal('char-avatar', c.avatar || '🧙‍♂️');
     safeSetVal('char-name', c.name || '');
@@ -295,7 +296,6 @@ const getMultFromRoll = (val) => {
     return 1;
 };
 
-// O Segredo do Log: Manda pro servidor pra todos verem
 window.addCombatLog = async function(data) {
     combatLog.unshift(data);
     if(combatLog.length > 30) combatLog.pop(); 
@@ -468,8 +468,6 @@ window.rollSpellMagic = function(index) {
 
     window.abrirModalCentral(payload);
     window.addCombatLog(payload);
-    
-    // SOMENTE QUEM ROLA MANDA PARA O SERVIDOR E PARA OS OUTROS VEREM! (Evita logs vazios/duplicados)
     if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", payload);
     
     if(spell.isCrit) spell.isCrit = false;
@@ -550,11 +548,9 @@ window.abrirModalCentral = function(data) {
     }
 }
 
-// O Segredo da Sincronização Perfeita (Puxa os logs antigos quando você abre a sala)
 function processRoomData(metadata) {
     let mudouAlgo = false;
     
-    // Sincroniza o Log se ele existir no servidor
     if (metadata["fatesheet_combat_log"] !== undefined) {
         combatLog = metadata["fatesheet_combat_log"];
     }
@@ -582,13 +578,8 @@ function initExtension() {
             try {
                 const meta = await OBR.room.getMetadata();
                 processRoomData(meta);
-                
                 OBR.room.onMetadataChange((metadata) => processRoomData(metadata));
-                
-                OBR.broadcast.onMessage("fatesheet-rolls", (event) => { 
-                    window.abrirModalCentral(event.data); 
-                    // NÃO CHAMA addCombatLog AQUI! Apenas quem ROLOU que manda o log pra nuvem, isso evita bugar o histórico.
-                });
+                OBR.broadcast.onMessage("fatesheet-rolls", (event) => { window.abrirModalCentral(event.data); });
             } catch(e) {}
         });
     }
