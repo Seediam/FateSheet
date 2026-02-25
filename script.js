@@ -5,7 +5,7 @@ const skillsData = [
     { name: "Intuição", attr: "Sorte" }, { name: "Medicina", attr: "Sorte" }, { name: "Percepção", attr: "Sorte" }, { name: "Sobrevivência", attr: "Sorte" },
     { name: "Atletismo", attr: "Força" }, { name: "Intimidação", attr: "Força" },
     { name: "Acrobacia", attr: "Agilidade" }, { name: "Furtividade", attr: "Agilidade" }, { name: "Prestidigitação", attr: "Agilidade" },
-    { name: "Atuação", attr: "Sorte" }, { name: "Enganação", attr: "Sorte" }, { name: "Persuasão", attr: "Sorte" }, { name: "Fortitude", attr: "Força" }, { name: "Vigor", attr: "Sorte" }
+    { name: "Atuação", attr: "Sorte" }, { name: "Enganação", attr: "Sorte" }, { name: "Persuasão", attr: "Sorte" }
 ];
 
 let characters = {}; 
@@ -74,14 +74,12 @@ window.renderCharacterList = function() {
         }
     }
 
-    if(!hasAny) {
-        container.innerHTML = '<div style="text-align:center; color:#666; margin-top: 20px;">A Mesa está vazia.</div>';
-    }
+    if(!hasAny) container.innerHTML = '<div style="text-align:center; color:#666; margin-top: 20px;">A Mesa está vazia.</div>';
 }
 
 window.createNewCharacter = function() {
     const newId = 'char_' + Date.now();
-    characters[newId] = { name: "Novo Personagem", category: "Jogadores", classe: "Plebeu", skills: {}, inventory: [], spells: [], photo: "", color: "#d4af37" };
+    characters[newId] = { name: "Novo Personagem", category: "Jogadores", classe: "Plebeu", skills: {}, inventory: [], spells: [], photo: "", color: "#d4af37", mov: 30 };
     currentCharId = newId;
     window.saveData(); 
     window.openCharacter(newId);
@@ -173,6 +171,7 @@ window.openCharacter = function(id) {
     safeSetVal('grimoire-name', charData.grimoire || '');
     safeSetVal('mana-zone', charData.mana || '');
     safeSetVal('passiva', charData.passiva || ''); 
+    safeSetVal('char-mov', charData.mov || 30);
     
     playerSkills = charData.skills || {};
     playerInventory = charData.inventory || [];
@@ -193,20 +192,30 @@ window.openCharacter = function(id) {
 window.calcVitals = function() {
     let cat = document.getElementById('char-category').value;
     let forcaBase = parseInt(document.getElementById('attr-forca').value) || 0;
+    let magiaBase = parseInt(document.getElementById('attr-magia').value) || 0;
     let sorteBase = parseInt(document.getElementById('attr-sorte').value) || 0;
     let classe = document.getElementById('char-class').value;
 
+    // VIDA E MANA ATUALIZADOS
     if (cat !== 'Monstros') {
-        let extraMana = 0;
-        if(classe === 'Andarilho') extraMana = 25;
-        if(classe === 'Estrangeiro') extraMana = 50;
-        if(classe === 'Nobre') extraMana = 75;
-        document.getElementById('val-vida-player').innerText = `${40 + (sorteBase * 5)} / ${40 + (sorteBase * 5)}`;
-        document.getElementById('val-mana').innerText = `${25 + extraMana} / ${25 + extraMana}`;
+        let maxMana = 25;
+        if(classe === 'Andarilho') maxMana = 50;
+        if(classe === 'Estrangeiro') maxMana = 75;
+        if(classe === 'Nobre') maxMana = 100;
+        
+        let maxHealth = 40 + (sorteBase * 5);
+
+        document.getElementById('val-vida-player').innerText = `${maxHealth} / ${maxHealth}`;
+        document.getElementById('val-mana').innerText = `${maxMana} / ${maxMana}`;
     } else {
         document.getElementById('val-mana').innerText = `25 / 25`;
     }
 
+    // DEFESAS
+    document.getElementById('val-def-fisica').innerText = forcaBase * 5;
+    document.getElementById('val-def-magica').innerText = magiaBase * 5;
+
+    // PESO
     let maxWeight = forcaBase * 5;
     let currentWeight = playerInventory.reduce((acc, item) => acc + ((parseFloat(item.peso)||0) * (parseInt(item.qtd)||1)), 0);
     
@@ -223,89 +232,110 @@ window.calcVitals = function() {
     }
 }
 
-// ------ A MÁGICA DO CONSTRUTOR DE MAGIAS ------
+// ------ MAGIAS RETRÁTEIS E DINÂMICAS ------
+window.toggleSpellInfo = function(index) {
+    playerSpells[index].isOpen = !playerSpells[index].isOpen;
+    window.renderSpells();
+}
+
 window.renderSpells = function() {
     const container = document.getElementById('spells-container');
     container.innerHTML = '';
     playerSpells.forEach((spell, index) => {
         
-        // Garante os valores padrão caso a magia acabe de ser criada
+        if(spell.isOpen === undefined) spell.isOpen = true;
         spell.tipo = spell.tipo || "Dano";
         spell.bQtd = spell.bQtd || 1; spell.bD = spell.bD || "d20";
         spell.aQtd = spell.aQtd || 0; spell.aD = spell.aD || "";
         spell.fQtd = spell.fQtd || 0; spell.fD = spell.fD || "";
+        spell.betaQtd = spell.betaQtd || 0; spell.betaD = spell.betaD || "";
+        spell.isCrit = spell.isCrit || false;
+
+        let isSelf = spell.tipo === "Self";
+        let isLoc = spell.tipo === "Locomoção";
 
         let row = document.createElement('div');
         row.className = 'spell-item';
-        row.innerHTML = `
-            <div class="inv-row">
-                <button class="btn-roll-spell" onclick="rollSpellMagic(${index})" title="Rolar Magia">🎲</button>
-                <input type="text" class="inv-input" style="flex: 2; font-weight: bold; color: var(--accent-gold);" placeholder="Nome da Habilidade" value="${spell.nome}" onchange="updateSpell(${index}, 'nome', this.value)">
-                <input type="text" class="inv-input" style="flex: 1;" placeholder="Custo" value="${spell.custo}" onchange="updateSpell(${index}, 'custo', this.value)">
-                <input type="text" class="inv-input" style="flex: 1;" placeholder="Alcance" value="${spell.alcance}" onchange="updateSpell(${index}, 'alcance', this.value)">
-                <button class="btn-danger" onclick="removeSpell(${index})">X</button>
-            </div>
-            <div class="inv-row" style="margin-top: 5px;">
-                <textarea class="inv-input" style="flex: 1; resize: vertical;" rows="1" placeholder="Descrição e Efeitos..." onchange="updateSpell(${index}, 'desc', this.value)">${spell.desc}</textarea>
-            </div>
-            <div class="dice-config-row">
-                <select class="inv-input dice-sel" onchange="updateSpell(${index}, 'tipo', this.value)">
-                    <option value="Dano" ${spell.tipo==='Dano'?'selected':''}>Dano</option>
-                    <option value="Controle" ${spell.tipo==='Controle'?'selected':''}>Controle</option>
-                    <option value="Self" ${spell.tipo==='Self'?'selected':''}>Self</option>
-                </select>
-                
-                <div class="dice-group">
-                    <span style="color:#fff">Base</span>
-                    <input type="number" class="inv-input dice-qty" min="1" value="${spell.bQtd}" onchange="updateSpell(${index}, 'bQtd', this.value)">
-                    <select class="inv-input dice-sel" onchange="updateSpell(${index}, 'bD', this.value)">
-                        <option value="d4" ${spell.bD==='d4'?'selected':''}>d4</option>
-                        <option value="d6" ${spell.bD==='d6'?'selected':''}>d6</option>
-                        <option value="d8" ${spell.bD==='d8'?'selected':''}>d8</option>
-                        <option value="d10" ${spell.bD==='d10'?'selected':''}>d10</option>
-                        <option value="d12" ${spell.bD==='d12'?'selected':''}>d12</option>
-                        <option value="d20" ${spell.bD==='d20'?'selected':''}>d20</option>
-                        <option value="d100" ${spell.bD==='d100'?'selected':''}>d100</option>
-                    </select>
+        
+        let headerHtml = `
+            <div class="spell-header">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                   <button class="btn-roll-spell" onclick="event.stopPropagation(); rollSpellMagic(${index})" title="Rolar Magia">🎲</button>
+                   <span style="font-weight: bold; color: var(--accent-gold); font-size: 16px;">${spell.nome || 'Nova Magia'}</span>
                 </div>
-
-                <div class="dice-group" style="border-color:#1e3a8a">
-                    <span style="color:#44aaff">A</span>
-                    <input type="number" class="inv-input dice-qty" min="0" value="${spell.aQtd}" onchange="updateSpell(${index}, 'aQtd', this.value)">
-                    <select class="inv-input dice-sel" onchange="updateSpell(${index}, 'aD', this.value)">
-                        <option value="" ${spell.aD===''?'selected':''}>--</option>
-                        <option value="d4" ${spell.aD==='d4'?'selected':''}>d4</option>
-                        <option value="d6" ${spell.aD==='d6'?'selected':''}>d6</option>
-                        <option value="d8" ${spell.aD==='d8'?'selected':''}>d8</option>
-                        <option value="d10" ${spell.aD==='d10'?'selected':''}>d10</option>
-                        <option value="d12" ${spell.aD==='d12'?'selected':''}>d12</option>
-                        <option value="d20" ${spell.aD==='d20'?'selected':''}>d20</option>
-                        <option value="d100" ${spell.aD==='d100'?'selected':''}>d100</option>
-                    </select>
-                </div>
-
-                <div class="dice-group" style="border-color:#7f1d1d">
-                    <span style="color:#ff4444">F</span>
-                    <input type="number" class="inv-input dice-qty" min="0" value="${spell.fQtd}" onchange="updateSpell(${index}, 'fQtd', this.value)">
-                    <select class="inv-input dice-sel" onchange="updateSpell(${index}, 'fD', this.value)">
-                        <option value="" ${spell.fD===''?'selected':''}>--</option>
-                        <option value="d4" ${spell.fD==='d4'?'selected':''}>d4</option>
-                        <option value="d6" ${spell.fD==='d6'?'selected':''}>d6</option>
-                        <option value="d8" ${spell.fD==='d8'?'selected':''}>d8</option>
-                        <option value="d10" ${spell.fD==='d10'?'selected':''}>d10</option>
-                        <option value="d12" ${spell.fD==='d12'?'selected':''}>d12</option>
-                        <option value="d20" ${spell.fD==='d20'?'selected':''}>d20</option>
-                        <option value="d100" ${spell.fD==='d100'?'selected':''}>d100</option>
-                    </select>
+                <div style="display:flex; align-items:center; gap: 10px;">
+                   <button class="btn-danger" style="padding: 4px 8px;" onclick="event.stopPropagation(); removeSpell(${index})">X</button>
+                   <span class="chevron" onclick="toggleSpellInfo(${index})">${spell.isOpen ? '▼' : '►'}</span>
                 </div>
             </div>
         `;
+
+        let bodyHtml = `
+            <div class="spell-body" style="display: ${spell.isOpen ? 'flex' : 'none'}; flex-direction: column; gap: 5px; margin-top: 10px;">
+                <div class="inv-row">
+                    <input type="text" class="inv-input" style="flex: 2; font-weight: bold;" placeholder="Nome da Habilidade" value="${spell.nome}" onchange="updateSpell(${index}, 'nome', this.value)">
+                    <input type="text" class="inv-input" style="flex: 1;" placeholder="Custo (Mana)" value="${spell.custo}" onchange="updateSpell(${index}, 'custo', this.value)">
+                    <input type="text" class="inv-input" style="flex: 1;" placeholder="Alcance" value="${spell.alcance}" onchange="updateSpell(${index}, 'alcance', this.value)">
+                </div>
+                <div class="inv-row" style="margin-top: 5px;">
+                    <textarea class="inv-input" style="flex: 1; resize: vertical;" rows="1" placeholder="Descrição e Efeitos..." onchange="updateSpell(${index}, 'desc', this.value)">${spell.desc}</textarea>
+                </div>
+                <div class="dice-config-row">
+                    <select class="inv-input dice-sel" onchange="updateSpell(${index}, 'tipo', this.value); window.renderSpells();">
+                        <option value="Dano" ${spell.tipo==='Dano'?'selected':''}>Dano</option>
+                        <option value="Controle" ${spell.tipo==='Controle'?'selected':''}>Controle</option>
+                        <option value="Self" ${spell.tipo==='Self'?'selected':''}>Self</option>
+                        <option value="Locomoção" ${spell.tipo==='Locomoção'?'selected':''}>Locomoção</option>
+                    </select>
+                    
+                    <div class="dice-group">
+                        <span style="color:#fff">Base</span>
+                        <input type="number" class="inv-input dice-qty" min="1" value="${spell.bQtd}" onchange="updateSpell(${index}, 'bQtd', this.value)">
+                        <select class="inv-input dice-sel" onchange="updateSpell(${index}, 'bD', this.value)">
+                            <option value="d4" ${spell.bD==='d4'?'selected':''}>d4</option><option value="d6" ${spell.bD==='d6'?'selected':''}>d6</option><option value="d8" ${spell.bD==='d8'?'selected':''}>d8</option><option value="d10" ${spell.bD==='d10'?'selected':''}>d10</option><option value="d12" ${spell.bD==='d12'?'selected':''}>d12</option><option value="d20" ${spell.bD==='d20'?'selected':''}>d20</option><option value="d100" ${spell.bD==='d100'?'selected':''}>d100</option>
+                        </select>
+                    </div>
+
+                    ${(!isSelf && !isLoc) ? `
+                    <div class="dice-group" style="border-color:#1e3a8a">
+                        <span style="color:#44aaff">α</span>
+                        <input type="number" class="inv-input dice-qty" min="0" value="${spell.aQtd}" onchange="updateSpell(${index}, 'aQtd', this.value)">
+                        <select class="inv-input dice-sel" onchange="updateSpell(${index}, 'aD', this.value)">
+                            <option value="" ${spell.aD===''?'selected':''}>--</option><option value="d4" ${spell.aD==='d4'?'selected':''}>d4</option><option value="d6" ${spell.aD==='d6'?'selected':''}>d6</option><option value="d8" ${spell.aD==='d8'?'selected':''}>d8</option><option value="d10" ${spell.aD==='d10'?'selected':''}>d10</option><option value="d12" ${spell.aD==='d12'?'selected':''}>d12</option><option value="d20" ${spell.aD==='d20'?'selected':''}>d20</option><option value="d100" ${spell.aD==='d100'?'selected':''}>d100</option>
+                        </select>
+                    </div>
+
+                    <div class="dice-group" style="border-color:#7f1d1d">
+                        <span style="color:#ff4444">δ</span>
+                        <input type="number" class="inv-input dice-qty" min="0" value="${spell.fQtd}" onchange="updateSpell(${index}, 'fQtd', this.value)">
+                        <select class="inv-input dice-sel" onchange="updateSpell(${index}, 'fD', this.value)">
+                            <option value="" ${spell.fD===''?'selected':''}>--</option><option value="d4" ${spell.fD==='d4'?'selected':''}>d4</option><option value="d6" ${spell.fD==='d6'?'selected':''}>d6</option><option value="d8" ${spell.fD==='d8'?'selected':''}>d8</option><option value="d10" ${spell.fD==='d10'?'selected':''}>d10</option><option value="d12" ${spell.fD==='d12'?'selected':''}>d12</option><option value="d20" ${spell.fD==='d20'?'selected':''}>d20</option><option value="d100" ${spell.fD==='d100'?'selected':''}>d100</option>
+                        </select>
+                    </div>` : ''}
+
+                    ${isLoc ? `
+                    <div class="dice-group" style="border-color:#7e22ce">
+                        <span style="color:#a855f7">β</span>
+                        <input type="number" class="inv-input dice-qty" min="0" value="${spell.betaQtd}" onchange="updateSpell(${index}, 'betaQtd', this.value)">
+                        <select class="inv-input dice-sel" onchange="updateSpell(${index}, 'betaD', this.value)">
+                            <option value="" ${spell.betaD===''?'selected':''}>--</option><option value="d4" ${spell.betaD==='d4'?'selected':''}>d4</option><option value="d6" ${spell.betaD==='d6'?'selected':''}>d6</option><option value="d8" ${spell.betaD==='d8'?'selected':''}>d8</option><option value="d10" ${spell.betaD==='d10'?'selected':''}>d10</option><option value="d12" ${spell.betaD==='d12'?'selected':''}>d12</option><option value="d20" ${spell.betaD==='d20'?'selected':''}>d20</option><option value="d100" ${spell.betaD==='d100'?'selected':''}>d100</option>
+                        </select>
+                    </div>` : ''}
+
+                    <div style="display:flex; align-items:center; gap:5px; margin-left: auto;">
+                        <input type="checkbox" id="crit-${index}" ${spell.isCrit ? 'checked' : ''} onchange="updateSpell(${index}, 'isCrit', this.checked)">
+                        <label for="crit-${index}" style="color:#ffd700; margin:0;">Crítico (Máx x3)</label>
+                    </div>
+                </div>
+            </div>
+        `;
+        row.innerHTML = headerHtml + bodyHtml;
         container.appendChild(row);
     });
 }
 
 window.addSpell = function() {
-    playerSpells.push({ nome: "", desc: "", custo: "", alcance: "", tipo: "Dano", bQtd: 1, bD: "d20", aQtd: 0, aD: "", fQtd: 0, fD: "" });
+    playerSpells.push({ nome: "", desc: "", custo: "", alcance: "", tipo: "Dano", bQtd: 1, bD: "d20", isOpen: true, isCrit: false });
     window.renderSpells();
     window.saveData();
 }
@@ -323,7 +353,7 @@ window.removeSpell = function(index) {
     }
 }
 
-// ------ A ROLAGEM EXCLUSIVA DE MAGIAS ------
+// ------ A ROLAGEM COM DANO MÁXIMO NO CRÍTICO ------
 window.rollSpellMagic = function(index) {
     const spell = playerSpells[index];
     if(!spell) return;
@@ -339,12 +369,26 @@ window.rollSpellMagic = function(index) {
         return res;
     }
 
-    const rBase = rolarDados(spell.bQtd, spell.bD);
-    const rAlpha = rolarDados(spell.aQtd, spell.aD);
-    const rDelta = rolarDados(spell.fQtd, spell.fD);
+    let rBase = [];
+    if(spell.isCrit) {
+        let faces = parseInt(spell.bD.replace('d', ''));
+        let maxDamage = faces * parseInt(spell.bQtd) * 3;
+        rBase = [maxDamage]; // Resultado único massivo pro crítico!
+    } else {
+        rBase = rolarDados(spell.bQtd, spell.bD);
+    }
+
+    let rAlpha = [], rDelta = [], rBeta = [];
+    if(spell.tipo !== 'Self' && spell.tipo !== 'Locomoção') {
+        rAlpha = rolarDados(spell.aQtd, spell.aD);
+        rDelta = rolarDados(spell.fQtd, spell.fD);
+    }
+    if(spell.tipo === 'Locomoção') {
+        rBeta = rolarDados(spell.betaQtd, spell.betaD);
+    }
 
     const rollData = {
-        type: "spell", // Avisa ao resultado.html que isso é magia!
+        type: "spell", 
         c: charName,
         color: charColor,
         sName: spell.nome || "Habilidade",
@@ -352,16 +396,24 @@ window.rollSpellMagic = function(index) {
         range: spell.alcance || "Self",
         desc: spell.desc || "",
         sType: spell.tipo || "Dano",
+        isCrit: spell.isCrit ? "true" : "false",
         rB: rBase.join(','), dB: spell.bD,
         rA: rAlpha.join(','), dA: spell.aD,
-        rF: rDelta.join(','), dF: spell.fD
+        rF: rDelta.join(','), dF: spell.fD,
+        rBeta: rBeta.join(','), dBeta: spell.betaD
     };
 
     window.abrirModalCentral(rollData);
     if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", rollData);
+    
+    // Desmarca o crítico automaticamente pra não esquecer ligado
+    if(spell.isCrit) {
+        spell.isCrit = false;
+        window.renderSpells();
+        window.saveData();
+    }
 }
 
-// RESTANTE DO CÓDIGO NORMAL (INVENTARIO E SKILLS)
 window.renderInventory = function() {
     const container = document.getElementById('inventory-container');
     container.innerHTML = '';
@@ -385,10 +437,7 @@ window.renderInventory = function() {
 }
 
 window.addInventoryItem = function() {
-    if(isOverweight) {
-        alert("Mochila cheia! Você está muito pesado para carregar novos itens.");
-        return;
-    }
+    if(isOverweight) return alert("Mochila cheia! Você está muito pesado para carregar novos itens.");
     playerInventory.push({ nome: "", desc: "", peso: 0, qtd: 1 });
     window.renderInventory();
     window.saveData();
@@ -426,7 +475,8 @@ window.saveData = async function() {
         sorte: document.getElementById('attr-sorte')?.value || 1,
         grimoire: document.getElementById('grimoire-name')?.value || "",
         mana: document.getElementById('mana-zone')?.value || "",
-        passiva: document.getElementById('passiva')?.value || "",
+        passiva: document.getElementById('passiva')?.value || "", 
+        mov: document.getElementById('char-mov')?.value || 30,
         skills: playerSkills,
         inventory: playerInventory,
         spells: playerSpells, 
@@ -497,7 +547,7 @@ window.rollSkill = function(skillName, attrName) {
     let skillMod = playerSkills[skillName] || 0;
     
     const rollData = {
-        type: "skill", // Avisa que é rolagem de atributo
+        type: "skill",
         c: charName,
         s: skillName,
         a: attrName,
@@ -518,7 +568,7 @@ window.abrirModalCentral = function(data) {
             id: "fate-roll-modal",
             url: `https://seediam.github.io/FateSheet/resultado.html?data=${dataUrl}`, 
             width: 450, 
-            height: data.type === "spell" ? 400 : 250 // Magia abre uma janela mais alta para caber tudo!
+            height: data.type === "spell" ? 420 : 250 // Modal maior pra magias!
         });
     }
 }
