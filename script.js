@@ -229,6 +229,7 @@ window.openCharacter = function(id) {
     window.renderGlobalRunes();
     window.renderSpells(); 
     window.calcVitals();
+    window.updateAlloc(); // Atualiza a tag [FC] na tela
 
     document.getElementById('screen-list').classList.remove('active');
     document.getElementById('screen-sheet').classList.add('active');
@@ -273,6 +274,8 @@ window.calcVitals = function() {
 // ------ NOVO REGRA DE LIMITES ------
 window.updateAlloc = function() {
     let isFora = document.getElementById('fora-combate') ? document.getElementById('fora-combate').checked : false;
+    document.getElementById('char-fc-badge').style.display = isFora ? 'block' : 'none'; // Mostra a TAG [FC]
+    
     let maxRunes = parseInt(document.getElementById('char-runas').value) || 0;
 
     let f = parseInt(document.getElementById('alloc-forca').value) || 0;
@@ -292,7 +295,6 @@ window.updateAlloc = function() {
 
     let totalAlloc = f + m + a + s;
 
-    // Se estiver em combate, trava pelo limite de Runas
     if (!isFora && totalAlloc > maxRunes) {
         alert(`EM COMBATE: Você só pode alocar dados até o limite das suas Runas (${maxRunes})!`);
         safeSetVal('alloc-forca', 0); safeSetVal('alloc-magia', 0); safeSetVal('alloc-agilidade', 0); safeSetVal('alloc-sorte', 0);
@@ -306,29 +308,111 @@ const getMultFromRoll = (val) => {
     return 1;
 };
 
-// ------ MUDADO PARA v4 E LIMITADO A 15 LOGS (NUNCA MAIS TRAVA) ------
+// ------ MINI LOG DENTRO DA FICHA ------
 window.addCombatLog = async function(data) {
     combatLog.unshift(data);
-    if(combatLog.length > 15) combatLog.pop(); 
+    if(combatLog.length > 20) combatLog.pop(); 
     if (OBR.isAvailable) {
-        await OBR.room.setMetadata({ "fatesheet_log_v4": combatLog });
-        // OBR Broadcast avisa o Log instantaneamente, para não esperar a nuvem sincronizar
+        await OBR.room.setMetadata({ "fatesheet_log_v5": combatLog });
         OBR.broadcast.sendMessage("fatesheet-log-update", combatLog);
+    }
+    window.renderMiniLog();
+}
+
+window.clearMiniLog = async function() {
+    if(confirm('Tem certeza que deseja apagar o histórico de combate para toda a mesa?')) {
+        combatLog = [];
+        if (OBR.isAvailable) {
+            await OBR.room.setMetadata({ "fatesheet_log_v5": [] });
+            OBR.broadcast.sendMessage("fatesheet-log-update", []);
+        }
+        window.renderMiniLog();
     }
 }
 
-window.abrirJanelaDeLog = function() {
-    if (OBR.isAvailable) {
-        OBR.popover.open({
-            id: "fatesheet-log-popover",
-            url: `https://seediam.github.io/FateSheet/log.html?v=${Date.now()}`, 
-            width: 320,
-            height: 450,
-            disableClickAway: true, 
-            anchorOrigin: { horizontal: "RIGHT", vertical: "BOTTOM" },
-            transformOrigin: { horizontal: "RIGHT", vertical: "BOTTOM" }
-        });
-    } else { alert("Log só funciona dentro da mesa do Owlbear!"); }
+window.renderMiniLog = function() {
+    const container = document.getElementById('mini-log-container');
+    if(!container) return;
+    container.innerHTML = '';
+    
+    if (!Array.isArray(combatLog)) return; 
+    
+    combatLog.forEach(log => {
+        try {
+            let div = document.createElement('div'); 
+            div.className = 'log-entry';
+            div.style.borderLeftColor = log.col || '#d4af37';
+            
+            let prefix = log.fc ? '<span style="color:#888; font-weight:bold;">[FC]</span> ' : '⚔️ ';
+            let actHtml = "";
+            let resHtml = "";
+            
+            if (log.t === "spell") {
+                actHtml = `${prefix}Rolou <b style="color:${log.col}">[ ${log.sn} ]</b>`;
+                let parts = []; let totalDano = 0;
+                
+                if(log.st !== "Self") {
+                    if(log.b && log.b.r && log.b.r.length > 0) {
+                        parts.push(`<span style="color:${log.col}">Base [${log.b.tot}]</span>`);
+                        totalDano += log.b.tot;
+                    }
+                    if(log.ru && log.ru.length > 0) {
+                        log.ru.forEach(r => {
+                            if(r.t === 'alpha') parts.push(`<span style="color:#44aaff">A: ${r.tot}</span>`);
+                            if(r.t === 'delta') parts.push(`<span style="color:#ff4444">D: ${r.tot}</span>`);
+                            if(r.t === 'arma') parts.push(`<span style="color:#ccc">Arma: ${r.tot}</span>`);
+                            totalDano += r.tot;
+                        });
+                    }
+                    if(log.beta && log.beta.r && log.beta.r.length > 0) {
+                        let betTot = log.beta.r.reduce((a,b)=>a+b, 0);
+                        parts.push(`<span style="color:#a855f7">B: ${betTot}</span>`);
+                        totalDano += betTot;
+                    }
+                    
+                    let strParts = parts.join(" ");
+                    let critCor = log.crit === 'true' ? '#ffd700' : log.col;
+                    resHtml = `${strParts} <b style="color:${critCor}">=> ${totalDano}</b>`;
+                } else {
+                    resHtml = `<span style="color:#888;">Efeito conjurado.</span>`;
+                }
+                
+                if (log.stName && log.stDT > 0) {
+                    let stRoll = parseInt(log.stRoll); let dt = parseInt(log.stDT);
+                    let stCor = stRoll >= dt ? "#44aaff" : "#ff4444";
+                    resHtml += `<div style="font-size:11px; margin-top:4px; color:${stCor}">⚡ ${log.stName}: [${stRoll}] vs DT ${dt}</div>`;
+                }
+            } 
+            else if (log.t === "attr") {
+                actHtml = `${prefix}Rolou <b>Atributos</b>`;
+                let parts = [];
+                
+                const formatAttr = (arrStr, color, pref) => {
+                    if(!arrStr) return; let arr = arrStr.split(',');
+                    if(arr.length === 0 || arrStr === "") return;
+                    let text = arr.map(v => {
+                        let val = parseInt(v);
+                        let c = val >= 20 ? '#ffd700' : (val >= 12 ? '#39ff14' : (val <= 4 ? '#ff4444' : '#fff'));
+                        let sBadge = log.sorte > 0 ? `<sup style="color:#39ff14">${log.sorte}</sup>` : "";
+                        return `<span style="color:${c}">${val}${sBadge}</span>`;
+                    }).join(", ");
+                    parts.push(`<span style="color:${color}; font-weight:bold;">${pref} [${text}]</span>`);
+                };
+
+                formatAttr(log.rF, "#ff4444", "F"); formatAttr(log.rM, "#44aaff", "M"); formatAttr(log.rA, "#a855f7", "A");
+                resHtml = parts.join(" | ");
+            } 
+            else {
+                actHtml = `${prefix}Rolou <b>${log.s}</b>`;
+                let r = (log.r && typeof log.r === 'string') ? log.r.split(',') : [0];
+                let v = parseInt(r[0]) + (log.mod || 0);
+                resHtml = `Resultado: <b style="color:${log.col}; font-size: 14px;">${v}</b>`;
+            }
+
+            div.innerHTML = `<div class="log-header"><span class="log-name" style="color:${log.col || '#d4af37'}">${log.av || '🧙‍♂️'} ${log.c}</span><span class="log-action">${actHtml}</span></div><div class="log-result">${resHtml}</div>`;
+            container.appendChild(div);
+        } catch (e) {}
+    });
 }
 
 window.rollAttributes = function() {
@@ -348,7 +432,6 @@ window.rollAttributes = function() {
 
     for(let i=0; i<f; i++) {
         let v = rollD20() + s; rolls.f.push(v);
-        // Só cria Runa se estiver Em Combate
         if(!isFora) c.activeRunes.push({ type: 'delta', face: 'd4', mult: getMultFromRoll(v), locked: true, fixo: 0, raw: v });
     }
     for(let i=0; i<m; i++) {
@@ -365,7 +448,8 @@ window.rollAttributes = function() {
         av: document.getElementById('char-avatar').value,
         c: document.getElementById('char-name').value || 'Desconhecido',
         col: document.getElementById('char-color').value || '#d4af37',
-        rF: rolls.f.join(','), rM: rolls.m.join(','), rA: rolls.a.join(','), sorte: s
+        rF: rolls.f.join(','), rM: rolls.m.join(','), rA: rolls.a.join(','), sorte: s,
+        fc: isFora
     };
 
     window.abrirModalCentral(payload);
@@ -457,6 +541,8 @@ window.removeSpell = function(index) { if(confirm("Remover magia?")) { playerSpe
 window.rollSpellMagic = function(index) {
     const spell = playerSpells[index];
     if(!spell) return;
+    let isFora = document.getElementById('fora-combate') ? document.getElementById('fora-combate').checked : false;
+
     const charName = document.getElementById('char-name').value || 'Desconhecido';
     const charColor = document.getElementById('char-color') ? document.getElementById('char-color').value : '#d4af37';
     let c = characters[currentCharId];
@@ -480,7 +566,8 @@ window.rollSpellMagic = function(index) {
 
     const payload = {
         t: "spell", av: document.getElementById('char-avatar').value, c: charName, col: charColor, sn: spell.nome || "Habilidade", cost: spell.custo || "0", rg: spell.alcance || "Self", desc: spell.desc || "", st: spell.tipo || "Dano",
-        b: { f: spell.bD, m: spell.bMult, r: bRolls, tot: bTot }, ru: runesPack, crit: spell.isCrit ? "true" : "false", stName: spell.statusName || "", stDT: spell.statusDT || "0", stRoll: stRoll, audio: spell.audioUrl || ""
+        b: { f: spell.bD, m: spell.bMult, r: bRolls, tot: bTot }, ru: runesPack, crit: spell.isCrit ? "true" : "false", stName: spell.statusName || "", stDT: spell.statusDT || "0", stRoll: stRoll, audio: spell.audioUrl || "",
+        fc: isFora
     };
 
     window.abrirModalCentral(payload);
@@ -518,7 +605,7 @@ window.saveData = async function() {
         vidaMonster: document.getElementById('val-vida-monster')?.value || 100, forca: document.getElementById('attr-forca')?.value || 1, magia: document.getElementById('attr-magia')?.value || 1, agilidade: document.getElementById('attr-agilidade')?.value || 1, sorte: document.getElementById('attr-sorte')?.value || 1,
         grimoireSelect: document.getElementById('grimoire-select')?.value || "", grimoireDT: document.getElementById('grimoire-dt')?.value || 10, mana: document.getElementById('mana-zone')?.value || "", passiva: document.getElementById('passiva')?.value || "", 
         mov: document.getElementById('char-mov')?.value || 30, runas: document.getElementById('char-runas')?.value || 0,
-        foraCombate: document.getElementById('fora-combate')?.checked || false, // SALVA A CHECKBOX
+        foraCombate: document.getElementById('fora-combate')?.checked || false,
         skills: playerSkills, inventory: playerInventory, spells: playerSpells, photo: currentPhoto, activeRunes: characters[currentCharId] ? characters[currentCharId].activeRunes : [], alloc: al
     };
     characters[currentCharId] = sheetData;
@@ -542,7 +629,8 @@ window.updateSkill = function(skillName, change, event) { event.stopPropagation(
 window.rollSkill = function(skillName, attrName) {
     let idMapped = attrName.toLowerCase().replace('ç', 'c'); let baseAttr = parseInt(document.getElementById(`attr-${idMapped}`).value) || 1;
     let classe = document.getElementById('char-class').value; let isMonster = document.getElementById('char-category').value === 'Monstros';
-    
+    let isFora = document.getElementById('fora-combate') ? document.getElementById('fora-combate').checked : false;
+
     if(!isMonster) {
         if (classe === 'Plebeu') { if(attrName === 'Força') baseAttr += 1; if(attrName === 'Magia') baseAttr -= 1; }
         if (classe === 'Andarilho' && attrName === 'Agilidade') baseAttr += 1;
@@ -552,7 +640,7 @@ window.rollSkill = function(skillName, attrName) {
     if(baseAttr < 1) baseAttr = 1;
     let results = []; for (let i = 0; i < baseAttr; i++) { let die = Math.floor(Math.random() * 20) + 1; if (isOverweight) die -= 5; results.push(die); }
     
-    const payload = { t: "skill", av: document.getElementById('char-avatar').value, c: document.getElementById('char-name').value || 'Desconhecido', s: skillName, a: attrName, r: results.join(','), pen: isOverweight ? "true" : "false", col: document.getElementById('char-color').value || '#d4af37', mod: playerSkills[skillName] || 0 };
+    const payload = { t: "skill", av: document.getElementById('char-avatar').value, c: document.getElementById('char-name').value || 'Desconhecido', s: skillName, a: attrName, r: results.join(','), pen: isOverweight ? "true" : "false", col: document.getElementById('char-color').value || '#d4af37', mod: playerSkills[skillName] || 0, fc: isFora };
 
     window.abrirModalCentral(payload);
     window.addCombatLog(payload);
@@ -569,9 +657,9 @@ window.abrirModalCentral = function(data) {
 function processRoomData(metadata) {
     let mudouAlgo = false;
     
-    // MUDADO PARA A CHAVE v4
-    if (metadata["fatesheet_log_v4"] !== undefined) {
-        combatLog = metadata["fatesheet_log_v4"];
+    if (metadata["fatesheet_log_v5"] !== undefined) {
+        combatLog = metadata["fatesheet_log_v5"];
+        window.renderMiniLog();
     }
 
     for (let key in metadata) {
@@ -599,9 +687,9 @@ function initExtension() {
                 processRoomData(meta);
                 OBR.room.onMetadataChange((metadata) => processRoomData(metadata));
                 
-                // O LOG AGORA SE ATUALIZA INSTANTANEAMENTE AQUI TAMBÉM:
                 OBR.broadcast.onMessage("fatesheet-log-update", (event) => {
                     combatLog = event.data;
+                    window.renderMiniLog();
                 });
                 
                 OBR.broadcast.onMessage("fatesheet-rolls", (event) => { window.abrirModalCentral(event.data); });
