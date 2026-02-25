@@ -8,6 +8,42 @@ const skillsData = [
     { name: "Atuação", attr: "Sorte" }, { name: "Enganação", attr: "Sorte" }, { name: "Persuasão", attr: "Sorte" }
 ];
 
+const grimoiresDb = {
+    "Gelo": "❄️ Gelo — Passiva: Zero Absoluto\nSempre que causar dano, aplica Resfriamento (1).\nAo atingir 3 acúmulos no mesmo alvo: ele perde 10ft de movimento e sofre -1 em testes físicos por 1 turno.\nSe congelar um alvo, você ganha +1 Runa temporária no próximo turno.",
+    "Fogo": "🔥 Fogo — Passiva: Combustão Persistente\nSempre que causar dano, aplica Queimadura (1).\nQueimadura causa 1d4 no início do turno do alvo.\nSe o alvo já estiver queimando e você causar dano novamente, o dano base aumenta em +1d6.",
+    "Vento": "🌪 Vento — Passiva: Corrente Ascendente\nSempre que usar Locomoção, ganha +10ft adicionais.\nSe causar dano após se mover 20ft ou mais no turno, aplica Desequilíbrio (-2 no próximo teste do alvo).",
+    "Água": "🌊 Água — Passiva: Fluxo Adaptável\nUma vez por turno, pode converter 50% do dano recebido em redução de Mana ao invés de HP.\nSe terminar o turno sem sofrer dano, recupera 5 Mana.",
+    "Planta": "🌱 Planta — Passiva: Enraizar\nQuando atingir o mesmo alvo duas vezes seguidas, ele fica com -10ft de movimento.\nSe o alvo já estiver com redução de movimento, sofre -2 em Agilidade.",
+    "Roseira": "🌹 Roseira — Passiva: Espinhos Reativos\nSempre que sofrer dano corpo a corpo, o atacante recebe 1d6 de dano perfurante.\nSe você estiver com menos de 50% de HP, o dano reativo vira 1d10.",
+    "Constrição": "🧊 Constrição — Passiva: Pressão Constante\nSe um alvo estiver sob qualquer condição negativa aplicada por você, ele sofre -1 adicional em testes.\nSe tentar remover um efeito seu e falhar, recebe 1d6 de dano.",
+    "Fumaça Arcana": "🌫 Fumaça Arcana — Passiva: Forma Intangível\nUma vez por turno, se sofrer dano, pode reduzir em 1d8.\nSe reduzir 6 ou mais, pode se mover 10ft sem gastar ação.",
+    "Espinhos": "🌿 Espinhos — Passiva: Terreno Hostil\nAlvos que entrarem em alcance corpo a corpo sofrem 1d4.\nSe ficarem 2 turnos próximos, ficam com -2 em Movimento.",
+    "Tecido": "🧵 Tecido — Passiva: Trama Viva\nSempre que usar habilidade defensiva, ganha +1 Runa temporária no próximo turno.\nSe bloquear totalmente um ataque (reduzir a 0), pode aplicar -2 no próximo teste do atacante.",
+    "Terra": "🌍 Terra — Passiva: Fortaleza Natural\nSe permanecer parado no turno, ganha +1d6 redução no próximo dano recebido.\nSe usar habilidade defensiva, recebe +1 Runa de Força temporária.",
+    "Raio": "⚡ Raio — Passiva: Sobrecarga\nSe tirar 20 natural em qualquer runa ofensiva, causa 1d6 adicional e pode atingir outro alvo a 10ft.\nSe errar (1-4), sofre 1d4 de dano elétrico.",
+    "Lama": "🌑 Lama — Passiva: Afundar\nSempre que causar dano, reduz o movimento do alvo em 5ft cumulativo (até -20).\nSe o alvo chegar a 0ft, sofre -2 em testes físicos.",
+    "Espelhos": "🪞 Espelhos — Passiva: Reflexão Arcana\nUma vez por turno, se sofrer dano mágico, pode refletir 50% dele.\nSe tirar 20 na defesa, reflete 100%.",
+    "Veneno": "☠ Veneno — Passiva: Toxina Progressiva\nSempre que causar dano, aplica Veneno (1).\nA cada turno, Veneno aumenta o dano em +1 cumulativo.\nSe o alvo falhar duas runas seguidas, sofre 2d6 adicionais.",
+    "Escudo": "🛡 Escudo — Passiva: Bastilha\nSe usar habilidade defensiva, ganha -2 em dano recebido até o próximo turno.\nSe não sofrer dano no turno, ganha +1 Runa no próximo.",
+    "Espada": "⚔ Espada — Passiva: Corte Preciso\nSe tirar 12+ em duas runas no mesmo ataque, adiciona +1d6 extra.\nSe for crítico (20), ignora reduções defensivas.",
+    "Tinta": "🖋 Tinta — Passiva: Marca Escrita\nSempre que atingir um alvo, pode “marcá-lo”.\nAlvos marcados sofrem +1d6 do seu próximo ataque.\nSó pode manter 1 marca ativa.",
+    "Tempo": "⏳ Tempo — Passiva: Eco Temporal\nUma vez por combate, pode repetir uma rolagem de runa.\nSe tirar 20, ganha +1 Runa extra no próximo turno.",
+    "Sangue": "🩸 Sangue — Passiva: Vínculo Carmesim\nSempre que causar dano, cura 50% do valor causado.\nSe estiver com menos de 30% HP, ganha +1 Runa de Força.",
+    "Selamento": "🔒 Selamento — Passiva: Marca Restritiva\nSempre que aplicar Selado:\n-2 em testes mentais\nPrimeira habilidade do alvo no turno seguinte custa +5 Mana\nSó pode manter 1 selo ativo.",
+    "Morte": "💀 Morte — Passiva: Marca da Decadência\nAlvos abaixo de 40% HP sofrem +1d8 de dano seu.\nSe eliminar um alvo, ganha +1 Runa no próximo turno.",
+    "Luz": "✨ Luz — Passiva: Iluminação Purificadora\nAo usar habilidade, remove 1 efeito negativo leve seu.\nSe tirar 20, cega o alvo (-2 testes no próximo turno).",
+    "Sombras": "🌑 Sombras — Passiva: Passo Sombrio\nSe não for alvo no turno, ganha +1 Runa de Agilidade.\nPrimeiro ataque após ficar “não alvejado” causa +1d6.",
+    "Vida": "🌿 Vida — Passiva: Crescimento Vital\nSempre que curar ou reduzir dano, ganha +1 Runa temporária.\nSe estiver acima de 80% HP, recebe -2 em dano sofrido.",
+    "Espaço": "🌀 Espaço — Passiva: Distorção\nPode trocar de posição com um aliado 1x por turno ao usar Locomoção.\nSe tirar 20 em movimento, fica inalvejável até seu próximo turno.",
+    "Teleporte": "🧭 Teleporte — Passiva: Salto Instável\nSempre que usar Locomoção, ganha +1d6 no próximo dano.\nSe for alvo após se mover, recebe -2 no dano sofrido.",
+    "Negação": "🚫 Negação — Passiva: Cancelamento Absoluto\nUma vez por turno, pode anular o bônus de runa de um inimigo.\nSe tirar 20 na defesa, cancela totalmente a habilidade inimiga.",
+    "Criação": "🛠 Criação — Passiva: Manifestação\nPode criar um efeito simples por turno (plataforma, arma, barreira pequena).\nSe tirar 20, o efeito dura +1 turno extra.",
+    "Imaginação": "🧠 Imaginação — Passiva: Forma Impossível\nPode declarar um efeito ilusório simples por turno.\nSe o inimigo falhar teste mental, trata como real por 1 turno.",
+    "Realidade": "🌌 Realidade — Passiva: Ruptura\nUma vez por combate, pode alterar o resultado de uma runa (sua ou inimiga) em ±3.\nSe tirar 20 natural, ignora qualquer redução.",
+    "Sem Grimório": "⚫ Sem Grimório\nSem passiva.\nRecebe +1 Runa base permanente por combate.",
+    "Inumório": "🔴 Inumório\nSem passiva."
+};
+
 let characters = {}; 
 let currentCharId = null;
 let currentIsMine = true; 
@@ -46,7 +82,6 @@ window.renderCharacterList = function() {
     const container = document.getElementById('character-folders');
     if(!container) return;
     container.innerHTML = '';
-
     const categories = { "Jogadores": [], "NPCs": [], "Monstros": [] };
 
     for (let id in characters) {
@@ -74,13 +109,12 @@ window.renderCharacterList = function() {
             container.innerHTML += html;
         }
     }
-
     if(!hasAny) container.innerHTML = '<div style="text-align:center; color:#666; margin-top: 20px;">A Mesa está vazia.</div>';
 }
 
 window.createNewCharacter = function() {
     const newId = 'char_' + Date.now();
-    characters[newId] = { name: "Novo Personagem", category: "Jogadores", classe: "Plebeu", skills: {}, inventory: [], spells: [], photo: "", color: "#d4af37", mov: 30, runas: 0 };
+    characters[newId] = { name: "Novo Personagem", category: "Jogadores", classe: "Plebeu", skills: {}, inventory: [], spells: [], photo: "", color: "#d4af37", mov: 30, runas: 0, activeRunes: [], alloc: {f:0, m:0, a:0, s:0} };
     currentCharId = newId;
     window.saveData(); 
     window.openCharacter(newId);
@@ -147,6 +181,12 @@ window.updateCategoryUI = function() {
     window.saveData();
 }
 
+window.changeGrimoire = function() {
+    let val = document.getElementById('grimoire-select').value;
+    document.getElementById('passiva').value = grimoiresDb[val] || "";
+    window.saveData();
+}
+
 window.openCharacter = function(id) {
     currentCharId = id;
     const c = characters[id] || {};
@@ -170,12 +210,21 @@ window.openCharacter = function(id) {
     safeSetVal('attr-magia', c.magia || 1);
     safeSetVal('attr-agilidade', c.agilidade || 1);
     safeSetVal('attr-sorte', c.sorte || 1);
-    safeSetVal('grimoire-name', c.grimoire || '');
+    
+    // CARREGA O GRIMÓRIO E O DT
+    safeSetVal('grimoire-select', c.grimoireSelect || '');
+    safeSetVal('grimoire-dt', c.grimoireDT || 10);
     safeSetVal('mana-zone', c.mana || '');
     safeSetVal('passiva', c.passiva || ''); 
     safeSetVal('char-mov', c.mov || 30);
     safeSetVal('char-runas', c.runas || 0); 
     
+    let al = c.alloc || {f:0, m:0, a:0, s:0};
+    safeSetVal('alloc-forca', al.f);
+    safeSetVal('alloc-magia', al.m);
+    safeSetVal('alloc-agilidade', al.a);
+    safeSetVal('alloc-sorte', al.s);
+
     playerSkills = c.skills || {};
     playerInventory = c.inventory || [];
     playerSpells = c.spells || []; 
@@ -185,6 +234,7 @@ window.openCharacter = function(id) {
     window.setPhotoPreview(currentPhoto);
     window.renderSkills();
     window.renderInventory();
+    window.renderGlobalRunes();
     window.renderSpells(); 
     window.calcVitals();
 
@@ -228,35 +278,173 @@ window.calcVitals = function() {
     }
 }
 
-// ------ VERIFICADOR DE LIMITES DE RUNAS E AGILIDADE ------
-function checkRuneLimits(spellIndex, typeToVerify, addedQtd = 0) {
-    let spell = playerSpells[spellIndex];
-    let forca = parseInt(document.getElementById('attr-forca').value) || 0;
-    let magia = parseInt(document.getElementById('attr-magia').value) || 0;
-    let maxRunas = parseInt(document.getElementById('char-runas').value) || 0;
+window.updateAlloc = function() {
+    let f = parseInt(document.getElementById('alloc-forca').value) || 0;
+    let m = parseInt(document.getElementById('alloc-magia').value) || 0;
+    let a = parseInt(document.getElementById('alloc-agilidade').value) || 0;
+    let s = parseInt(document.getElementById('alloc-sorte').value) || 0;
+    
+    let maxF = parseInt(document.getElementById('attr-forca').value) || 0;
+    let maxM = parseInt(document.getElementById('attr-magia').value) || 0;
+    let maxA = parseInt(document.getElementById('attr-agilidade').value) || 0;
+    let maxS = parseInt(document.getElementById('attr-sorte').value) || 0;
 
-    let currentTotal = 0;
-    let currentTypeTotal = 0;
+    if(f > maxF) { f = maxF; safeSetVal('alloc-forca', f); }
+    if(m > maxM) { m = maxM; safeSetVal('alloc-magia', m); }
+    if(a > maxA) { a = maxA; safeSetVal('alloc-agilidade', a); }
+    if(s > maxS) { s = maxS; safeSetVal('alloc-sorte', s); }
 
-    spell.runes.forEach(r => {
-        currentTotal += parseInt(r.qtd) || 0;
-        if(r.type === typeToVerify) currentTypeTotal += parseInt(r.qtd) || 0;
-    });
+    if (f + m + a + s > 3) {
+        alert("Você só pode alocar até 3 dados por turno!");
+        safeSetVal('alloc-forca', 0); safeSetVal('alloc-magia', 0);
+        safeSetVal('alloc-agilidade', 0); safeSetVal('alloc-sorte', 0);
+    }
+    window.saveData();
+}
 
-    if (currentTotal + addedQtd > maxRunas) {
-        alert(`Limite de Runas Totais atingido! Sua ficha permite usar no máximo ${maxRunas} runa(s) por turno.`);
+const getMultFromRoll = (val) => {
+    if(val <= 4) return 0;
+    if(val <= 11) return 0.5;
+    return 1;
+};
+
+window.rollAttributes = function() {
+    let f = parseInt(document.getElementById('alloc-forca').value) || 0;
+    let m = parseInt(document.getElementById('alloc-magia').value) || 0;
+    let a = parseInt(document.getElementById('alloc-agilidade').value) || 0;
+    let s = parseInt(document.getElementById('alloc-sorte').value) || 0;
+
+    if(f+m+a+s === 0) return alert("Aloque algum dado antes de rolar o turno!");
+
+    let rolls = { f: [], m: [], a: [] };
+    let c = characters[currentCharId];
+    if(!c.activeRunes) c.activeRunes = [];
+
+    const rollD20 = () => Math.floor(Math.random() * 20) + 1;
+
+    for(let i=0; i<f; i++) {
+        let v = rollD20() + s; rolls.f.push(v);
+        c.activeRunes.push({ type: 'delta', face: 'd4', mult: getMultFromRoll(v), locked: true, fixo: 0, raw: v });
+    }
+    for(let i=0; i<m; i++) {
+        let v = rollD20() + s; rolls.m.push(v);
+        c.activeRunes.push({ type: 'alpha', face: 'd4', mult: getMultFromRoll(v), locked: true, fixo: 0, raw: v });
+    }
+    for(let i=0; i<a; i++) {
+        let v = rollD20() + s; rolls.a.push(v);
+        c.activeRunes.push({ type: 'beta', face: 'd4', mult: getMultFromRoll(v), locked: true, fixo: 0, raw: v });
+    }
+
+    const payload = {
+        t: "attr", 
+        c: document.getElementById('char-name').value || 'Desconhecido',
+        col: document.getElementById('char-color').value || '#d4af37',
+        rF: rolls.f.join(','),
+        rM: rolls.m.join(','),
+        rA: rolls.a.join(','),
+        sorte: s
+    };
+
+    window.abrirModalCentral(payload);
+    if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", payload);
+
+    window.saveData();
+    window.renderGlobalRunes();
+}
+
+window.checkRuneLimits = function(typeToAdd) {
+    let maxRunes = parseInt(document.getElementById('char-runas').value) || 0;
+    let c = characters[currentCharId];
+    if(!c.activeRunes) c.activeRunes = [];
+    
+    if (c.activeRunes.length >= maxRunes) {
+        alert(`Limite atingido! Você tem apenas ${maxRunes} runa(s) na ficha.`);
         return false;
     }
 
-    if (typeToVerify === 'alpha' && (currentTypeTotal + addedQtd > magia)) {
-        alert(`Limite de Alpha atingido! Seu atributo de Magia é apenas ${magia}.`);
-        return false;
-    }
-    if (typeToVerify === 'delta' && (currentTypeTotal + addedQtd > forca)) {
-        alert(`Limite de Delta atingido! Seu atributo de Força é apenas ${forca}.`);
-        return false;
-    }
+    let tCount = c.activeRunes.filter(r => r.type === typeToAdd).length;
+    let m = parseInt(document.getElementById('attr-magia').value) || 0;
+    let f = parseInt(document.getElementById('attr-forca').value) || 0;
+    let a = parseInt(document.getElementById('attr-agilidade').value) || 0;
+
+    if(typeToAdd === 'alpha' && tCount >= m) { alert(`Limite de Alpha! Sua Magia é ${m}.`); return false; }
+    if(typeToAdd === 'delta' && tCount >= f) { alert(`Limite de Delta! Sua Força é ${f}.`); return false; }
+    if(typeToAdd === 'beta' && tCount >= a) { alert(`Limite de Beta! Sua Agilidade é ${a}.`); return false; }
     return true;
+}
+
+window.addGlobalRune = function(type) {
+    if(!checkRuneLimits(type)) return;
+    characters[currentCharId].activeRunes.push({ type: type, face: "d4", mult: 1, fixo: 0, locked: false });
+    window.saveData(); window.renderGlobalRunes();
+}
+
+window.updateGlobalRune = function(idx, field, val) {
+    characters[currentCharId].activeRunes[idx][field] = val;
+    window.saveData(); window.renderGlobalRunes();
+}
+
+window.removeGlobalRune = function(idx) {
+    characters[currentCharId].activeRunes.splice(idx, 1);
+    window.saveData(); window.renderGlobalRunes();
+}
+
+window.renderGlobalRunes = function() {
+    const container = document.getElementById('global-runes-container');
+    container.innerHTML = '';
+    let c = characters[currentCharId];
+    if(!c || !c.activeRunes || c.activeRunes.length === 0) {
+        container.innerHTML = `
+            <div style="display:flex; gap:8px;">
+                <button class="btn-rune b-alpha" onclick="addGlobalRune('alpha')">+ α Azul</button>
+                <button class="btn-rune b-delta" onclick="addGlobalRune('delta')">+ δ Verm</button>
+                <button class="btn-rune b-beta" onclick="addGlobalRune('beta')">+ β Roxo</button>
+                <button class="btn-rune b-arma" onclick="addGlobalRune('arma')">+ ⚔️ Arma</button>
+            </div>
+        `;
+        return;
+    }
+
+    let html = `<div class="dice-config-row" style="border-color: var(--accent-gold); background: #111;">`;
+    html += `<div style="width:100%; display:flex; justify-content:space-between; align-items:center;">
+                <span style="color:var(--accent-gold); font-size:12px; font-weight:bold;">Runas Ativas do Turno</span>
+                <div style="display:flex; gap:4px;">
+                    <button class="btn-rune b-alpha" style="padding: 2px 6px;" onclick="addGlobalRune('alpha')">+ α</button>
+                    <button class="btn-rune b-delta" style="padding: 2px 6px;" onclick="addGlobalRune('delta')">+ δ</button>
+                    <button class="btn-rune b-beta" style="padding: 2px 6px;" onclick="addGlobalRune('beta')">+ β</button>
+                    <button class="btn-rune b-arma" style="padding: 2px 6px;" onclick="addGlobalRune('arma')">+ ⚔️</button>
+                </div>
+            </div>`;
+
+    c.activeRunes.forEach((r, idx) => {
+        let cHex = '#ccc', sym = '⚔️';
+        if(r.type === 'alpha') { cHex = '#44aaff'; sym = 'α'; }
+        if(r.type === 'delta') { cHex = '#ff4444'; sym = 'δ'; }
+        if(r.type === 'beta')  { cHex = '#a855f7'; sym = 'β'; }
+
+        let dis = r.locked ? "pointer-events:none; opacity:0.5;" : "";
+        let redA = r.mult === 0 ? "active" : "";
+        let whiA = r.mult === 0.5 ? "active" : "";
+        let greA = r.mult === 1 ? "active" : "";
+
+        html += `
+        <div class="dice-group" style="border-color:${cHex}; margin-top:5px;">
+            <span class="lbl" style="color:${cHex}; text-align:center;">${sym}</span>
+            <select class="inv-input dice-sel" onchange="updateGlobalRune(${idx}, 'face', this.value)">
+                <option value="d4" ${r.face==='d4'?'selected':''}>d4</option><option value="d6" ${r.face==='d6'?'selected':''}>d6</option><option value="d8" ${r.face==='d8'?'selected':''}>d8</option><option value="d10" ${r.face==='d10'?'selected':''}>d10</option><option value="d12" ${r.face==='d12'?'selected':''}>d12</option><option value="d20" ${r.face==='d20'?'selected':''}>d20</option><option value="d100" ${r.face==='d100'?'selected':''}>d100</option>
+            </select>
+            ${r.type === 'arma' ? `<span style="color:#ccc; font-weight:bold;">+</span><input type="number" class="inv-input dice-qty" placeholder="Fixo" value="${r.fixo || 0}" onchange="updateGlobalRune(${idx}, 'fixo', this.value)" style="width: 35px !important;">` : ''}
+            
+            <div class="mult-group" style="${dis}">
+                <span class="mult-btn m-red ${redA}" onclick="updateGlobalRune(${idx}, 'mult', 0)">X</span>
+                <span class="mult-btn m-white ${whiA}" onclick="updateGlobalRune(${idx}, 'mult', 0.5)">X</span>
+                <span class="mult-btn m-green ${greA}" onclick="updateGlobalRune(${idx}, 'mult', 1)">X</span>
+            </div>
+            <span style="color:#666; cursor:pointer; font-weight:bold; margin-left:5px; padding: 2px;" onclick="removeGlobalRune(${idx})">✖</span>
+        </div>`;
+    });
+    html += `</div>`;
+    container.innerHTML = html;
 }
 
 window.toggleSpellInfo = function(index) {
@@ -272,17 +460,12 @@ window.renderSpells = function() {
         if(spell.isOpen === undefined) spell.isOpen = true;
         spell.tipo = spell.tipo || "Dano"; 
         spell.bQtd = spell.bQtd || 1; spell.bD = spell.bD || "d20"; spell.bMult = spell.bMult !== undefined ? spell.bMult : 1;
-        spell.runes = spell.runes || [];
-        spell.betaQtd = spell.betaQtd || 0; spell.betaD = spell.betaD || ""; 
         spell.isCrit = spell.isCrit || false;
         spell.statusName = spell.statusName || ""; spell.statusDT = spell.statusDT || "";
 
         let isSelf = spell.tipo === "Self";
-        let isLoc = spell.tipo === "Locomoção";
 
-        let row = document.createElement('div');
-        row.className = 'spell-item';
-        
+        let row = document.createElement('div'); row.className = 'spell-item';
         let headerHtml = `
             <div class="spell-header" onclick="toggleSpellInfo(${index})">
                 <div style="display: flex; align-items: center; gap: 10px;">
@@ -295,32 +478,6 @@ window.renderSpells = function() {
                 </div>
             </div>`;
 
-        let runesHtml = '';
-        if(!isSelf && !isLoc) {
-            spell.runes.forEach((r, rIdx) => {
-                let cHex = '#ccc', sym = '⚔️';
-                if(r.type === 'alpha') { cHex = '#44aaff'; sym = 'α'; }
-                if(r.type === 'delta') { cHex = '#ff4444'; sym = 'δ'; }
-                
-                runesHtml += `
-                    <div class="dice-group" style="border-color:${cHex}; margin-top:5px;">
-                        <span class="lbl" style="color:${cHex}; text-align:center;">${sym}</span>
-                        <input type="number" class="inv-input dice-qty" min="1" value="${r.qtd}" onchange="updateRune(${index}, ${rIdx}, 'qtd', this.value)">
-                        <select class="inv-input dice-sel" onchange="updateRune(${index}, ${rIdx}, 'face', this.value)">
-                            <option value="d4" ${r.face==='d4'?'selected':''}>d4</option><option value="d6" ${r.face==='d6'?'selected':''}>d6</option><option value="d8" ${r.face==='d8'?'selected':''}>d8</option><option value="d10" ${r.face==='d10'?'selected':''}>d10</option><option value="d12" ${r.face==='d12'?'selected':''}>d12</option><option value="d20" ${r.face==='d20'?'selected':''}>d20</option><option value="d100" ${r.face==='d100'?'selected':''}>d100</option>
-                        </select>
-                        ${r.type === 'arma' ? `<span style="color:#ccc; font-weight:bold;">+</span><input type="number" class="inv-input dice-qty" placeholder="Fixo" value="${r.fixo || 0}" onchange="updateRune(${index}, ${rIdx}, 'fixo', this.value)" style="width: 35px !important;">` : ''}
-                        
-                        <div class="mult-group">
-                            <span class="mult-btn m-red ${r.mult===0?'active':''}" onclick="updateRune(${index}, ${rIdx}, 'mult', 0)">X</span>
-                            <span class="mult-btn m-white ${r.mult===0.5?'active':''}" onclick="updateRune(${index}, ${rIdx}, 'mult', 0.5)">X</span>
-                            <span class="mult-btn m-green ${r.mult===1?'active':''}" onclick="updateRune(${index}, ${rIdx}, 'mult', 1)">X</span>
-                        </div>
-                        <span style="color:#666; cursor:pointer; font-weight:bold; margin-left:5px;" onclick="removeRune(${index}, ${rIdx})">✖</span>
-                    </div>`;
-            });
-        }
-
         let bodyHtml = `
             <div style="display: ${spell.isOpen ? 'flex' : 'none'}; flex-direction: column; gap: 5px; margin-top: 10px;">
                 <div class="inv-row">
@@ -331,10 +488,10 @@ window.renderSpells = function() {
                 <div class="inv-row" style="margin-top: 5px;"><textarea class="inv-input" style="flex: 1; resize: vertical;" rows="1" placeholder="Descrição e Efeitos..." onchange="updateSpell(${index}, 'desc', this.value)">${spell.desc}</textarea></div>
                 <div class="dice-config-row">
                     <select class="inv-input dice-sel" style="width:100% !important;" onchange="updateSpell(${index}, 'tipo', this.value); window.renderSpells();">
-                        <option value="Dano" ${spell.tipo==='Dano'?'selected':''}>Dano (Base + Runas)</option>
-                        <option value="Controle" ${spell.tipo==='Controle'?'selected':''}>Controle (Base + Runas)</option>
-                        <option value="Self" ${spell.tipo==='Self'?'selected':''}>Self (Apenas Efeitos/DT)</option>
-                        <option value="Locomoção" ${spell.tipo==='Locomoção'?'selected':''}>Locomoção (Base + Beta)</option>
+                        <option value="Dano" ${spell.tipo==='Dano'?'selected':''}>Dano (Base + Runas Globais)</option>
+                        <option value="Controle" ${spell.tipo==='Controle'?'selected':''}>Controle (Base + Runas Globais)</option>
+                        <option value="Locomoção" ${spell.tipo==='Locomoção'?'selected':''}>Locomoção (Base + Runas Globais)</option>
+                        <option value="Self" ${spell.tipo==='Self'?'selected':''}>Self (Apenas Efeito)</option>
                     </select>
                     
                     ${(!isSelf) ? `
@@ -348,27 +505,10 @@ window.renderSpells = function() {
                             <span class="mult-btn m-white ${spell.bMult===0.5?'active':''}" onclick="updateSpell(${index}, 'bMult', 0.5)">X</span>
                             <span class="mult-btn m-green ${spell.bMult===1?'active':''}" onclick="updateSpell(${index}, 'bMult', 1)">X</span>
                         </div>
-                    </div>` : ''}
-
-                    ${runesHtml}
-
-                    ${(!isSelf && !isLoc) ? `
-                    <div style="display:flex; gap: 8px; margin-top: 5px; width: 100%;">
-                        <button class="btn-rune b-alpha" onclick="addRune(${index}, 'alpha')">+ α Azul</button>
-                        <button class="btn-rune b-delta" onclick="addRune(${index}, 'delta')">+ δ Verm</button>
-                        <button class="btn-rune b-arma" onclick="addRune(${index}, 'arma')">+ ⚔️ Arma</button>
-                    </div>` : ''}
-
-                    ${isLoc ? `
-                    <div class="dice-group" style="border-color:#7e22ce"><span class="lbl" style="color:#a855f7">βeta</span>
-                        <input type="number" class="inv-input dice-qty" min="0" value="${spell.betaQtd}" onchange="updateSpell(${index}, 'betaQtd', this.value)">
-                        <select class="inv-input dice-sel" onchange="updateSpell(${index}, 'betaD', this.value)"><option value="" ${spell.betaD===''?'selected':''}>--</option><option value="d4" ${spell.betaD==='d4'?'selected':''}>d4</option><option value="d6" ${spell.betaD==='d6'?'selected':''}>d6</option><option value="d8" ${spell.betaD==='d8'?'selected':''}>d8</option><option value="d10" ${spell.betaD==='d10'?'selected':''}>d10</option><option value="d12" ${spell.betaD==='d12'?'selected':''}>d12</option><option value="d20" ${spell.betaD==='d20'?'selected':''}>d20</option><option value="d100" ${spell.betaD==='d100'?'selected':''}>d100</option></select>
-                    </div>` : ''}
-
-                    ${(!isSelf) ? `
+                    </div>
                     <div style="display:flex; align-items:center; gap:5px; margin-left: auto; width: 100%; justify-content: flex-end; margin-top: 5px;">
                         <input type="checkbox" id="crit-${index}" ${spell.isCrit ? 'checked' : ''} onchange="updateSpell(${index}, 'isCrit', this.checked)">
-                        <label for="crit-${index}" style="color:#ffd700; margin:0; cursor:pointer;">Crítico (Máx x3)</label>
+                        <label for="crit-${index}" style="color:#ffd700; margin:0; cursor:pointer;">Crítico (Base Máx x3)</label>
                     </div>` : ''}
                 </div>
 
@@ -387,47 +527,12 @@ window.renderSpells = function() {
 }
 
 window.addSpell = function() {
-    playerSpells.push({ nome: "", desc: "", custo: "", alcance: "", tipo: "Dano", bQtd: 1, bD: "d20", bMult: 1, runes: [], isOpen: true, isCrit: false, statusName: "", statusDT: "" });
+    playerSpells.push({ nome: "", desc: "", custo: "", alcance: "", tipo: "Dano", bQtd: 1, bD: "d20", bMult: 1, isOpen: true, isCrit: false, statusName: "", statusDT: "" });
     window.renderSpells(); window.saveData();
 }
 
-window.updateSpell = function(index, field, value) {
-    if(field === 'betaQtd') {
-        let agil = parseInt(document.getElementById('attr-agilidade').value) || 0;
-        if (value > agil) {
-            alert(`Limite excedido! Sua Agilidade é apenas ${agil}.`);
-            playerSpells[index][field] = agil;
-            window.renderSpells(); return;
-        }
-    }
-    playerSpells[index][field] = value; window.saveData(); 
-}
-
-window.removeSpell = function(index) {
-    if(confirm("Remover magia?")) { playerSpells.splice(index, 1); window.renderSpells(); window.saveData(); }
-}
-
-window.addRune = function(spellIndex, type) {
-    if(!checkRuneLimits(spellIndex, type, 1)) return;
-    playerSpells[spellIndex].runes.push({ type: type, qtd: 1, face: "d4", mult: 1, fixo: 0 });
-    window.renderSpells(); window.saveData();
-}
-
-window.updateRune = function(sIdx, rIdx, field, val) {
-    if (field === 'qtd') {
-        let currentQtd = playerSpells[sIdx].runes[rIdx].qtd || 0;
-        let diff = parseInt(val) - currentQtd;
-        if (diff > 0 && !checkRuneLimits(sIdx, playerSpells[sIdx].runes[rIdx].type, diff)) {
-            window.renderSpells(); 
-            return;
-        }
-    }
-    playerSpells[sIdx].runes[rIdx][field] = val; window.renderSpells(); window.saveData();
-}
-
-window.removeRune = function(sIdx, rIdx) {
-    playerSpells[sIdx].runes.splice(rIdx, 1); window.renderSpells(); window.saveData();
-}
+window.updateSpell = function(index, field, value) { playerSpells[index][field] = value; window.saveData(); window.renderSpells(); }
+window.removeSpell = function(index) { if(confirm("Remover magia?")) { playerSpells.splice(index, 1); window.renderSpells(); window.saveData(); } }
 
 window.rollSpellMagic = function(index) {
     const spell = playerSpells[index];
@@ -435,6 +540,7 @@ window.rollSpellMagic = function(index) {
 
     const charName = document.getElementById('char-name').value || 'Desconhecido';
     const charColor = document.getElementById('char-color') ? document.getElementById('char-color').value : '#d4af37';
+    let c = characters[currentCharId];
 
     const rolar = (qtd, tDado) => {
         if (!qtd || qtd <= 0 || !tDado) return [];
@@ -451,22 +557,19 @@ window.rollSpellMagic = function(index) {
         } else {
             bRolls = rolar(spell.bQtd, spell.bD);
         }
-        bTot = Math.floor(bRolls.reduce((a,b)=>a+b, 0) * (spell.tipo==='Locomoção' ? 1 : spell.bMult));
+        bTot = Math.floor(bRolls.reduce((a,b)=>a+b, 0) * spell.bMult);
     }
 
     let runesPack = [];
-    if(spell.tipo !== 'Self' && spell.tipo !== 'Locomoção') {
-        runesPack = spell.runes.map(r => {
-            let rl = rolar(r.qtd, r.face);
+    if(spell.tipo !== 'Self' && c.activeRunes) {
+        runesPack = c.activeRunes.map(r => {
+            let rl = rolar(1, r.face); 
             let somaDados = rl.reduce((a,b)=>a+b, 0);
             let fixo = parseInt(r.fixo) || 0;
             let tot = Math.floor((somaDados + fixo) * r.mult);
             return { t: r.type, f: r.face, m: r.mult, r: rl, fixo: fixo, tot: tot };
         });
     }
-
-    let rBeta = [];
-    if(spell.tipo === 'Locomoção') rBeta = rolar(spell.betaQtd, spell.betaD);
 
     let stRoll = (spell.statusName && spell.statusDT > 0) ? Math.floor(Math.random() * 20) + 1 : 0;
 
@@ -476,16 +579,19 @@ window.rollSpellMagic = function(index) {
         b: { f: spell.bD, m: spell.bMult, r: bRolls, tot: bTot },
         ru: runesPack, 
         crit: spell.isCrit ? "true" : "false",
-        beta: { f: spell.betaD, r: rBeta },
         stName: spell.statusName || "", stDT: spell.statusDT || "0", stRoll: stRoll
     };
 
     window.abrirModalCentral(payload);
     if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", payload);
     
-    // MAGIA UTILIZADA: RESETA AS RUNAS E DESLIGA O CRITICO
+    // MAGIA UTILIZADA: RESETA O TURNO
     if(spell.isCrit) spell.isCrit = false;
-    spell.runes = []; 
+    c.activeRunes = []; 
+    c.alloc = {f:0, m:0, a:0, s:0};
+    safeSetVal('alloc-forca', 0); safeSetVal('alloc-magia', 0); safeSetVal('alloc-agilidade', 0); safeSetVal('alloc-sorte', 0);
+    
+    window.renderGlobalRunes();
     window.renderSpells();
     window.saveData();
 }
@@ -520,15 +626,25 @@ window.removeInv = function(index) { playerInventory.splice(index, 1); window.re
 window.saveData = async function() {
     if (!currentCharId) return; 
     let isMonster = document.getElementById('char-category')?.value === 'Monstros';
+    
+    let al = {
+        f: parseInt(document.getElementById('alloc-forca').value)||0, m: parseInt(document.getElementById('alloc-magia').value)||0,
+        a: parseInt(document.getElementById('alloc-agilidade').value)||0, s: parseInt(document.getElementById('alloc-sorte').value)||0
+    };
 
     const sheetData = {
         name: document.getElementById('char-name')?.value || "Sem Nome", color: document.getElementById('char-color')?.value || "#d4af37", category: document.getElementById('char-category')?.value || "Jogadores",
         age: document.getElementById('char-age')?.value || "", race: isMonster ? document.getElementById('char-race-monster').value : document.getElementById('char-race-player').value,
         classe: document.getElementById('char-class')?.value || "Plebeu", prof: document.getElementById('char-prof')?.value || "", profDesc: document.getElementById('char-prof-desc')?.value || "",
         vidaMonster: document.getElementById('val-vida-monster')?.value || 100, forca: document.getElementById('attr-forca')?.value || 1, magia: document.getElementById('attr-magia')?.value || 1, agilidade: document.getElementById('attr-agilidade')?.value || 1, sorte: document.getElementById('attr-sorte')?.value || 1,
-        grimoire: document.getElementById('grimoire-name')?.value || "", mana: document.getElementById('mana-zone')?.value || "", passiva: document.getElementById('passiva')?.value || "", 
+        
+        // GRIMÓRIO SALVANDO AQUI!
+        grimoireSelect: document.getElementById('grimoire-select')?.value || "", grimoireDT: document.getElementById('grimoire-dt')?.value || 10,
+        mana: document.getElementById('mana-zone')?.value || "", passiva: document.getElementById('passiva')?.value || "", 
         mov: document.getElementById('char-mov')?.value || 30, runas: document.getElementById('char-runas')?.value || 0,
-        skills: playerSkills, inventory: playerInventory, spells: playerSpells, photo: currentPhoto 
+        
+        skills: playerSkills, inventory: playerInventory, spells: playerSpells, photo: currentPhoto,
+        activeRunes: characters[currentCharId] ? characters[currentCharId].activeRunes : [], alloc: al
     };
 
     characters[currentCharId] = sheetData;
@@ -587,7 +703,7 @@ window.rollSkill = function(skillName, attrName) {
 window.abrirModalCentral = function(data) {
     if (OBR.isAvailable) {
         const dataUrl = encodeURIComponent(JSON.stringify(data));
-        OBR.modal.open({ id: "fate-roll-modal", url: `https://seediam.github.io/FateSheet/resultado.html?data=${dataUrl}`, width: 450, height: data.t === "spell" ? 480 : 250 });
+        OBR.modal.open({ id: "fate-roll-modal", url: `https://seediam.github.io/FateSheet/resultado.html?data=${dataUrl}`, width: 450, height: (data.t === "spell" || data.t === "attr") ? 550 : 250 });
     }
 }
 
