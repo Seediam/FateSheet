@@ -4,31 +4,13 @@
     <meta charset="UTF-8">
     <style>
         :root { --aura-color: #d4af37; }
-
-        @keyframes camera-shake {
-            0% { transform: translate(1px, 1px) rotate(0deg); }
-            10% { transform: translate(-2px, -2px) rotate(-1deg); }
-            20% { transform: translate(-3px, 0px) rotate(1deg); }
-            30% { transform: translate(3px, 2px) rotate(0deg); }
-            40% { transform: translate(1px, -1px) rotate(1deg); }
-            50% { transform: translate(-1px, 2px) rotate(-1deg); }
-            60% { transform: translate(-3px, 1px) rotate(0deg); }
-            70% { transform: translate(3px, 1px) rotate(-1deg); }
-            80% { transform: translate(-1px, -1px) rotate(1deg); }
-            90% { transform: translate(1px, 2px) rotate(0deg); }
-            100% { transform: translate(0px, 0px) rotate(0deg); }
-        }
-        
+        @keyframes camera-shake { 0%{transform:translate(1px, 1px) rotate(0deg)} 10%{transform:translate(-2px, -2px) rotate(-1deg)} 20%{transform:translate(-3px, 0px) rotate(1deg)} 30%{transform:translate(3px, 2px) rotate(0deg)} 40%{transform:translate(1px, -1px) rotate(1deg)} 50%{transform:translate(-1px, 2px) rotate(-1deg)} 60%{transform:translate(-3px, 1px) rotate(0deg)} 70%{transform:translate(3px, 1px) rotate(-1deg)} 80%{transform:translate(-1px, -1px) rotate(1deg)} 90%{transform:translate(1px, 2px) rotate(0deg)} 100%{transform:translate(0px, 0px) rotate(0deg)} }
         body { margin: 0; background: transparent; display: flex; align-items: center; justify-content: center; height: 100vh; overflow: hidden; font-family: 'Segoe UI', Tahoma, sans-serif; }
-        
         .popup { background: rgba(15, 15, 20, 0.98); box-shadow: 0 0 30px rgba(0,0,0,0.9); border: 2px solid var(--aura-color); padding: 20px; border-radius: 8px; width: 90%; max-width: 400px; text-align: center; color: white;}
-        
         .char-name { color: var(--aura-color); font-weight: 900; font-size: 20px; text-transform: uppercase; letter-spacing: 2px; text-shadow: 0 0 10px rgba(0,0,0,0.5);}
         .action { font-size: 14px; color: #8a8a9e; margin: 5px 0 15px 0; text-transform: uppercase;}
-        
         .roll-box { font-size: 32px; font-weight: bold; background: #111; padding: 15px; border-radius: 6px; border: 1px dashed var(--aura-color); margin: 15px 0; text-shadow: 0 0 15px rgba(255, 255, 255, 0.5); letter-spacing: 2px;}
         .penalty { color: #ff4444; font-size: 12px; font-weight: bold; margin-bottom: 10px; display: none;}
-        
         .crit-anim { animation: camera-shake 0.4s both; border-color: #ffd700 !important; box-shadow: 0 0 50px #ffd700; }
         .crit-text { color: #ffd700 !important; text-shadow: 0 0 15px #ffd700; }
     </style>
@@ -52,9 +34,7 @@
             if (dataStr) {
                 const data = JSON.parse(decodeURIComponent(dataStr));
                 
-                if(data.color) {
-                    document.documentElement.style.setProperty('--aura-color', data.color);
-                }
+                if(data.color) document.documentElement.style.setProperty('--aura-color', data.color);
 
                 // --------- MODO MAGIA ---------
                 if(data.type === "spell") {
@@ -64,30 +44,19 @@
                     document.getElementById('c-name').innerText = data.c;
                     let critBadge = isCrit ? `<span style="color:#ffd700; border: 1px solid #ffd700; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 5px;">CRÍTICO</span>` : "";
                     
-                    document.getElementById('c-action').innerHTML = `
-                        <span style="font-size:18px; color:#fff; font-weight:bold;">- ${data.sName} -</span> ${critBadge}<br>
-                        <span style="font-size:11px; color:#888;">Custo: ${data.cost} Mana | Alcance: ${data.range} | Tipo: ${data.sType}</span>
-                    `;
+                    document.getElementById('c-action').innerHTML = `<span style="font-size:18px; color:#fff; font-weight:bold;">- ${data.sName} -</span> ${critBadge}<br><span style="font-size:11px; color:#888;">Custo: ${data.cost} | Alcance: ${data.range} | Tipo: ${data.sType}</span>`;
 
                     let descHtml = data.desc ? `<div style="font-size:12px; color:#ccc; margin-top:10px; margin-bottom:15px; background:#111; padding:10px; border-radius:4px; text-align:left; border-left:3px solid var(--aura-color);">${data.desc}</div>` : "";
 
                     const formatArr = (str) => str ? str.split(',') : [];
-                    const arrB = formatArr(data.rB);
-                    const arrA = formatArr(data.rA);
-                    const arrF = formatArr(data.rF);
-                    const arrBeta = formatArr(data.rBeta);
+                    const arrB = formatArr(data.rB); const arrA = formatArr(data.rA); const arrF = formatArr(data.rF); const arrBeta = formatArr(data.rBeta);
 
                     const buildRollRow = (arr, diceType, label, color, isBaseCrit = false) => {
                         if(arr.length === 0) return "";
                         let total = arr.reduce((a,b)=>a+parseInt(b), 0);
                         let textTotal = isBaseCrit ? `<span class="crit-text">${total}</span>` : `<b style="color:${color};">${total}</b>`;
-                        
                         let textArr = arr.map(v => `<span style="${isBaseCrit ? 'color:#ffd700;' : 'color:#fff;'}">${v}</span>`).join(" + ");
-                        return `<div style="margin-top:8px; font-size:14px; text-align:left; border-bottom:1px solid #333; padding-bottom:6px;">
-                                    <span style="color:${color}; font-weight:bold; display:inline-block; width:45px;">${label}</span> 
-                                    <span style="font-size:10px; color:#666;">(${isBaseCrit ? 'MÁX' : arr.length+diceType})</span>: 
-                                    [ ${textArr} ] = <span style="font-size:18px;">${textTotal}</span>
-                                </div>`;
+                        return `<div style="margin-top:8px; font-size:14px; text-align:left; border-bottom:1px solid #333; padding-bottom:6px;"><span style="color:${color}; font-weight:bold; display:inline-block; width:45px;">${label}</span> <span style="font-size:10px; color:#666;">(${isBaseCrit ? 'MÁX x3' : arr.length+diceType})</span>: [ ${textArr} ] = <span style="font-size:18px;">${textTotal}</span></div>`;
                     };
 
                     let sumTotal = 0;
@@ -99,21 +68,31 @@
                     let rollsHtml = "";
                     rollsHtml += buildRollRow(arrB, data.dB, "Base", "var(--aura-color)", isCrit);
                     rollsHtml += buildRollRow(arrA, data.dA, "αlpha", "#44aaff");
-                    rollsHtml += buildRollRow(arrBeta, data.dBeta, "βeta", "#a855f7"); // Roxo
+                    rollsHtml += buildRollRow(arrBeta, data.dBeta, "βeta", "#a855f7"); 
                     rollsHtml += buildRollRow(arrF, data.dF, "δelta", "#ff4444");
 
-                    let corFinal = isCrit ? "#ffd700" : "var(--aura-color)";
-                    let classFinal = isCrit ? "crit-text" : "";
+                    // Adiciona Efeito/Status (DT) no visual
+                    let statusHtml = "";
+                    if (data.stName && data.stDT > 0) {
+                        let stRoll = parseInt(data.stRoll); let dt = parseInt(data.stDT);
+                        let stCor = stRoll >= dt ? "#44aaff" : "#ff4444";
+                        let stText = stRoll >= dt ? "SUCESSO" : "FALHOU";
+                        statusHtml = `<div style="margin-top:10px; padding:8px; background:#111; border:1px dashed ${stCor}; border-radius:6px; font-size:14px;">
+                            <div style="color:#a855f7; font-weight:bold; margin-bottom:5px;">⚡ Efeito: ${data.stName} (DT ${dt})</div>
+                            Dado: [<span style="color:${stCor}; font-weight:bold; font-size:18px;">${stRoll}</span>] ➔ <b style="color:${stCor};">${stText}</b>
+                        </div>`;
+                    }
 
-                    let totalHtml = `<div style="margin-top:15px; font-size:22px; font-weight:bold; color:#fff;">Total do Efeito: <span style="color:${corFinal};" class="${classFinal}">${sumTotal}</span></div>`;
+                    let corFinal = isCrit ? "#ffd700" : "var(--aura-color)"; let classFinal = isCrit ? "crit-text" : "";
+                    let totalHtml = `<div style="margin-top:15px; font-size:22px; font-weight:bold; color:#fff;">Total: <span style="color:${corFinal};" class="${classFinal}">${sumTotal}</span></div>`;
                     if(data.sType === "Dano") totalHtml = `<div style="margin-top:15px; font-size:24px; font-weight:bold; color:#fff;">Dano Total: <span style="color:${corFinal};" class="${classFinal}">${sumTotal}</span></div>`;
                     if(data.sType === "Locomoção") totalHtml = `<div style="margin-top:15px; font-size:22px; font-weight:bold; color:#fff;">Movimento: <span style="color:${corFinal};" class="${classFinal}">+${sumTotal} ft</span></div>`;
 
-                    document.getElementById('c-roll').innerHTML = descHtml + rollsHtml + totalHtml;
+                    document.getElementById('c-roll').innerHTML = descHtml + rollsHtml + statusHtml + totalHtml;
                     document.getElementById('c-roll').style.fontSize = "16px"; 
                     document.getElementById('c-pen').style.display = "none"; 
                 } 
-                // --------- MODO PERÍCIA NORMAL ---------
+                // --------- MODO PERÍCIA NORMAL (Com +2 escrito) ---------
                 else {
                     document.getElementById('c-name').innerText = data.c;
                     document.getElementById('c-action').innerHTML = `ROLOU <b>${data.s}</b> <span style="font-size:11px;">(${data.a})</span>`;
@@ -125,7 +104,7 @@
                     const formattedResults = resArray.map(v => {
                         let raw = parseInt(v);
                         let total = raw + skillMod;
-                        let modStr = skillMod !== 0 ? `<sup style="font-size: 0.5em; opacity: 0.7;">${skillMod > 0 ? '+'+skillMod : skillMod}</sup>` : '';
+                        let modStr = skillMod !== 0 ? `<sup style="font-size: 0.6em; opacity: 0.8; font-weight: bold;">${skillMod > 0 ? '+'+skillMod : skillMod}</sup>` : '';
                         let textDisplay = `${total}${modStr}`;
 
                         if (raw >= 20) { temCritico = true; return `<span style="color:#ffd700;">${textDisplay}</span>`; }
@@ -136,14 +115,10 @@
                     document.getElementById('c-roll').innerHTML = `[ ${formattedResults} ]`;
 
                     if(data.pen === "true") document.getElementById('c-pen').style.display = "block";
-
-                    if (temCritico) {
-                        document.getElementById('popup-box').classList.add('crit-anim');
-                    }
+                    if (temCritico) document.getElementById('popup-box').classList.add('crit-anim');
                 }
             }
 
-            // Magia tem muito texto, fica mais tempo na tela
             let tempo = dataStr && JSON.parse(decodeURIComponent(dataStr)).type === "spell" ? 7000 : 4500;
             setTimeout(() => { OBR.modal.close('fate-roll-modal'); }, tempo);
         });
