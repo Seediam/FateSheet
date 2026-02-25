@@ -41,25 +41,26 @@
                     return '';
                 };
 
-                const renderRow = (label, color, face, rollsArr, mult, tot, isCrit = false) => {
+                const renderRow = (label, color, face, rollsArr, mult, tot, isCrit = false, fixo = 0) => {
                     if(!rollsArr || rollsArr.length === 0) return "";
                     let valTexts = rollsArr.map(v => `<span style="${isCrit?'color:#ffd700;':'color:#fff;'}">${v}</span>`).join(" + ");
+                    let fixoText = fixo > 0 ? ` + <span style="color:#ccc;">${fixo}</span>` : (fixo < 0 ? ` - <span style="color:#ccc;">${Math.abs(fixo)}</span>` : '');
                     let tHtml = isCrit ? `<span class="crit-text">${tot}</span>` : `<b style="color:${color};">${tot}</b>`;
                     let mHtml = getMultText(mult);
                     return `<div style="margin-top:8px; font-size:14px; text-align:left; border-bottom:1px solid #333; padding-bottom:6px;">
                                 <span style="color:${color}; font-weight:bold; display:inline-block; width:45px;">${label}</span> 
                                 <span style="font-size:10px; color:#666;">(${isCrit ? 'MÁX x3' : rollsArr.length+face})</span>: 
-                                [ ${valTexts} ] ${mHtml} = <span style="font-size:18px;">${tHtml}</span>
+                                [ ${valTexts} ]${fixoText} ${mHtml} = <span style="font-size:18px;">${tHtml}</span>
                             </div>`;
                 };
 
                 // MODO MAGIA COMPLETO
                 if(data.t === "spell") {
                     let isCrit = data.crit === "true";
-                    if(isCrit) document.getElementById('popup-box').classList.add('crit-anim');
+                    if(isCrit && data.st !== "Self") document.getElementById('popup-box').classList.add('crit-anim');
 
                     document.getElementById('c-name').innerText = data.c;
-                    let critBadge = isCrit ? `<span style="color:#ffd700; border: 1px solid #ffd700; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 5px;">CRÍTICO</span>` : "";
+                    let critBadge = (isCrit && data.st !== "Self") ? `<span style="color:#ffd700; border: 1px solid #ffd700; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 5px;">CRÍTICO</span>` : "";
                     
                     document.getElementById('c-action').innerHTML = `<span style="font-size:18px; color:#fff; font-weight:bold;">- ${data.sn} -</span> ${critBadge}<br><span style="font-size:11px; color:#888;">Custo: ${data.cost} | Alcance: ${data.rg} | Tipo: ${data.st}</span>`;
 
@@ -68,40 +69,56 @@
                     let sumTotal = 0;
                     let rollsHtml = "";
 
-                    // BASE
-                    if(data.b && data.b.r.length > 0) {
-                        rollsHtml += renderRow("Base", "var(--aura-color)", data.b.f, data.b.r, data.b.m, data.b.tot, isCrit);
-                        sumTotal += data.b.tot;
+                    // BASE E RUNAS SÓ SE NÃO FOR SELF
+                    if(data.st !== "Self") {
+                        if(data.b && data.b.r.length > 0) {
+                            rollsHtml += renderRow("Base", "var(--aura-color)", data.b.f, data.b.r, data.b.m, data.b.tot, isCrit);
+                            sumTotal += data.b.tot;
+                        }
+
+                        if(data.ru && data.ru.length > 0) {
+                            data.ru.forEach(r => {
+                                let label = '⚔️ Arma'; let col = '#ccc';
+                                if(r.t === 'alpha') { label = 'αlpha'; col = '#44aaff'; }
+                                if(r.t === 'delta') { label = 'δelta'; col = '#ff4444'; }
+                                rollsHtml += renderRow(label, col, r.f, r.r, r.m, r.tot, false, r.fixo);
+                                sumTotal += r.tot;
+                            });
+                        }
+
+                        if(data.beta && data.beta.r && data.beta.r.length > 0) {
+                            let betTot = data.beta.r.reduce((a,b)=>a+b, 0);
+                            rollsHtml += renderRow("βeta", "#a855f7", data.beta.f, data.beta.r, 1, betTot);
+                            sumTotal += betTot;
+                        }
                     }
 
-                    // RUNAS ADICIONAIS (Alpha e Delta dinâmicos)
-                    if(data.ru && data.ru.length > 0) {
-                        data.ru.forEach(r => {
-                            let label = r.t === 'alpha' ? 'αlpha' : 'δelta';
-                            let col = r.t === 'alpha' ? '#44aaff' : '#ff4444';
-                            rollsHtml += renderRow(label, col, r.f, r.r, r.m, r.tot);
-                            sumTotal += r.tot;
-                        });
-                    }
-
-                    // LOCOMOÇÃO (Beta)
-                    if(data.beta && data.beta.r && data.beta.r.length > 0) {
-                        let betTot = data.beta.r.reduce((a,b)=>a+b, 0);
-                        rollsHtml += renderRow("βeta", "#a855f7", data.beta.f, data.beta.r, 1, betTot);
-                        sumTotal += betTot;
+                    // ADICIONA EFEITO/STATUS (DT) NO VISUAL
+                    let statusHtml = "";
+                    if (data.stName && data.stDT > 0) {
+                        let stRoll = parseInt(data.stRoll); let dt = parseInt(data.stDT);
+                        let stCor = stRoll >= dt ? "#44aaff" : "#ff4444";
+                        let stText = stRoll >= dt ? "SUCESSO" : "FALHOU";
+                        statusHtml = `<div style="margin-top:10px; padding:8px; background:#111; border:1px dashed ${stCor}; border-radius:6px; font-size:14px;">
+                            <div style="color:#a855f7; font-weight:bold; margin-bottom:5px;">⚡ Efeito: ${data.stName} (DT ${dt})</div>
+                            Dado: [<span style="color:${stCor}; font-weight:bold; font-size:18px;">${stRoll}</span>] ➔ <b style="color:${stCor};">${stText}</b>
+                        </div>`;
                     }
 
                     let corFinal = isCrit ? "#ffd700" : "var(--aura-color)"; 
                     let classFinal = isCrit ? "crit-text" : "";
-                    let totalHtml = `<div style="margin-top:15px; font-size:22px; font-weight:bold; color:#fff;">Total: <span style="color:${corFinal};" class="${classFinal}">${sumTotal}</span></div>`;
-                    if(data.st === "Dano") totalHtml = `<div style="margin-top:15px; font-size:24px; font-weight:bold; color:#fff;">Dano Total: <span style="color:${corFinal};" class="${classFinal}">${sumTotal}</span></div>`;
-                    if(data.st === "Locomoção") totalHtml = `<div style="margin-top:15px; font-size:22px; font-weight:bold; color:#fff;">Movimento: <span style="color:${corFinal};" class="${classFinal}">+${sumTotal} ft</span></div>`;
+                    
+                    let totalHtml = "";
+                    if(data.st !== "Self") {
+                        if(data.st === "Locomoção") totalHtml = `<div style="margin-top:15px; font-size:22px; font-weight:bold; color:#fff;">Movimento: <span style="color:${corFinal};" class="${classFinal}">+${sumTotal} ft</span></div>`;
+                        else totalHtml = `<div style="margin-top:15px; font-size:24px; font-weight:bold; color:#fff;">Dano Total: <span style="color:${corFinal};" class="${classFinal}">${sumTotal}</span></div>`;
+                    }
 
-                    document.getElementById('c-roll').innerHTML = descHtml + rollsHtml + totalHtml;
+                    document.getElementById('c-roll').innerHTML = descHtml + rollsHtml + statusHtml + totalHtml;
                     document.getElementById('c-roll').style.fontSize = "16px"; 
                     document.getElementById('c-pen').style.display = "none"; 
                 } 
-                // MODO PERÍCIA NORMAL (COM MODIFICADOR 16²)
+                // MODO PERÍCIA NORMAL
                 else {
                     document.getElementById('c-name').innerText = data.c;
                     document.getElementById('c-action').innerHTML = `ROLOU <b>${data.s}</b> <span style="font-size:11px;">(${data.a})</span>`;
@@ -127,7 +144,7 @@
                     if (temCritico) document.getElementById('popup-box').classList.add('crit-anim');
                 }
             }
-            setTimeout(() => { OBR.modal.close('fate-roll-modal'); }, 6000);
+            setTimeout(() => { OBR.modal.close('fate-roll-modal'); }, 7000); // 7 segundos pra todo mundo ler a magia calma
         });
     </script>
 </body>
