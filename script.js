@@ -174,7 +174,7 @@ window.openCharacter = function(id) {
     safeSetVal('mana-zone', c.mana || '');
     safeSetVal('passiva', c.passiva || ''); 
     safeSetVal('char-mov', c.mov || 30);
-    safeSetVal('char-runas', c.runas || 0); // NOVO
+    safeSetVal('char-runas', c.runas || 0); 
     
     playerSkills = c.skills || {};
     playerInventory = c.inventory || [];
@@ -228,7 +228,37 @@ window.calcVitals = function() {
     }
 }
 
-// ------ NOVO CONSTRUTOR DE MAGIAS COM RUNAS DINÂMICAS ------
+// ------ VERIFICADOR DE LIMITES DE RUNAS E AGILIDADE ------
+function checkRuneLimits(spellIndex, typeToVerify, addedQtd = 0) {
+    let spell = playerSpells[spellIndex];
+    let forca = parseInt(document.getElementById('attr-forca').value) || 0;
+    let magia = parseInt(document.getElementById('attr-magia').value) || 0;
+    let maxRunas = parseInt(document.getElementById('char-runas').value) || 0;
+
+    let currentTotal = 0;
+    let currentTypeTotal = 0;
+
+    spell.runes.forEach(r => {
+        currentTotal += parseInt(r.qtd) || 0;
+        if(r.type === typeToVerify) currentTypeTotal += parseInt(r.qtd) || 0;
+    });
+
+    if (currentTotal + addedQtd > maxRunas) {
+        alert(`Limite de Runas Totais atingido! Sua ficha permite usar no máximo ${maxRunas} runa(s) por turno.`);
+        return false;
+    }
+
+    if (typeToVerify === 'alpha' && (currentTypeTotal + addedQtd > magia)) {
+        alert(`Limite de Alpha atingido! Seu atributo de Magia é apenas ${magia}.`);
+        return false;
+    }
+    if (typeToVerify === 'delta' && (currentTypeTotal + addedQtd > forca)) {
+        alert(`Limite de Delta atingido! Seu atributo de Força é apenas ${forca}.`);
+        return false;
+    }
+    return true;
+}
+
 window.toggleSpellInfo = function(index) {
     playerSpells[index].isOpen = !playerSpells[index].isOpen;
     window.renderSpells();
@@ -245,6 +275,7 @@ window.renderSpells = function() {
         spell.runes = spell.runes || [];
         spell.betaQtd = spell.betaQtd || 0; spell.betaD = spell.betaD || ""; 
         spell.isCrit = spell.isCrit || false;
+        spell.statusName = spell.statusName || ""; spell.statusDT = spell.statusDT || "";
 
         let isSelf = spell.tipo === "Self";
         let isLoc = spell.tipo === "Locomoção";
@@ -267,15 +298,19 @@ window.renderSpells = function() {
         let runesHtml = '';
         if(!isSelf && !isLoc) {
             spell.runes.forEach((r, rIdx) => {
-                let cHex = r.type === 'alpha' ? '#44aaff' : '#ff4444';
-                let sym = r.type === 'alpha' ? 'α' : 'δ';
+                let cHex = '#ccc', sym = '⚔️';
+                if(r.type === 'alpha') { cHex = '#44aaff'; sym = 'α'; }
+                if(r.type === 'delta') { cHex = '#ff4444'; sym = 'δ'; }
+                
                 runesHtml += `
                     <div class="dice-group" style="border-color:${cHex}; margin-top:5px;">
-                        <span class="lbl" style="color:${cHex}">${sym}</span>
+                        <span class="lbl" style="color:${cHex}; text-align:center;">${sym}</span>
                         <input type="number" class="inv-input dice-qty" min="1" value="${r.qtd}" onchange="updateRune(${index}, ${rIdx}, 'qtd', this.value)">
                         <select class="inv-input dice-sel" onchange="updateRune(${index}, ${rIdx}, 'face', this.value)">
                             <option value="d4" ${r.face==='d4'?'selected':''}>d4</option><option value="d6" ${r.face==='d6'?'selected':''}>d6</option><option value="d8" ${r.face==='d8'?'selected':''}>d8</option><option value="d10" ${r.face==='d10'?'selected':''}>d10</option><option value="d12" ${r.face==='d12'?'selected':''}>d12</option><option value="d20" ${r.face==='d20'?'selected':''}>d20</option><option value="d100" ${r.face==='d100'?'selected':''}>d100</option>
                         </select>
+                        ${r.type === 'arma' ? `<span style="color:#ccc; font-weight:bold;">+</span><input type="number" class="inv-input dice-qty" placeholder="Fixo" value="${r.fixo || 0}" onchange="updateRune(${index}, ${rIdx}, 'fixo', this.value)" style="width: 35px !important;">` : ''}
+                        
                         <div class="mult-group">
                             <span class="mult-btn m-red ${r.mult===0?'active':''}" onclick="updateRune(${index}, ${rIdx}, 'mult', 0)">X</span>
                             <span class="mult-btn m-white ${r.mult===0.5?'active':''}" onclick="updateRune(${index}, ${rIdx}, 'mult', 0.5)">X</span>
@@ -298,22 +333,22 @@ window.renderSpells = function() {
                     <select class="inv-input dice-sel" style="width:100% !important;" onchange="updateSpell(${index}, 'tipo', this.value); window.renderSpells();">
                         <option value="Dano" ${spell.tipo==='Dano'?'selected':''}>Dano (Base + Runas)</option>
                         <option value="Controle" ${spell.tipo==='Controle'?'selected':''}>Controle (Base + Runas)</option>
-                        <option value="Self" ${spell.tipo==='Self'?'selected':''}>Self (Só Base)</option>
+                        <option value="Self" ${spell.tipo==='Self'?'selected':''}>Self (Apenas Efeitos/DT)</option>
                         <option value="Locomoção" ${spell.tipo==='Locomoção'?'selected':''}>Locomoção (Base + Beta)</option>
                     </select>
                     
+                    ${(!isSelf) ? `
                     <div class="dice-group"><span class="lbl" style="color:#fff">Base</span>
                         <input type="number" class="inv-input dice-qty" min="1" value="${spell.bQtd}" onchange="updateSpell(${index}, 'bQtd', this.value)">
                         <select class="inv-input dice-sel" onchange="updateSpell(${index}, 'bD', this.value)">
                             <option value="d4" ${spell.bD==='d4'?'selected':''}>d4</option><option value="d6" ${spell.bD==='d6'?'selected':''}>d6</option><option value="d8" ${spell.bD==='d8'?'selected':''}>d8</option><option value="d10" ${spell.bD==='d10'?'selected':''}>d10</option><option value="d12" ${spell.bD==='d12'?'selected':''}>d12</option><option value="d20" ${spell.bD==='d20'?'selected':''}>d20</option><option value="d100" ${spell.bD==='d100'?'selected':''}>d100</option>
                         </select>
-                        ${(!isSelf && !isLoc) ? `
                         <div class="mult-group">
                             <span class="mult-btn m-red ${spell.bMult===0?'active':''}" onclick="updateSpell(${index}, 'bMult', 0)">X</span>
                             <span class="mult-btn m-white ${spell.bMult===0.5?'active':''}" onclick="updateSpell(${index}, 'bMult', 0.5)">X</span>
                             <span class="mult-btn m-green ${spell.bMult===1?'active':''}" onclick="updateSpell(${index}, 'bMult', 1)">X</span>
-                        </div>` : ''}
-                    </div>
+                        </div>
+                    </div>` : ''}
 
                     ${runesHtml}
 
@@ -321,6 +356,7 @@ window.renderSpells = function() {
                     <div style="display:flex; gap: 8px; margin-top: 5px; width: 100%;">
                         <button class="btn-rune b-alpha" onclick="addRune(${index}, 'alpha')">+ α Azul</button>
                         <button class="btn-rune b-delta" onclick="addRune(${index}, 'delta')">+ δ Verm</button>
+                        <button class="btn-rune b-arma" onclick="addRune(${index}, 'arma')">+ ⚔️ Arma</button>
                     </div>` : ''}
 
                     ${isLoc ? `
@@ -335,6 +371,15 @@ window.renderSpells = function() {
                         <label for="crit-${index}" style="color:#ffd700; margin:0; cursor:pointer;">Crítico (Máx x3)</label>
                     </div>` : ''}
                 </div>
+
+                <div class="dice-config-row" style="margin-top: 5px; border-color: #a855f7;">
+                    <div style="display: flex; width: 100%; align-items: center; gap: 5px;">
+                        <span style="color:#a855f7; font-size: 11px; font-weight: bold; white-space: nowrap;">⚡ Status/Efeito</span>
+                        <input type="text" class="inv-input" style="flex: 2;" placeholder="Ex: Queimar" value="${spell.statusName}" onchange="updateSpell(${index}, 'statusName', this.value)">
+                        <span style="color:#fff; font-size: 11px; font-weight: bold;">DT:</span>
+                        <input type="number" class="inv-input dice-qty" placeholder="15" value="${spell.statusDT}" onchange="updateSpell(${index}, 'statusDT', this.value)">
+                    </div>
+                </div>
             </div>`;
         row.innerHTML = headerHtml + bodyHtml;
         container.appendChild(row);
@@ -342,26 +387,44 @@ window.renderSpells = function() {
 }
 
 window.addSpell = function() {
-    playerSpells.push({ nome: "", desc: "", custo: "", alcance: "", tipo: "Dano", bQtd: 1, bD: "d20", bMult: 1, runes: [], isOpen: true, isCrit: false });
+    playerSpells.push({ nome: "", desc: "", custo: "", alcance: "", tipo: "Dano", bQtd: 1, bD: "d20", bMult: 1, runes: [], isOpen: true, isCrit: false, statusName: "", statusDT: "" });
     window.renderSpells(); window.saveData();
 }
-window.updateSpell = function(index, field, value) { playerSpells[index][field] = value; window.renderSpells(); window.saveData(); }
+
+window.updateSpell = function(index, field, value) {
+    if(field === 'betaQtd') {
+        let agil = parseInt(document.getElementById('attr-agilidade').value) || 0;
+        if (value > agil) {
+            alert(`Limite excedido! Sua Agilidade é apenas ${agil}.`);
+            playerSpells[index][field] = agil;
+            window.renderSpells(); return;
+        }
+    }
+    playerSpells[index][field] = value; window.saveData(); 
+}
+
 window.removeSpell = function(index) {
     if(confirm("Remover magia?")) { playerSpells.splice(index, 1); window.renderSpells(); window.saveData(); }
 }
 
 window.addRune = function(spellIndex, type) {
-    let maxRunes = parseInt(document.getElementById('char-runas').value) || 0;
-    if (playerSpells[spellIndex].runes.length >= maxRunes) {
-        alert(`Limite atingido! Você tem apenas ${maxRunes} runa(s) disponíveis.`);
-        return;
-    }
-    playerSpells[spellIndex].runes.push({ type: type, qtd: 1, face: "d4", mult: 1 });
+    if(!checkRuneLimits(spellIndex, type, 1)) return;
+    playerSpells[spellIndex].runes.push({ type: type, qtd: 1, face: "d4", mult: 1, fixo: 0 });
     window.renderSpells(); window.saveData();
 }
+
 window.updateRune = function(sIdx, rIdx, field, val) {
+    if (field === 'qtd') {
+        let currentQtd = playerSpells[sIdx].runes[rIdx].qtd || 0;
+        let diff = parseInt(val) - currentQtd;
+        if (diff > 0 && !checkRuneLimits(sIdx, playerSpells[sIdx].runes[rIdx].type, diff)) {
+            window.renderSpells(); 
+            return;
+        }
+    }
     playerSpells[sIdx].runes[rIdx][field] = val; window.renderSpells(); window.saveData();
 }
+
 window.removeRune = function(sIdx, rIdx) {
     playerSpells[sIdx].runes.splice(rIdx, 1); window.renderSpells(); window.saveData();
 }
@@ -380,26 +443,32 @@ window.rollSpellMagic = function(index) {
         return res;
     }
 
-    let bRolls = [];
-    if(spell.isCrit && spell.tipo !== 'Self') {
-        let faces = parseInt(spell.bD.replace('d', ''));
-        bRolls = [faces * parseInt(spell.bQtd) * 3]; 
-    } else {
-        bRolls = rolar(spell.bQtd, spell.bD);
+    let bRolls = [], bTot = 0;
+    if(spell.tipo !== 'Self') {
+        if(spell.isCrit) {
+            let faces = parseInt(spell.bD.replace('d', ''));
+            bRolls = [faces * parseInt(spell.bQtd) * 3]; 
+        } else {
+            bRolls = rolar(spell.bQtd, spell.bD);
+        }
+        bTot = Math.floor(bRolls.reduce((a,b)=>a+b, 0) * (spell.tipo==='Locomoção' ? 1 : spell.bMult));
     }
-    let bTot = Math.floor(bRolls.reduce((a,b)=>a+b, 0) * (spell.tipo==='Self' || spell.tipo==='Locomoção' ? 1 : spell.bMult));
 
     let runesPack = [];
     if(spell.tipo !== 'Self' && spell.tipo !== 'Locomoção') {
         runesPack = spell.runes.map(r => {
             let rl = rolar(r.qtd, r.face);
-            let tot = Math.floor(rl.reduce((a,b)=>a+b, 0) * r.mult);
-            return { t: r.type, f: r.face, m: r.mult, r: rl, tot: tot };
+            let somaDados = rl.reduce((a,b)=>a+b, 0);
+            let fixo = parseInt(r.fixo) || 0;
+            let tot = Math.floor((somaDados + fixo) * r.mult);
+            return { t: r.type, f: r.face, m: r.mult, r: rl, fixo: fixo, tot: tot };
         });
     }
 
     let rBeta = [];
     if(spell.tipo === 'Locomoção') rBeta = rolar(spell.betaQtd, spell.betaD);
+
+    let stRoll = (spell.statusName && spell.statusDT > 0) ? Math.floor(Math.random() * 20) + 1 : 0;
 
     const payload = {
         t: "spell", c: charName, col: charColor,
@@ -407,15 +476,16 @@ window.rollSpellMagic = function(index) {
         b: { f: spell.bD, m: spell.bMult, r: bRolls, tot: bTot },
         ru: runesPack, 
         crit: spell.isCrit ? "true" : "false",
-        beta: { f: spell.betaD, r: rBeta }
+        beta: { f: spell.betaD, r: rBeta },
+        stName: spell.statusName || "", stDT: spell.statusDT || "0", stRoll: stRoll
     };
 
     window.abrirModalCentral(payload);
     if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", payload);
     
-    // Reseta o turno da magia automaticamente
+    // MAGIA UTILIZADA: RESETA AS RUNAS E DESLIGA O CRITICO
     if(spell.isCrit) spell.isCrit = false;
-    spell.runes = []; // APAGA AS RUNAS DINÂMICAS APÓS O USO
+    spell.runes = []; 
     window.renderSpells();
     window.saveData();
 }
@@ -517,7 +587,7 @@ window.rollSkill = function(skillName, attrName) {
 window.abrirModalCentral = function(data) {
     if (OBR.isAvailable) {
         const dataUrl = encodeURIComponent(JSON.stringify(data));
-        OBR.modal.open({ id: "fate-roll-modal", url: `https://seediam.github.io/FateSheet/resultado.html?data=${dataUrl}`, width: 450, height: data.t === "spell" ? 450 : 250 });
+        OBR.modal.open({ id: "fate-roll-modal", url: `https://seediam.github.io/FateSheet/resultado.html?data=${dataUrl}`, width: 450, height: data.t === "spell" ? 480 : 250 });
     }
 }
 
