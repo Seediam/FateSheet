@@ -45,7 +45,7 @@ const grimoiresDb = {
 };
 
 let characters = {}; 
-let combatLog = []; 
+let combatLog = []; // Onde guardamos a vida do log
 let currentCharId = null;
 let currentIsMine = true; 
 let playerSkills = {}; 
@@ -182,6 +182,7 @@ window.changeGrimoire = function() {
 window.openCharacter = function(id) {
     currentCharId = id;
     const c = characters[id] || {};
+    currentIsMine = true;
     
     safeSetVal('char-avatar', c.avatar || '🧙‍♂️');
     safeSetVal('char-name', c.name || '');
@@ -295,16 +296,15 @@ const getMultFromRoll = (val) => {
     return 1;
 };
 
-// ------ ATUALIZADO: Log usa o v2 para não puxar lixo antigo ------
+// ------ MUDADO PARA SALVAR NA CHAVE v3 ------
 window.addCombatLog = async function(data) {
     combatLog.unshift(data);
     if(combatLog.length > 40) combatLog.pop(); 
-    if (OBR.isAvailable) await OBR.room.setMetadata({ "fatesheet_log_v2": combatLog });
+    if (OBR.isAvailable) await OBR.room.setMetadata({ "fatesheet_log_v3": combatLog });
 }
 
 window.abrirJanelaDeLog = function() {
     if (OBR.isAvailable) {
-        // O Date.now() mata o cache do Log para ele nunca ficar com a tela preta
         OBR.popover.open({
             id: "fatesheet-log-popover",
             url: `https://seediam.github.io/FateSheet/log.html?v=${Date.now()}`, 
@@ -552,9 +552,9 @@ window.abrirModalCentral = function(data) {
 function processRoomData(metadata) {
     let mudouAlgo = false;
     
-    // --- NOVO BANCO DE LOG (v2) PRA LIMPAR O CORROMPIDO ---
-    if (metadata["fatesheet_log_v2"] !== undefined) {
-        combatLog = metadata["fatesheet_log_v2"];
+    // MUDADO PARA A CHAVE v3
+    if (metadata["fatesheet_log_v3"] !== undefined) {
+        combatLog = metadata["fatesheet_log_v3"];
     }
 
     for (let key in metadata) {
@@ -581,6 +581,7 @@ function initExtension() {
                 const meta = await OBR.room.getMetadata();
                 processRoomData(meta);
                 OBR.room.onMetadataChange((metadata) => processRoomData(metadata));
+                OBR.broadcast.onMessage("fatesheet-rolls", (event) => { window.abrirModalCentral(event.data); });
             } catch(e) {}
         });
     }
