@@ -114,6 +114,7 @@
         
         @keyframes pulseAlert { 0% { box-shadow: 0 0 5px #ff4444; } 50% { box-shadow: 0 0 20px #ff4444; } 100% { box-shadow: 0 0 5px #ff4444; } }
         .clash-alert { background: #2a0a0a; border: 2px solid #ff4444; border-radius: 8px; padding: 15px; margin-top: 15px; margin-bottom: 15px; animation: pulseAlert 1.5s infinite; }
+        .section-title { margin-top: 20px; border-bottom: 1px solid var(--border-subtle); padding-bottom: 5px; font-size: 14px; color: var(--accent-gold); }
     </style>
 </head>
 <body>
@@ -215,7 +216,7 @@
                 </div>
 
                 <div class="status-box">
-                    <div class="status-item">
+                    <div class="status-item" id="hp-player-wrapper">
                         <label style="color:#ff4444">Vida</label>
                         <div style="display:flex; justify-content:center; align-items:baseline;">
                             <input type="number" id="char-hp-atual" class="status-input" value="40" onchange="saveData()"> 
@@ -223,6 +224,8 @@
                             <span id="val-vida-max" class="status-max">40</span>
                         </div>
                     </div>
+                    <input type="number" id="val-vida-monster" value="100" style="display:none; width: 100%; background: transparent; border: none; color: #fff; font-size: 18px; font-weight: bold; text-align: center; outline: none; border-bottom: 1px dashed #ff4444; margin-top: 5px;" onchange="saveData()">
+                    
                     <div class="status-item">
                         <label style="color:#44aaff">Mana</label>
                         <div style="display:flex; justify-content:center; align-items:baseline;">
@@ -349,6 +352,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@2/lib/index.js"></script>
-    <script type="module" src="script.js?v=900010"></script>
+    <script type="module" src="script.js?v=990920"></script>
 </body>
 </html>
