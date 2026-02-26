@@ -31,7 +31,7 @@
         .chevron { display: inline-block; width: 15px; transition: transform 0.3s ease; }
         .folder-content { display: none; flex-direction: column; width: 100%; margin-bottom: 15px; gap: 8px; }
         .folder-content.open { display: flex; }
-        .char-list-item { display: flex; width: 100%; box-sizing: border-box; align-items: center; justify-content: space-between; background: var(--bg-panel); padding: 10px 15px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; transition: 0.2s; font-weight: bold; border-left: 4px solid var(--accent-gold);}
+        .char-list-item { display: flex; flex-direction: column; width: 100%; box-sizing: border-box; background: var(--bg-panel); padding: 10px 15px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; transition: 0.2s; font-weight: bold; border-left: 4px solid var(--accent-gold);}
         .char-list-item:hover { background: #23232d; border-color: var(--border-subtle); transform: translateX(3px); }
 
         .tabs { display: flex; gap: 15px; margin-bottom: 20px; border-bottom: 2px solid var(--border-subtle); padding-bottom: 5px; overflow-x: auto; }
@@ -76,7 +76,6 @@
         .inv-input { padding: 8px !important; font-size: 12px; }
         .btn-danger { background: #3a1c1c; border: none; color: #fff; cursor: pointer; border-radius: 4px; padding: 6px 10px; transition: 0.2s; font-weight: bold;}
         .btn-danger:hover { background: var(--danger); }
-        .overweight { border-color: var(--danger) !important; color: var(--danger) !important; }
 
         .spell-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding: 2px 0;}
         .dice-config-row { display: flex; flex-direction: column; gap: 5px; margin-top: 5px; background: #15151e; padding: 8px; border-radius: 4px; border: 1px dashed var(--border-subtle);}
@@ -114,9 +113,9 @@
         
         @keyframes pulseAlert { 0% { box-shadow: 0 0 5px #ff4444; } 50% { box-shadow: 0 0 20px #ff4444; } 100% { box-shadow: 0 0 5px #ff4444; } }
         
-        /* POPUP DE ALVO */
         .modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:9999; justify-content:center; align-items:center; }
         .modal-content { background:var(--bg-panel); border:2px solid var(--accent-gold); padding:20px; border-radius:8px; width:85%; max-width:300px; box-shadow: 0 0 30px rgba(0,0,0,0.8); }
+        .section-title { color: var(--accent-gold); margin: 20px 0 10px 0; border-bottom: 1px solid var(--border-subtle); padding-bottom: 5px; font-size: 14px; }
     </style>
 </head>
 <body>
@@ -136,7 +135,11 @@
 
     <div class="app-container" id="app">
         <div id="screen-list" class="screen active">
-            <h3 class="section-title" style="text-align: center; margin-top: 5px; border:none;">Mesa Global</h3>
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px; margin-bottom: 15px;">
+                <h3 class="section-title" style="margin: 0; border: none;">Mesa Global</h3>
+                <button class="btn-ctrl" style="width:auto; padding: 6px 12px; background:#1a1a24; color:#44aaff; font-size:12px; border: 1px solid #44aaff;" onclick="abrirJanelaDeLog()">📜 Abrir Log</button>
+            </div>
+            
             <button class="btn-new" onclick="createNewCharacter()">+ Criar Novo Personagem</button>
             <input type="file" id="import-file" accept=".json" style="display: none;" onchange="importCharacter(event)">
             <button class="btn-import" onclick="document.getElementById('import-file').click()">📥 Importar Ficha (JSON)</button>
@@ -179,6 +182,7 @@
                             <optgroup label="Monstros"><option value="🐺">🐺</option><option value="🦅">🦅</option><option value="🐉">🐉</option><option value="🐟">🐟</option><option value="💀">💀</option><option value="👹">👹</option></optgroup>
                         </select>
                     </div>
+
                     <div style="flex: 1;">
                         <div class="form-group" style="position: relative;">
                             <label>Nome</label>
@@ -328,6 +332,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@2/lib/index.js"></script>
-    <script type="module" src="script.js?v=777999"></script>
+    <script type="module" src="script.js?v=000212"></script>
 </body>
 </html>
