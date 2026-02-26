@@ -46,6 +46,8 @@ const grimoiresDb = {
 
 let characters = {}; 
 let combatLog = []; 
+let clashes = {}; // Duelos da Nuvem
+let activeDefenses = {}; // Duelos locais abertos
 let currentCharId = null;
 let playerSkills = {}; 
 let playerInventory = [];
@@ -53,8 +55,7 @@ let playerSpells = [];
 let currentPhoto = "";
 let folderState = { "Jogadores": true, "NPCs": true, "Monstros": true };
 let isOverweight = false;
-let pendingClash = null; 
-let pendingSpellIndex = null; // Guarda a magia na hora do popup de alvo
+let pendingSpellIndex = null; 
 
 window.onload = function() {
     document.getElementById('loading').style.display = 'none';
@@ -158,173 +159,150 @@ window.importCharacter = function(event) {
 const safeSetVal = (id, val) => { const el = document.getElementById(id); if(el) el.value = val; };
 const safeSetCheck = (id, val) => { const el = document.getElementById(id); if(el) el.checked = val; };
 
-window.updateSheetColor = function() {
-    let color = document.getElementById('char-color').value;
-    document.documentElement.style.setProperty('--accent-gold', color);
-    window.saveData();
-}
+window.updateSheetColor = function() { let color = document.getElementById('char-color')?.value; document.documentElement.style.setProperty('--accent-gold', color); window.saveData(); }
+window.changeGrimoire = function() { let val = document.getElementById('grimoire-select')?.value; if(val) document.getElementById('passiva').value = grimoiresDb[val] || ""; window.saveData(); }
 
 window.updateCategoryUI = function() {
     const cat = document.getElementById('char-category')?.value;
     const isMonster = (cat === 'Monstros');
-    
     const safeDisplay = (id, display) => { let el = document.getElementById(id); if(el) el.style.display = display; };
-
     safeDisplay('box-classe-prof', isMonster ? 'none' : 'block');
     safeDisplay('char-race-player', isMonster ? 'none' : 'block');
     safeDisplay('char-race-monster', isMonster ? 'block' : 'none');
     safeDisplay('hp-player-wrapper', isMonster ? 'none' : 'flex');
     safeDisplay('val-vida-monster', isMonster ? 'block' : 'none');
-    
-    window.calcVitals();
-    window.saveData();
-}
-
-window.changeGrimoire = function() {
-    let val = document.getElementById('grimoire-select')?.value;
-    if(val) document.getElementById('passiva').value = grimoiresDb[val] || "";
-    window.saveData();
+    window.calcVitals(); window.saveData();
 }
 
 window.openCharacter = function(id) {
-    currentCharId = id;
-    const c = characters[id] || {};
-    
-    safeSetVal('char-avatar', c.avatar || '🧙‍♂️');
-    safeSetVal('char-name', c.name || '');
-    safeSetVal('char-color', c.color || '#d4af37');
-    document.documentElement.style.setProperty('--accent-gold', c.color || '#d4af37');
+    try {
+        currentCharId = id;
+        const c = characters[id] || {};
+        
+        safeSetVal('char-avatar', c.avatar || '🧙‍♂️'); safeSetVal('char-name', c.name || ''); safeSetVal('char-color', c.color || '#d4af37');
+        document.documentElement.style.setProperty('--accent-gold', c.color || '#d4af37');
+        safeSetVal('char-category', c.category || 'Jogadores'); safeSetVal('char-age', c.age || ''); safeSetVal('char-class', c.classe || 'Plebeu'); safeSetVal('char-prof', c.prof || ''); safeSetVal('char-prof-desc', c.profDesc || '');
+        if(c.category === 'Monstros') safeSetVal('char-race-monster', c.race || 'Terrestres'); else safeSetVal('char-race-player', c.race || 'Humano');
+        
+        safeSetVal('char-hp-atual', c.hpAtual !== undefined ? c.hpAtual : 40);
+        safeSetVal('char-mp-atual', c.mpAtual !== undefined ? c.mpAtual : 25);
+        safeSetVal('val-vida-monster', c.vidaMonster || 100);
+        safeSetVal('attr-forca', c.forca || 1); safeSetVal('attr-magia', c.magia || 1); safeSetVal('attr-agilidade', c.agilidade || 1); safeSetVal('attr-sorte', c.sorte || 1);
+        safeSetVal('grimoire-select', c.grimoireSelect || ''); safeSetVal('grimoire-dt', c.grimoireDT || 10); safeSetVal('mana-zone', c.mana || ''); safeSetVal('passiva', c.passiva || ''); 
+        safeSetVal('char-mov', c.mov || 30); safeSetVal('char-runas', c.runas || 0); 
+        
+        safeSetCheck('fora-combate', c.foraCombate || false); safeSetCheck('char-ingame', c.inGame || false);
+        
+        let al = c.alloc || {f:0, m:0, a:0, s:0};
+        safeSetVal('alloc-forca', al.f); safeSetVal('alloc-magia', al.m); safeSetVal('alloc-agilidade', al.a); safeSetVal('alloc-sorte', al.s);
 
-    safeSetVal('char-category', c.category || 'Jogadores');
-    safeSetVal('char-age', c.age || '');
-    safeSetVal('char-class', c.classe || 'Plebeu');
-    safeSetVal('char-prof', c.prof || '');
-    safeSetVal('char-prof-desc', c.profDesc || '');
-    
-    if(c.category === 'Monstros') safeSetVal('char-race-monster', c.race || 'Terrestres');
-    else safeSetVal('char-race-player', c.race || 'Humano');
+        playerSkills = c.skills || {}; playerInventory = c.inventory || []; playerSpells = c.spells || []; 
+        
+        window.updateCategoryUI(); window.renderSkills(); window.renderInventory(); window.renderCombatTracker(); window.renderGlobalRunes(); window.renderSpells(); window.calcVitals(); window.updateAlloc(); 
 
-    safeSetVal('char-hp-atual', c.hpAtual !== undefined ? c.hpAtual : 40);
-    safeSetVal('char-mp-atual', c.mpAtual !== undefined ? c.mpAtual : 25);
-    safeSetVal('val-vida-monster', c.vidaMonster || 100);
-    
-    safeSetVal('attr-forca', c.forca || 1);
-    safeSetVal('attr-magia', c.magia || 1);
-    safeSetVal('attr-agilidade', c.agilidade || 1);
-    safeSetVal('attr-sorte', c.sorte || 1);
-    
-    safeSetVal('grimoire-select', c.grimoireSelect || '');
-    safeSetVal('grimoire-dt', c.grimoireDT || 10);
-    safeSetVal('mana-zone', c.mana || '');
-    safeSetVal('passiva', c.passiva || ''); 
-    safeSetVal('char-mov', c.mov || 30);
-    safeSetVal('char-runas', c.runas || 0); 
-    
-    safeSetCheck('fora-combate', c.foraCombate || false);
-    safeSetCheck('char-ingame', c.inGame || false);
-    
-    let al = c.alloc || {f:0, m:0, a:0, s:0};
-    safeSetVal('alloc-forca', al.f);
-    safeSetVal('alloc-magia', al.m);
-    safeSetVal('alloc-agilidade', al.a);
-    safeSetVal('alloc-sorte', al.s);
-
-    playerSkills = c.skills || {};
-    playerInventory = c.inventory || [];
-    playerSpells = c.spells || []; 
-    
-    window.updateCategoryUI();
-    window.renderSkills();
-    window.renderInventory();
-    window.renderCombatTracker(); 
-    window.renderGlobalRunes();
-    window.renderSpells(); 
-    window.calcVitals();
-    window.updateAlloc(); 
-    window.checkClashStatus();
-
-    document.getElementById('screen-list').classList.remove('active');
-    document.getElementById('screen-sheet').classList.add('active');
+        document.getElementById('screen-list').classList.remove('active');
+        document.getElementById('screen-sheet').classList.add('active');
+    } catch(e) { console.error("Erro ao abrir ficha:", e); }
 }
 
 window.calcVitals = function() {
-    let cat = document.getElementById('char-category')?.value;
-    let forcaBase = parseInt(document.getElementById('attr-forca')?.value) || 0;
-    let magiaBase = parseInt(document.getElementById('attr-magia')?.value) || 0;
-    let sorteBase = parseInt(document.getElementById('attr-sorte')?.value) || 0;
-    let classe = document.getElementById('char-class')?.value || 'Plebeu';
-
-    let elVidaM = document.getElementById('val-vida-max');
-    let elManaM = document.getElementById('val-mana-max');
+    let cat = document.getElementById('char-category')?.value; let forcaBase = parseInt(document.getElementById('attr-forca')?.value) || 0; let magiaBase = parseInt(document.getElementById('attr-magia')?.value) || 0; let sorteBase = parseInt(document.getElementById('attr-sorte')?.value) || 0; let classe = document.getElementById('char-class')?.value || 'Plebeu';
+    let elVidaM = document.getElementById('val-vida-max'); let elManaM = document.getElementById('val-mana-max');
 
     if (cat !== 'Monstros') {
-        let extraMana = 0;
-        if(classe === 'Andarilho') extraMana = 50;
-        if(classe === 'Estrangeiro') extraMana = 75;
-        if(classe === 'Nobre') extraMana = 100;
-        
-        if(elVidaM) elVidaM.innerText = 40 + (sorteBase * 5);
-        if(elManaM) elManaM.innerText = 25 + extraMana;
+        let extraMana = 0; if(classe === 'Andarilho') extraMana = 50; if(classe === 'Estrangeiro') extraMana = 75; if(classe === 'Nobre') extraMana = 100;
+        if(elVidaM) elVidaM.innerText = 40 + (sorteBase * 5); if(elManaM) elManaM.innerText = 25 + extraMana;
     } else {
         if(elManaM) elManaM.innerText = 25;
-        if(elVidaM) {
-            let mv = document.getElementById('val-vida-monster')?.value || 100;
-            elVidaM.innerText = mv;
-        }
+        if(elVidaM) { let mv = document.getElementById('val-vida-monster')?.value || 100; elVidaM.innerText = mv; }
     }
 
-    let dfFis = document.getElementById('val-def-fisica');
-    let dfMag = document.getElementById('val-def-magica');
-    if(dfFis) dfFis.innerText = forcaBase * 5;
-    if(dfMag) dfMag.innerText = magiaBase * 5;
+    let dfFis = document.getElementById('val-def-fisica'); let dfMag = document.getElementById('val-def-magica');
+    if(dfFis) dfFis.innerText = forcaBase * 5; if(dfMag) dfMag.innerText = magiaBase * 5;
 
-    let maxWeight = forcaBase * 5;
-    let currentWeight = playerInventory.reduce((acc, item) => acc + ((parseFloat(item.peso)||0) * (parseInt(item.qtd)||1)), 0);
-    
-    let ep = document.getElementById('val-peso');
-    if(ep) ep.innerText = `${currentWeight.toFixed(1)} / ${maxWeight}`;
-    
-    let bp = document.getElementById('box-peso');
-    let pa = document.getElementById('peso-aviso');
+    let maxWeight = forcaBase * 5; let currentWeight = playerInventory.reduce((acc, item) => acc + ((parseFloat(item.peso)||0) * (parseInt(item.qtd)||1)), 0);
+    let ep = document.getElementById('val-peso'); if(ep) ep.innerText = `${currentWeight.toFixed(1)} / ${maxWeight}`;
+    let bp = document.getElementById('box-peso'); let pa = document.getElementById('peso-aviso');
 
-    if (currentWeight > maxWeight) {
-        isOverweight = true;
-        if(bp) bp.classList.add('overweight');
-        if(pa) pa.style.display = 'block';
-    } else {
-        isOverweight = false;
-        if(bp) bp.classList.remove('overweight');
-        if(pa) pa.style.display = 'none';
-    }
+    if (currentWeight > maxWeight) { isOverweight = true; if(bp) bp.classList.add('overweight'); if(pa) pa.style.display = 'block'; } 
+    else { isOverweight = false; if(bp) bp.classList.remove('overweight'); if(pa) pa.style.display = 'none'; }
 }
 
-// ------ ORDENAÇÃO DE COMBATE PELA INICIATIVA ------
+// ------ COMBAT TRACKER COM DEFESA INCORPORADA ------
 window.renderCombatTracker = function() {
     const container = document.getElementById('combat-tracker-list');
     if(!container) return;
     
     let combatants = Object.values(characters).filter(c => c.inGame);
-    combatants.sort((a, b) => (b.initiative || 0) - (a.initiative || 0)); // Maior pro menor
+    combatants.sort((a, b) => (b.initiative || 0) - (a.initiative || 0)); 
 
     let html = '';
     
     combatants.forEach((c, idx) => {
         let hpM = c.category==='Monstros' ? (c.vidaMonster||100) : (40 + (c.sorte||0)*5);
         let mpM = c.category==='Monstros' ? 25 : 25 + (c.classe==='Andarilho'?25:c.classe==='Estrangeiro'?50:c.classe==='Nobre'?75:0);
-        
-        let positionTag = c.hasRolledTurn ? `<span style="font-size:10px; color:var(--accent-gold); font-weight:bold; background:#000; padding:2px 4px; border-radius:3px;">${idx + 1}º</span>` : `<span style="font-size:10px; color:#888; font-weight:bold; background:#000; padding:2px 4px; border-radius:3px;">⌛ Pendente</span>`;
+        let positionTag = c.hasRolledTurn ? `<span style="font-size:10px; color:var(--accent-gold); font-weight:bold; background:#000; padding:2px 4px; border-radius:3px;">${idx + 1}º a Atacar</span>` : `<span style="font-size:10px; color:#888; font-weight:bold; background:#000; padding:2px 4px; border-radius:3px;">⌛ Pendente</span>`;
 
-        html += `<div style="background:var(--bg-panel); padding:8px; margin-bottom:5px; border-left:4px solid ${c.color || '#fff'}; border-radius:4px; display:flex; justify-content:space-between; align-items:center;">
-            <div style="display:flex; align-items:center; gap:8px;">
-                <span style="font-size:18px;">${c.avatar || '🧙‍♂️'}</span> 
-                <div>
-                    <b style="font-size:14px;">${c.name}</b><br>${positionTag}
+        let clashHtml = '';
+        if (clashes[c.id]) {
+            let clash = clashes[c.id];
+            let defState = activeDefenses[c.id];
+            
+            if (!defState) {
+                // Alerta de Ataque
+                clashHtml = `
+                <div style="background:#2a0a0a; border:1px dashed #ff4444; padding:8px; margin-top:8px; border-radius:4px;">
+                    <div style="color:#ff4444; font-size:12px; margin-bottom:5px;">⚠️ Atacado por <b>${clash.c}</b> (Dano: ${clash.gross})</div>
+                    <div style="display:flex; gap:5px;">
+                        <button class="btn-ctrl" style="background:#ff4444; color:#fff; flex:1;" onclick="window.aceitarDano('${c.id}')">Tomar Dano</button>
+                        <button class="btn-ctrl" style="background:#44aaff; color:#fff; flex:1;" onclick="window.iniciarDefesa('${c.id}')">Defender</button>
+                    </div>
+                </div>`;
+            } else {
+                // Tela de Defesa com Runas
+                let defFis = (c.forca || 0) * 5;
+                let defMag = (c.magia || 0) * 5;
+                let defHib = Math.floor((defFis + defMag) / 3);
+                
+                let runesHtml = (c.activeRunes || []).map((r, rIdx) => {
+                    let cHex = r.type==='alpha' ? '#44aaff' : (r.type==='delta' ? '#ff4444' : (r.type==='beta' ? '#a855f7' : '#ccc'));
+                    let sym = r.type==='alpha' ? 'α' : (r.type==='delta' ? 'δ' : (r.type==='beta' ? 'β' : '⚔️'));
+                    return `<div style="display:inline-flex; align-items:center; background:#111; border:1px solid ${cHex}; padding:2px 6px; border-radius:4px; margin-right:4px; margin-bottom:4px; font-size:11px;">
+                        <span style="color:${cHex}; margin-right:5px;">${sym}</span><span style="color:#fff; margin-right:5px;">${r.face}</span>
+                        <button style="background:transparent; border:none; color:#ff4444; font-weight:bold; cursor:pointer;" onclick="window.descartarRunaDefesa('${c.id}', ${rIdx})">X</button>
+                    </div>`;
+                }).join('');
+                if(runesHtml === '') runesHtml = '<span style="color:#666; font-size:11px;">Você não tem runas ativas.</span>';
+
+                clashHtml = `
+                <div style="background:#1a1a24; border:1px solid #44aaff; padding:8px; margin-top:8px; border-radius:4px;">
+                    <div style="color:#44aaff; font-size:12px; margin-bottom:5px; display:flex; justify-content:space-between;">
+                        <span>🛡️ Defendendo <b>${clash.c}</b> (Dano: ${clash.gross})</span>
+                        <span>Bloqueado: <b style="color:#39ff14; font-size:14px;">${defState.blocked}</b></span>
+                    </div>
+                    <select id="def-type-${c.id}" class="inv-input" style="width:100%; margin-bottom:5px;" onchange="window.updateDefType('${c.id}', this.value)">
+                        <option value="fisica" ${defState.type==='fisica'?'selected':''}>Defesa Física (${defFis}/runa)</option>
+                        <option value="magica" ${defState.type==='magica'?'selected':''}>Defesa Mágica (${defMag}/runa)</option>
+                        <option value="hibrida" ${defState.type==='hibrida'?'selected':''}>Defesa Híbrida (${defHib}/runa)</option>
+                    </select>
+                    <div style="margin-bottom:5px;">${runesHtml}</div>
+                    <button class="btn-ctrl" style="background:#39ff14; color:#000; width:100%; margin-top:5px;" onclick="window.confirmarDefesa('${c.id}')">Confirmar Defesa</button>
+                </div>`;
+            }
+        }
+
+        html += `<div style="background:var(--bg-panel); padding:8px; margin-bottom:5px; border-left:4px solid ${c.color || '#fff'}; border-radius:4px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:18px;">${c.avatar || '🧙‍♂️'}</span> 
+                    <div><b style="font-size:14px;">${c.name}</b><br>${positionTag}</div>
+                </div>
+                <div style="font-size:12px; text-align:right;">
+                    <span style="color:#ff4444; font-weight:bold;">HP: ${c.hpAtual||0} / ${hpM}</span><br>
+                    <span style="color:#44aaff; font-weight:bold;">MP: ${c.mpAtual||0} / ${mpM}</span>
                 </div>
             </div>
-            <div style="font-size:12px; text-align:right;">
-                <span style="color:#ff4444; font-weight:bold;">HP: ${c.hpAtual||0} / ${hpM}</span><br>
-                <span style="color:#44aaff; font-weight:bold;">MP: ${c.mpAtual||0} / ${mpM}</span>
-            </div>
+            ${clashHtml}
         </div>`;
     });
     
@@ -334,30 +312,76 @@ window.renderCombatTracker = function() {
 
 window.novaRodadaGlobal = async function() {
     if(!confirm("Iniciar nova rodada? Todos precisarão rolar os Atributos novamente.")) return;
-    for(let id in characters) {
-        characters[id].hasRolledTurn = false;
-        characters[id].initiative = 0;
-    }
+    for(let id in characters) { characters[id].hasRolledTurn = false; characters[id].initiative = 0; }
+    await window.saveData(); window.renderCombatTracker();
+}
+
+window.iniciarDefesa = function(id) { activeDefenses[id] = { blocked: 0, type: 'fisica' }; window.renderCombatTracker(); }
+window.updateDefType = function(id, val) { if(activeDefenses[id]) activeDefenses[id].type = val; window.renderCombatTracker(); }
+
+window.descartarRunaDefesa = async function(id, rIdx) {
+    let c = characters[id]; if(!c) return;
+    let st = activeDefenses[id]; if(!st) return;
+    
+    let defFis = (c.forca || 0) * 5; let defMag = (c.magia || 0) * 5;
+    let defHib = Math.floor((defFis + defMag) / 3);
+    
+    if (st.type === 'fisica') st.blocked += defFis;
+    else if (st.type === 'magica') st.blocked += defMag;
+    else st.blocked += defHib;
+
+    c.activeRunes.splice(rIdx, 1);
+    await window.saveData(); window.renderCombatTracker();
+}
+
+window.aceitarDano = async function(id) {
+    let clash = clashes[id]; if(!clash) return;
+    let c = characters[id]; if(!c) return;
+    
+    c.hpAtual = (c.hpAtual || 0) - clash.gross;
+    clash.blocked = 0; clash.net = clash.gross; clash.t = 'clash';
+    
     await window.saveData();
-    window.renderCombatTracker();
+    window.abrirModalCentral(clash); window.addCombatLog(clash);
+    if(OBR.isAvailable) {
+        OBR.broadcast.sendMessage("fatesheet-rolls", clash);
+        let meta = await OBR.room.getMetadata();
+        let cc = meta.fatesheet_clashes || {};
+        delete cc[id];
+        await OBR.room.setMetadata({ fatesheet_clashes: cc });
+    }
+    delete clashes[id]; window.renderCombatTracker();
+}
+
+window.confirmarDefesa = async function(id) {
+    let clash = clashes[id]; if(!clash) return;
+    let c = characters[id]; if(!c) return;
+    let st = activeDefenses[id]; if(!st) return;
+
+    let netDamage = Math.max(0, clash.gross - st.blocked);
+    c.hpAtual = (c.hpAtual || 0) - netDamage;
+    
+    clash.blocked = st.blocked; clash.net = netDamage; clash.t = 'clash';
+    
+    await window.saveData();
+    window.abrirModalCentral(clash); window.addCombatLog(clash);
+    if(OBR.isAvailable) {
+        OBR.broadcast.sendMessage("fatesheet-rolls", clash);
+        let meta = await OBR.room.getMetadata();
+        let cc = meta.fatesheet_clashes || {};
+        delete cc[id];
+        await OBR.room.setMetadata({ fatesheet_clashes: cc });
+    }
+    delete activeDefenses[id]; delete clashes[id]; window.renderCombatTracker();
 }
 
 window.updateAlloc = function() {
-    let cb = document.getElementById('fora-combate');
-    let isFora = cb ? cb.checked : false;
-    let bdg = document.getElementById('char-fc-badge');
-    if(bdg) bdg.style.display = isFora ? 'block' : 'none'; 
-    
+    let cb = document.getElementById('fora-combate'); let isFora = cb ? cb.checked : false;
+    let bdg = document.getElementById('char-fc-badge'); if(bdg) bdg.style.display = isFora ? 'block' : 'none'; 
     let maxRunes = parseInt(document.getElementById('char-runas')?.value) || 0;
-    let f = parseInt(document.getElementById('alloc-forca')?.value) || 0;
-    let m = parseInt(document.getElementById('alloc-magia')?.value) || 0;
-    let a = parseInt(document.getElementById('alloc-agilidade')?.value) || 0;
-    let s = parseInt(document.getElementById('alloc-sorte')?.value) || 0;
 
-    let maxF = parseInt(document.getElementById('attr-forca')?.value) || 0;
-    let maxM = parseInt(document.getElementById('attr-magia')?.value) || 0;
-    let maxA = parseInt(document.getElementById('attr-agilidade')?.value) || 0;
-    let maxS = parseInt(document.getElementById('attr-sorte')?.value) || 0;
+    let f = parseInt(document.getElementById('alloc-forca')?.value) || 0; let m = parseInt(document.getElementById('alloc-magia')?.value) || 0; let a = parseInt(document.getElementById('alloc-agilidade')?.value) || 0; let s = parseInt(document.getElementById('alloc-sorte')?.value) || 0;
+    let maxF = parseInt(document.getElementById('attr-forca')?.value) || 0; let maxM = parseInt(document.getElementById('attr-magia')?.value) || 0; let maxA = parseInt(document.getElementById('attr-agilidade')?.value) || 0; let maxS = parseInt(document.getElementById('attr-sorte')?.value) || 0;
 
     if(f > maxF) { f = maxF; safeSetVal('alloc-forca', f); }
     if(m > maxM) { m = maxM; safeSetVal('alloc-magia', m); }
@@ -374,39 +398,33 @@ window.updateAlloc = function() {
 
 const getMultFromRoll = (val) => { if(val <= 4) return 0; if(val <= 11) return 0.5; return 1; };
 
+// ------ LOG SEGURO (Max 7) ------
 window.addCombatLog = async function(data) {
     if (OBR.isAvailable) {
         try {
             let meta = await OBR.room.getMetadata();
-            let nuvemLog = meta["fatesheet_log_v6"] || [];
-            nuvemLog.unshift(data);
-            if(nuvemLog.length > 7) nuvemLog.length = 7; 
+            let nuvemLog = meta["fatesheet_log_v8"] || [];
+            nuvemLog.unshift(data); if(nuvemLog.length > 7) nuvemLog.length = 7; 
             combatLog = nuvemLog;
-            await OBR.room.setMetadata({ "fatesheet_log_v6": combatLog });
+            await OBR.room.setMetadata({ "fatesheet_log_v8": combatLog });
             OBR.broadcast.sendMessage("fatesheet-log-update", combatLog);
         } catch(e) {}
     } else {
-        combatLog.unshift(data);
-        if(combatLog.length > 7) combatLog.length = 7;
+        combatLog.unshift(data); if(combatLog.length > 7) combatLog.length = 7;
     }
     window.renderMiniLog();
 }
 
 window.clearMiniLog = async function() {
-    if(confirm('Tem certeza que deseja apagar o histórico de combate para toda a mesa?')) {
+    if(confirm('Apagar o histórico de combate para toda a mesa?')) {
         combatLog = [];
-        if (OBR.isAvailable) {
-            await OBR.room.setMetadata({ "fatesheet_log_v6": [] });
-            OBR.broadcast.sendMessage("fatesheet-log-update", []);
-        }
+        if (OBR.isAvailable) { await OBR.room.setMetadata({ "fatesheet_log_v8": [] }); OBR.broadcast.sendMessage("fatesheet-log-update", []); }
         window.renderMiniLog();
     }
 }
 
 window.renderMiniLog = function() {
-    const container = document.getElementById('mini-log-container');
-    if(!container) return;
-    container.innerHTML = '';
+    const container = document.getElementById('mini-log-container'); if(!container) return; container.innerHTML = '';
     if (!Array.isArray(combatLog)) return; 
     
     combatLog.forEach(log => {
@@ -433,15 +451,9 @@ window.renderMiniLog = function() {
                             totalDano += r.tot;
                         });
                     }
-                    if(log.beta && log.beta.r && log.beta.r.length > 0) {
-                        let betTot = log.beta.r.reduce((a,b)=>a+b, 0); parts.push(`<span style="color:#a855f7">B: ${betTot}</span>`); totalDano += betTot;
-                    }
+                    if(log.beta && log.beta.r && log.beta.r.length > 0) { let betTot = log.beta.r.reduce((a,b)=>a+b, 0); parts.push(`<span style="color:#a855f7">B: ${betTot}</span>`); totalDano += betTot; }
                     resHtml = `${parts.join(" ")} <b style="color:${log.crit === 'true' ? '#ffd700' : log.col}">=> ${totalDano}</b>`;
-                } else if (log.st === "Cura") {
-                    resHtml = `<span style="color:#39ff14;">💚 Curou: ${log.b.tot} HP</span>`;
-                } else {
-                    resHtml = `<span style="color:#888;">Efeito Conjurado.</span>`;
-                }
+                } else if (log.st === "Cura") { resHtml = `<span style="color:#39ff14;">💚 Curou: ${log.b.tot} HP</span>`; } else { resHtml = `<span style="color:#888;">Efeito Conjurado.</span>`; }
                 
                 if (log.stName && log.stDT > 0) {
                     let stRoll = parseInt(log.stRoll); let dt = parseInt(log.stDT); let stCor = stRoll >= dt ? "#44aaff" : "#ff4444";
@@ -460,84 +472,39 @@ window.renderMiniLog = function() {
                     }).join(", ");
                     parts.push(`<span style="color:${color}; font-weight:bold;">${pref} [${text}]</span>`);
                 };
-                formatAttr(log.rF, "#ff4444", "F"); formatAttr(log.rM, "#44aaff", "M"); formatAttr(log.rA, "#a855f7", "A");
-                resHtml = parts.join(" | ");
+                formatAttr(log.rF, "#ff4444", "F"); formatAttr(log.rM, "#44aaff", "M"); formatAttr(log.rA, "#a855f7", "A"); resHtml = parts.join(" | ");
             } else {
                 actHtml = `${prefix}Rolou <b>${log.s}</b>`; let r = (log.r && typeof log.r === 'string') ? log.r.split(',') : [0];
                 resHtml = `Resultado: <b style="color:${log.col}; font-size: 14px;">${parseInt(r[0]) + (log.mod || 0)}</b>`;
             }
-
-            div.innerHTML = `<div class="log-header"><span class="log-name" style="color:${log.col || '#d4af37'}">${log.av || '🧙‍♂️'} ${log.c}</span><span class="log-action">${actHtml}</span></div><div class="log-result">${resHtml}</div>`;
-            container.appendChild(div);
+            div.innerHTML = `<div class="log-header"><span class="log-name" style="color:${log.col || '#d4af37'}">${log.av || '🧙‍♂️'} ${log.c}</span><span class="log-action">${actHtml}</span></div><div class="log-result">${resHtml}</div>`; container.appendChild(div);
         } catch (e) {}
     });
 }
 
+window.closeTargetModal = function() { document.getElementById('target-modal').style.display = 'none'; pendingSpellIndex = null; }
+
 window.rollAttributes = function() {
-    let cb = document.getElementById('fora-combate');
-    let isFora = cb ? cb.checked : false;
-    let f = parseInt(document.getElementById('alloc-forca').value) || 0;
-    let m = parseInt(document.getElementById('alloc-magia').value) || 0;
-    let a = parseInt(document.getElementById('alloc-agilidade').value) || 0;
-    let s = parseInt(document.getElementById('alloc-sorte').value) || 0;
+    let cb = document.getElementById('fora-combate'); let isFora = cb ? cb.checked : false;
+    let f = parseInt(document.getElementById('alloc-forca').value) || 0; let m = parseInt(document.getElementById('alloc-magia').value) || 0; let a = parseInt(document.getElementById('alloc-agilidade').value) || 0; let s = parseInt(document.getElementById('alloc-sorte').value) || 0;
 
     if(f+m+a+s === 0) return alert("Aloque algum dado antes de rolar!");
 
-    let rolls = { f: [], m: [], a: [] };
-    let c = characters[currentCharId];
-    if(!c.activeRunes) c.activeRunes = [];
-
+    let rolls = { f: [], m: [], a: [] }; let c = characters[currentCharId]; if(!c.activeRunes) c.activeRunes = [];
     const rollD20 = () => Math.floor(Math.random() * 20) + 1;
-
     let maxAgilRoll = 0;
 
-    for(let i=0; i<f; i++) {
-        let v = rollD20() + s; rolls.f.push(v);
-        if(!isFora) c.activeRunes.push({ type: 'delta', face: 'd4', mult: getMultFromRoll(v), locked: true, fixo: 0, raw: v });
-    }
-    for(let i=0; i<m; i++) {
-        let v = rollD20() + s; rolls.m.push(v);
-        if(!isFora) c.activeRunes.push({ type: 'alpha', face: 'd4', mult: getMultFromRoll(v), locked: true, fixo: 0, raw: v });
-    }
-    for(let i=0; i<a; i++) {
-        let v = rollD20() + s; rolls.a.push(v);
-        if(v > maxAgilRoll) maxAgilRoll = v;
-        if(!isFora) c.activeRunes.push({ type: 'beta', face: 'd4', mult: getMultFromRoll(v), locked: true, fixo: 0, raw: v });
-    }
+    for(let i=0; i<f; i++) { let v = rollD20() + s; rolls.f.push(v); if(!isFora) c.activeRunes.push({ type: 'delta', face: 'd4', mult: getMultFromRoll(v), locked: true, fixo: 0, raw: v }); }
+    for(let i=0; i<m; i++) { let v = rollD20() + s; rolls.m.push(v); if(!isFora) c.activeRunes.push({ type: 'alpha', face: 'd4', mult: getMultFromRoll(v), locked: true, fixo: 0, raw: v }); }
+    for(let i=0; i<a; i++) { let v = rollD20() + s; rolls.a.push(v); if(v > maxAgilRoll) maxAgilRoll = v; if(!isFora) c.activeRunes.push({ type: 'beta', face: 'd4', mult: getMultFromRoll(v), locked: true, fixo: 0, raw: v }); }
 
-    // CALCULA A INICIATIVA
-    if(!isFora) {
-        c.hasRolledTurn = true;
-        if (a > 0) { c.initiative = 100 + maxAgilRoll; } 
-        else { c.initiative = rollD20(); } // Aleatório 1 a 20 pra quem não tem agilidade
-    }
+    if(!isFora) { c.hasRolledTurn = true; if (a > 0) { c.initiative = 100 + maxAgilRoll; } else { c.initiative = rollD20(); } }
 
-    const payload = {
-        t: "attr", av: document.getElementById('char-avatar').value, c: document.getElementById('char-name').value || 'Desconhecido', col: document.getElementById('char-color').value || '#d4af37',
-        rF: rolls.f.join(','), rM: rolls.m.join(','), rA: rolls.a.join(','), sorte: s, fc: isFora
-    };
+    const payload = { t: "attr", av: document.getElementById('char-avatar').value, c: document.getElementById('char-name').value || 'Desconhecido', col: document.getElementById('char-color').value || '#d4af37', rF: rolls.f.join(','), rM: rolls.m.join(','), rA: rolls.a.join(','), sorte: s, fc: isFora };
 
-    window.abrirModalCentral(payload);
-    window.addCombatLog(payload);
+    window.abrirModalCentral(payload); window.addCombatLog(payload);
     if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", payload);
-
-    window.saveData();
-    window.renderGlobalRunes();
-    window.renderCombatTracker();
-}
-
-window.checkRuneLimits = function(typeToAdd) {
-    let maxRunes = parseInt(document.getElementById('char-runas').value) || 0;
-    let c = characters[currentCharId];
-    if(!c.activeRunes) c.activeRunes = [];
-    if (c.activeRunes.length >= maxRunes) { alert(`Limite atingido! Você tem apenas ${maxRunes} runa(s) na ficha.`); return false; }
-    let tCount = c.activeRunes.filter(r => r.type === typeToAdd).length;
-    let m = parseInt(document.getElementById('attr-magia').value) || 0; let f = parseInt(document.getElementById('attr-forca').value) || 0; let a = parseInt(document.getElementById('attr-agilidade').value) || 0;
-
-    if(typeToAdd === 'alpha' && tCount >= m) { alert(`Limite de Alpha! Sua Magia é ${m}.`); return false; }
-    if(typeToAdd === 'delta' && tCount >= f) { alert(`Limite de Delta! Sua Força é ${f}.`); return false; }
-    if(typeToAdd === 'beta' && tCount >= a) { alert(`Limite de Beta! Sua Agilidade é ${a}.`); return false; }
-    return true;
+    window.saveData(); window.renderGlobalRunes(); window.renderCombatTracker();
 }
 
 window.addGlobalRune = function(type) { if(!checkRuneLimits(type)) return; characters[currentCharId].activeRunes.push({ type: type, face: "d4", mult: 1, fixo: 0, locked: false }); window.saveData(); window.renderGlobalRunes(); }
@@ -551,106 +518,62 @@ window.renderGlobalRunes = function() {
         container.innerHTML = `<div style="display:flex; gap:8px;"><button class="btn-rune b-alpha" onclick="addGlobalRune('alpha')">+ α Azul</button><button class="btn-rune b-delta" onclick="addGlobalRune('delta')">+ δ Verm</button><button class="btn-rune b-beta" onclick="addGlobalRune('beta')">+ β Roxo</button><button class="btn-rune b-arma" onclick="addGlobalRune('arma')">+ ⚔️ Arma</button></div>`; return;
     }
     let html = `<div class="dice-config-row" style="border-color: var(--accent-gold); background: #111;"><div style="width:100%; display:flex; justify-content:space-between; align-items:center;"><span style="color:var(--accent-gold); font-size:12px; font-weight:bold;">Runas do Turno</span><div style="display:flex; gap:4px;"><button class="btn-rune b-alpha" style="padding: 2px 6px;" onclick="addGlobalRune('alpha')">+ α</button><button class="btn-rune b-delta" style="padding: 2px 6px;" onclick="addGlobalRune('delta')">+ δ</button><button class="btn-rune b-beta" style="padding: 2px 6px;" onclick="addGlobalRune('beta')">+ β</button><button class="btn-rune b-arma" style="padding: 2px 6px;" onclick="addGlobalRune('arma')">+ ⚔️</button></div></div>`;
-
     c.activeRunes.forEach((r, idx) => {
-        let cHex = '#ccc', sym = '⚔️';
-        if(r.type === 'alpha') { cHex = '#44aaff'; sym = 'α'; }
-        if(r.type === 'delta') { cHex = '#ff4444'; sym = 'δ'; }
-        if(r.type === 'beta')  { cHex = '#a855f7'; sym = 'β'; }
-
-        let dis = r.locked ? "pointer-events:none; opacity:0.5;" : "";
-        let redA = r.mult === 0 ? "active" : ""; let whiA = r.mult === 0.5 ? "active" : ""; let greA = r.mult === 1 ? "active" : "";
-
+        let cHex = '#ccc', sym = '⚔️'; if(r.type === 'alpha') { cHex = '#44aaff'; sym = 'α'; } if(r.type === 'delta') { cHex = '#ff4444'; sym = 'δ'; } if(r.type === 'beta')  { cHex = '#a855f7'; sym = 'β'; }
+        let dis = r.locked ? "pointer-events:none; opacity:0.5;" : ""; let redA = r.mult === 0 ? "active" : ""; let whiA = r.mult === 0.5 ? "active" : ""; let greA = r.mult === 1 ? "active" : "";
         html += `<div class="dice-group" style="border-color:${cHex}; margin-top:5px;"><span class="lbl" style="color:${cHex}; text-align:center;">${sym}</span><select class="inv-input dice-sel" onchange="updateGlobalRune(${idx}, 'face', this.value)"><option value="d4" ${r.face==='d4'?'selected':''}>d4</option><option value="d6" ${r.face==='d6'?'selected':''}>d6</option><option value="d8" ${r.face==='d8'?'selected':''}>d8</option><option value="d10" ${r.face==='d10'?'selected':''}>d10</option><option value="d12" ${r.face==='d12'?'selected':''}>d12</option><option value="d20" ${r.face==='d20'?'selected':''}>d20</option><option value="d100" ${r.face==='d100'?'selected':''}>d100</option></select>${r.type === 'arma' ? `<span style="color:#ccc; font-weight:bold;">+</span><input type="number" class="inv-input dice-qty" placeholder="Fixo" value="${r.fixo || 0}" onchange="updateGlobalRune(${idx}, 'fixo', this.value)" style="width: 35px !important;">` : ''}<div class="mult-group" style="${dis}"><span class="mult-btn m-red ${redA}" onclick="updateGlobalRune(${idx}, 'mult', 0)">X</span><span class="mult-btn m-white ${whiA}" onclick="updateGlobalRune(${idx}, 'mult', 0.5)">X</span><span class="mult-btn m-green ${greA}" onclick="updateGlobalRune(${idx}, 'mult', 1)">X</span></div><span style="color:#666; cursor:pointer; font-weight:bold; margin-left:5px; padding: 2px;" onclick="removeGlobalRune(${idx})">✖</span></div>`;
     });
     html += `</div>`; container.innerHTML = html;
 }
 
 window.toggleSpellInfo = function(index) { playerSpells[index].isOpen = !playerSpells[index].isOpen; window.renderSpells(); window.saveData(); }
-
 window.renderSpells = function() {
     const container = document.getElementById('spells-container'); if(!container) return; container.innerHTML = '';
     playerSpells.forEach((spell, index) => {
         if(spell.isOpen === undefined) spell.isOpen = true;
-        spell.tipo = spell.tipo || "Dano"; spell.bQtd = spell.bQtd || 1; spell.bD = spell.bD || "d20"; spell.bMult = spell.bMult !== undefined ? spell.bMult : 1;
-        spell.isCrit = spell.isCrit || false; spell.statusName = spell.statusName || ""; spell.statusDT = spell.statusDT || ""; spell.audioUrl = spell.audioUrl || "";
-
-        let isSelf = spell.tipo === "Self";
-        let row = document.createElement('div'); row.className = 'spell-item';
-        let headerHtml = `<div class="spell-header" onclick="toggleSpellInfo(${index})"><div style="display: flex; align-items: center; gap: 10px;"><button class="btn-roll-spell" onclick="event.stopPropagation(); rollSpellMagic(${index})" title="Rolar Magia">🎲</button><span style="font-weight: bold; color: var(--accent-gold); font-size: 16px;">${spell.nome || 'Nova Magia'}</span></div><div style="display:flex; align-items:center; gap: 10px;"><button class="btn-danger" style="padding: 4px 8px;" onclick="event.stopPropagation(); removeSpell(${index})">X</button><span class="chevron">${spell.isOpen ? '▼' : '►'}</span></div></div>`;
-
+        spell.tipo = spell.tipo || "Dano"; spell.bQtd = spell.bQtd || 1; spell.bD = spell.bD || "d20"; spell.bMult = spell.bMult !== undefined ? spell.bMult : 1; spell.isCrit = spell.isCrit || false; spell.statusName = spell.statusName || ""; spell.statusDT = spell.statusDT || ""; spell.audioUrl = spell.audioUrl || "";
+        let isSelf = spell.tipo === "Self"; let row = document.createElement('div'); row.className = 'spell-item';
+        let headerHtml = `<div class="spell-header" onclick="toggleSpellInfo(${index})"><div style="display: flex; align-items: center; gap: 10px;"><button class="btn-roll-spell" onclick="event.stopPropagation(); window.iniciarAtaqueMagia(${index})" title="Rolar Magia">🎲</button><span style="font-weight: bold; color: var(--accent-gold); font-size: 16px;">${spell.nome || 'Nova Magia'}</span></div><div style="display:flex; align-items:center; gap: 10px;"><button class="btn-danger" style="padding: 4px 8px;" onclick="event.stopPropagation(); removeSpell(${index})">X</button><span class="chevron">${spell.isOpen ? '▼' : '►'}</span></div></div>`;
         let bodyHtml = `<div style="display: ${spell.isOpen ? 'flex' : 'none'}; flex-direction: column; gap: 5px; margin-top: 10px;"><div class="inv-row"><input type="text" class="inv-input" style="flex: 2; font-weight: bold;" placeholder="Habilidade" value="${spell.nome}" onchange="updateSpell(${index}, 'nome', this.value)"><input type="number" class="inv-input" style="flex: 1;" placeholder="Custo MP" value="${spell.custo}" onchange="updateSpell(${index}, 'custo', this.value)"><input type="text" class="inv-input" style="flex: 1;" placeholder="Alcance" value="${spell.alcance}" onchange="updateSpell(${index}, 'alcance', this.value)"></div><div class="inv-row" style="margin-top: 5px;"><textarea class="inv-input" style="flex: 1; resize: vertical;" rows="1" placeholder="Descrição e Efeitos..." onchange="updateSpell(${index}, 'desc', this.value)">${spell.desc}</textarea></div><div class="inv-row"><span style="font-size:16px;">🎵</span><input type="text" class="inv-input" style="flex: 1; border-color: #555;" placeholder="URL de Áudio Customizado (Discord Link .mp3)" value="${spell.audioUrl}" onchange="updateSpell(${index}, 'audioUrl', this.value)"></div><div class="dice-config-row"><select class="inv-input dice-sel" style="width:100% !important;" onchange="updateSpell(${index}, 'tipo', this.value); window.renderSpells();"><option value="Dano" ${spell.tipo==='Dano'?'selected':''}>Dano (Base + Runas Globais)</option><option value="Controle" ${spell.tipo==='Controle'?'selected':''}>Controle (Base + Runas Globais)</option><option value="Cura" ${spell.tipo==='Cura'?'selected':''}>Cura (Base + Runas Globais)</option><option value="Locomoção" ${spell.tipo==='Locomoção'?'selected':''}>Locomoção (Base + Runas Globais)</option><option value="Self" ${spell.tipo==='Self'?'selected':''}>Self (Apenas Efeito)</option></select>${(!isSelf) ? `<div class="dice-group"><span class="lbl" style="color:#fff">Base</span><input type="number" class="inv-input dice-qty" min="1" value="${spell.bQtd}" onchange="updateSpell(${index}, 'bQtd', this.value)"><select class="inv-input dice-sel" onchange="updateSpell(${index}, 'bD', this.value)"><option value="d4" ${spell.bD==='d4'?'selected':''}>d4</option><option value="d6" ${spell.bD==='d6'?'selected':''}>d6</option><option value="d8" ${spell.bD==='d8'?'selected':''}>d8</option><option value="d10" ${spell.bD==='d10'?'selected':''}>d10</option><option value="d12" ${spell.bD==='d12'?'selected':''}>d12</option><option value="d20" ${spell.bD==='d20'?'selected':''}>d20</option><option value="d100" ${spell.bD==='d100'?'selected':''}>d100</option></select><div class="mult-group"><span class="mult-btn m-red ${spell.bMult===0?'active':''}" onclick="updateSpell(${index}, 'bMult', 0)">X</span><span class="mult-btn m-white ${spell.bMult===0.5?'active':''}" onclick="updateSpell(${index}, 'bMult', 0.5)">X</span><span class="mult-btn m-green ${spell.bMult===1?'active':''}" onclick="updateSpell(${index}, 'bMult', 1)">X</span></div></div><div style="display:flex; align-items:center; gap:5px; margin-left: auto; width: 100%; justify-content: flex-end; margin-top: 5px;"><input type="checkbox" id="crit-${index}" ${spell.isCrit ? 'checked' : ''} onchange="updateSpell(${index}, 'isCrit', this.checked)"><label for="crit-${index}" style="color:#ffd700; margin:0; cursor:pointer;">Crítico (Base Máx x3)</label></div>` : ''}</div><div class="dice-config-row" style="margin-top: 5px; border-color: #a855f7;"><div style="display: flex; width: 100%; align-items: center; gap: 5px;"><span style="color:#a855f7; font-size: 11px; font-weight: bold; white-space: nowrap;">⚡ Status/Efeito</span><input type="text" class="inv-input" style="flex: 2;" placeholder="Ex: Queimar" value="${spell.statusName}" onchange="updateSpell(${index}, 'statusName', this.value)"><span style="color:#fff; font-size: 11px; font-weight: bold;">DT:</span><input type="number" class="inv-input dice-qty" placeholder="15" value="${spell.statusDT}" onchange="updateSpell(${index}, 'statusDT', this.value)"></div></div></div>`;
         row.innerHTML = headerHtml + bodyHtml; container.appendChild(row);
     });
 }
-
-window.addSpell = function() { playerSpells.push({ nome: "", desc: "", custo: "", alcance: "", tipo: "Dano", bQtd: 1, bD: "d20", bMult: 1, isOpen: true, isCrit: false, statusName: "", statusDT: "", audioUrl: "" }); window.renderSpells(); window.saveData(); }
+window.addSpell = function() { playerSpells.push({ nome: "", desc: "", custo: "", alcance: "", tipo: "Dano", bQtd: 1, bD: "d20", bMult: 1, isOpen: true, isCrit: false, statusName: "", statusDT: "", audioUrl: "", target: "" }); window.renderSpells(); window.saveData(); }
 window.updateSpell = function(index, field, value) { playerSpells[index][field] = value; window.saveData(); window.renderSpells(); }
 window.removeSpell = function(index) { if(confirm("Remover magia?")) { playerSpells.splice(index, 1); window.renderSpells(); window.saveData(); } }
 
-// SISTEMA DE POPUP DE ALVO
-window.closeTargetModal = function() { document.getElementById('target-modal').style.display = 'none'; pendingSpellIndex = null; }
-
-window.rollSpellMagic = function(index) {
-    const spell = playerSpells[index];
-    if(!spell) return;
-    
-    let isFora = document.getElementById('fora-combate') ? document.getElementById('fora-combate').checked : false;
-
-    // TRAVA DE COMBATE! TODOS DEVEM ROLAR
+window.iniciarAtaqueMagia = function(index) {
+    let cb = document.getElementById('fora-combate'); let isFora = cb ? cb.checked : false;
     if (!isFora) {
         let inCombatChars = Object.values(characters).filter(ch => ch.inGame);
         let missing = inCombatChars.filter(ch => !ch.hasRolledTurn);
-        if (missing.length > 0) {
-            alert("Aguarde as seguintes fichas rolarem os atributos de turno:\n" + missing.map(m=>m.name).join(', '));
-            return;
-        }
+        if (missing.length > 0) { alert("Aguarde as seguintes fichas rolarem os atributos de turno:\n" + missing.map(m=>m.name).join(', ')); return; }
     }
-
+    const spell = playerSpells[index];
     if (spell.tipo === "Dano" || spell.tipo === "Controle" || spell.tipo === "Cura") {
         pendingSpellIndex = index;
-        let sel = document.getElementById('modal-target-select');
-        sel.innerHTML = '<option value="">Sem Alvo Especifico</option>';
-        Object.keys(characters).forEach(k => {
-            let ch = characters[k];
-            if (ch.inGame) {
-                sel.innerHTML += `<option value="${k}">${ch.name}</option>`;
-            }
-        });
+        let sel = document.getElementById('modal-target-select'); sel.innerHTML = '<option value="">Sem Alvo Especifico</option>';
+        Object.keys(characters).forEach(k => { let ch = characters[k]; if (ch.inGame) sel.innerHTML += `<option value="${k}">${ch.name}</option>`; });
         document.getElementById('target-modal').style.display = 'flex';
     } else {
-        // Self e Locomoção não precisa de alvo
-        window.confirmarAtaqueAlvo(""); 
+        pendingSpellIndex = index; window.confirmarAtaqueAlvo(); 
     }
 }
 
 window.confirmarAtaqueAlvo = function() {
-    let targetId = document.getElementById('modal-target-select') ? document.getElementById('modal-target-select').value : "";
-    document.getElementById('target-modal').style.display = 'none';
-    
-    let index = pendingSpellIndex !== null ? pendingSpellIndex : -1;
-    if (index === -1) return;
+    let sel = document.getElementById('modal-target-select'); let targetId = sel ? sel.value : "";
+    let modal = document.getElementById('target-modal'); if(modal) modal.style.display = 'none';
+    let index = pendingSpellIndex !== null ? pendingSpellIndex : -1; if (index === -1) return;
     pendingSpellIndex = null;
-
-    const spell = playerSpells[index];
+    const spell = playerSpells[index]; let c = characters[currentCharId];
     let isFora = document.getElementById('fora-combate') ? document.getElementById('fora-combate').checked : false;
-    let charColor = document.getElementById('char-color') ? document.getElementById('char-color').value : '#d4af37';
-    let c = characters[currentCharId];
     
     let manaCost = parseInt(spell.custo) || 0;
     if (manaCost > 0) {
-        if (c.mpAtual < manaCost) {
-            if(!confirm("Mana insuficiente! Deseja castar a magia mesmo assim?")) return;
-        } else {
-            c.mpAtual -= manaCost;
-            safeSetVal('char-mp-atual', c.mpAtual);
-        }
+        if (c.mpAtual < manaCost) { if(!confirm("Mana insuficiente! Deseja castar a magia mesmo assim?")) return; } 
+        else { c.mpAtual -= manaCost; safeSetVal('char-mp-atual', c.mpAtual); }
     }
-
-    const rolar = (qtd, tDado) => {
-        if (!qtd || qtd <= 0 || !tDado) return []; let faces = parseInt(tDado.replace('d', ''));
-        let res = []; for(let i=0; i<qtd; i++) res.push(Math.floor(Math.random() * faces) + 1); return res;
-    }
+    const rolar = (qtd, tDado) => { if (!qtd || qtd <= 0 || !tDado) return []; let faces = parseInt(tDado.replace('d', '')); let res = []; for(let i=0; i<qtd; i++) res.push(Math.floor(Math.random() * faces) + 1); return res; }
     
     let bRolls = [], bTot = 0;
     if(spell.tipo !== 'Self') {
@@ -668,30 +591,22 @@ window.confirmarAtaqueAlvo = function() {
     let grossDamage = bTot; runesPack.forEach(r => grossDamage += r.tot);
 
     const payload = {
-        t: "spell", av: document.getElementById('char-avatar').value, c: document.getElementById('char-name').value || 'Desconhecido', col: charColor, sn: spell.nome || "Habilidade", cost: spell.custo || "0", rg: spell.alcance || "Self", desc: spell.desc || "", st: spell.tipo || "Dano",
+        t: "spell", av: document.getElementById('char-avatar').value, c: document.getElementById('char-name').value || 'Desconhecido', col: document.getElementById('char-color').value || '#d4af37', sn: spell.nome || "Habilidade", cost: spell.custo || "0", rg: spell.alcance || "Self", desc: spell.desc || "", st: spell.tipo || "Dano",
         b: { f: spell.bD, m: spell.bMult, r: bRolls, tot: bTot }, ru: runesPack, crit: spell.isCrit ? "true" : "false", stName: spell.statusName || "", stDT: spell.statusDT || "0", stRoll: stRoll, audio: spell.audioUrl || "", fc: isFora
     };
 
     if (targetId !== "") {
-        let tgt = characters[targetId];
-        payload.targetId = targetId;
-        payload.targetName = tgt ? tgt.name : "Desconhecido";
-
+        let tgt = characters[targetId]; payload.targetId = targetId; payload.targetName = tgt ? tgt.name : "Desconhecido";
         if (spell.tipo === "Cura") {
-            if(tgt) {
-                let maxH = tgt.category==='Monstros' ? (tgt.vidaMonster||100) : (40 + (tgt.sorte||0)*5);
-                tgt.hpAtual = Math.min(maxH, (tgt.hpAtual||0) + grossDamage);
-                payload.healed = grossDamage;
-            }
+            if(tgt) { let maxH = tgt.category==='Monstros' ? (tgt.vidaMonster||100) : (40 + (tgt.sorte||0)*5); tgt.hpAtual = Math.min(maxH, (tgt.hpAtual||0) + grossDamage); payload.healed = grossDamage; }
             window.abrirModalCentral(payload); window.addCombatLog(payload);
-            if (OBR.isAvailable) {
-                OBR.broadcast.sendMessage("fatesheet-rolls", payload);
-                OBR.room.setMetadata({ [`fatesheet_char_${targetId}`]: characters[targetId] }); 
-            }
+            if (OBR.isAvailable) { OBR.broadcast.sendMessage("fatesheet-rolls", payload); OBR.room.setMetadata({ [`fatesheet_char_${targetId}`]: characters[targetId] }); }
         } else if (spell.tipo === "Dano" || spell.tipo === "Controle") {
-            if (OBR.isAvailable) {
-                OBR.room.setMetadata({ fatesheet_clash: payload });
-                alert(`Ataque enviado para ${payload.targetName}! Aguardando Defesa...`);
+            payload.gross = grossDamage;
+            if (OBR.isAvailable) { 
+                OBR.room.setMetadata({ fatesheet_clashes: { [targetId]: payload } }); 
+                alert(`Ataque enviado para ${payload.targetName}! Aguardando Defesa...`); 
+                window.abrirModalCentral(payload); // Atacante vê o dado tbm!
             } else { alert("O sistema precisa estar online no Owlbear!"); }
         } else {
              window.abrirModalCentral(payload); window.addCombatLog(payload);
@@ -703,53 +618,8 @@ window.confirmarAtaqueAlvo = function() {
     }
     
     if(spell.isCrit) spell.isCrit = false;
-    c.activeRunes = []; c.alloc = {f:0, m:0, a:0, s:0};
-    safeSetVal('alloc-forca', 0); safeSetVal('alloc-magia', 0); safeSetVal('alloc-agilidade', 0); safeSetVal('alloc-sorte', 0);
+    c.activeRunes = []; c.alloc = {f:0, m:0, a:0, s:0}; safeSetVal('alloc-forca', 0); safeSetVal('alloc-magia', 0); safeSetVal('alloc-agilidade', 0); safeSetVal('alloc-sorte', 0);
     window.renderGlobalRunes(); window.renderSpells(); window.saveData(); window.renderCombatTracker();
-}
-
-window.checkClashStatus = function() {
-    let cp = document.getElementById('clash-panel');
-    let cd = document.getElementById('clash-desc');
-    if(pendingClash && pendingClash.targetId === currentCharId) {
-        if(cp) cp.style.display = 'block';
-        let dBruto = pendingClash.b.tot + (pendingClash.ru?pendingClash.ru.reduce((a,b)=>a+b.tot,0):0);
-        if(cd) cd.innerText = `Oponente: ${pendingClash.c} | Dano Bruto: ${dBruto}`;
-    } else {
-        if(cp) cp.style.display = 'none';
-    }
-}
-
-window.resolverDefesa = async function() {
-    if(!pendingClash) return;
-    let c = characters[currentCharId];
-    let usedRunes = parseInt(document.getElementById('clash-runes-used')?.value) || 0;
-    let defType = document.getElementById('clash-def-type')?.value || 'fisica';
-
-    if (usedRunes > (c.runas||0)) return alert("Você não tem Runas suficientes!");
-    c.runas -= usedRunes; safeSetVal('char-runas', c.runas);
-
-    let defTotal = usedRunes * (defType === 'fisica' ? ((c.forca||0) * 5) : ((c.magia||0) * 5));
-    let grossDamage = pendingClash.b.tot + (pendingClash.ru?pendingClash.ru.reduce((a,b)=>a+b.tot,0):0);
-    let netDamage = Math.max(0, grossDamage - defTotal);
-    
-    c.hpAtual = (c.hpAtual||0) - netDamage;
-    safeSetVal('char-hp-atual', c.hpAtual);
-    await window.saveData();
-    window.renderCombatTracker();
-
-    pendingClash.blocked = defTotal; pendingClash.net = netDamage;
-    pendingClash.gross = grossDamage; pendingClash.t = "clash"; 
-
-    window.abrirModalCentral(pendingClash);
-    window.addCombatLog(pendingClash);
-    
-    if (OBR.isAvailable) {
-        OBR.broadcast.sendMessage("fatesheet-rolls", pendingClash);
-        await OBR.room.setMetadata({ fatesheet_clash: undefined });
-    }
-    pendingClash = null;
-    window.checkClashStatus();
 }
 
 window.renderInventory = function() {
@@ -765,28 +635,38 @@ window.addInventoryItem = function() { if(isOverweight) return alert("Sua mochil
 window.updateInv = function(index, field, value) { playerInventory[index][field] = value; window.renderInventory(); window.saveData(); }
 window.removeInv = function(index) { playerInventory.splice(index, 1); window.renderInventory(); window.saveData(); }
 
+// SALVAMENTO BLINDADO DE ERROS DE DIGITAÇÃO E CACHE
 window.saveData = async function() {
     if (!currentCharId) return; 
-    let isMonster = document.getElementById('char-category')?.value === 'Monstros';
-    
-    let al = { f: parseInt(document.getElementById('alloc-forca').value)||0, m: parseInt(document.getElementById('alloc-magia').value)||0, a: parseInt(document.getElementById('alloc-agilidade').value)||0, s: parseInt(document.getElementById('alloc-sorte').value)||0 };
-    const sheetData = {
-        name: document.getElementById('char-name')?.value || "Sem Nome", avatar: document.getElementById('char-avatar')?.value || "🧙‍♂️", color: document.getElementById('char-color')?.value || "#d4af37", category: document.getElementById('char-category')?.value || "Jogadores",
-        age: document.getElementById('char-age')?.value || "", race: isMonster ? document.getElementById('char-race-monster').value : document.getElementById('char-race-player').value,
-        classe: document.getElementById('char-class')?.value || "Plebeu", prof: document.getElementById('char-prof')?.value || "", profDesc: document.getElementById('char-prof-desc')?.value || "",
-        vidaMonster: document.getElementById('val-vida-monster')?.value || 100, forca: document.getElementById('attr-forca')?.value || 1, magia: document.getElementById('attr-magia')?.value || 1, agilidade: document.getElementById('attr-agilidade')?.value || 1, sorte: document.getElementById('attr-sorte')?.value || 1,
-        grimoireSelect: document.getElementById('grimoire-select')?.value || "", grimoireDT: document.getElementById('grimoire-dt')?.value || 10, mana: document.getElementById('mana-zone')?.value || "", passiva: document.getElementById('passiva')?.value || "", 
-        mov: document.getElementById('char-mov')?.value || 30, runas: document.getElementById('char-runas')?.value || 0,
-        foraCombate: document.getElementById('fora-combate')?.checked || false, inGame: document.getElementById('char-ingame')?.checked || false,
-        hpAtual: parseInt(document.getElementById('char-hp-atual')?.value) || 0, mpAtual: parseInt(document.getElementById('char-mp-atual')?.value) || 0,
-        skills: playerSkills, inventory: playerInventory, spells: playerSpells, photo: currentPhoto, activeRunes: characters[currentCharId] ? characters[currentCharId].activeRunes : [], alloc: al,
-        hasRolledTurn: characters[currentCharId]?.hasRolledTurn || false, initiative: characters[currentCharId]?.initiative || 0
-    };
-    characters[currentCharId] = sheetData;
-    try { localStorage.setItem('fatesheet_db', JSON.stringify(characters)); } catch(e){}
-
-    if (OBR.isAvailable) await OBR.room.setMetadata({ [`fatesheet_char_${currentCharId}`]: sheetData });
+    try {
+        let c = characters[currentCharId] || {};
+        // Só puxa da tela se for a ficha que está ativamente aberta!
+        if (document.getElementById('screen-sheet').classList.contains('active')) {
+            let isMonster = document.getElementById('char-category')?.value === 'Monstros';
+            let al = { f: parseInt(document.getElementById('alloc-forca')?.value)||0, m: parseInt(document.getElementById('alloc-magia')?.value)||0, a: parseInt(document.getElementById('alloc-agilidade')?.value)||0, s: parseInt(document.getElementById('alloc-sorte')?.value)||0 };
+            
+            c.name = document.getElementById('char-name')?.value || "Sem Nome"; c.avatar = document.getElementById('char-avatar')?.value || "🧙‍♂️"; c.color = document.getElementById('char-color')?.value || "#d4af37"; c.category = document.getElementById('char-category')?.value || "Jogadores";
+            c.age = document.getElementById('char-age')?.value || ""; c.race = isMonster ? document.getElementById('char-race-monster')?.value : document.getElementById('char-race-player')?.value;
+            c.classe = document.getElementById('char-class')?.value || "Plebeu"; c.prof = document.getElementById('char-prof')?.value || ""; c.profDesc = document.getElementById('char-prof-desc')?.value || "";
+            c.vidaMonster = document.getElementById('val-vida-monster')?.value || 100; c.forca = document.getElementById('attr-forca')?.value || 1; c.magia = document.getElementById('attr-magia')?.value || 1; c.agilidade = document.getElementById('attr-agilidade')?.value || 1; c.sorte = document.getElementById('attr-sorte')?.value || 1;
+            c.grimoireSelect = document.getElementById('grimoire-select')?.value || ""; c.grimoireDT = document.getElementById('grimoire-dt')?.value || 10; c.mana = document.getElementById('mana-zone')?.value || ""; c.passiva = document.getElementById('passiva')?.value || ""; 
+            c.mov = document.getElementById('char-mov')?.value || 30; c.runas = document.getElementById('char-runas')?.value || 0;
+            c.foraCombate = document.getElementById('fora-combate')?.checked || false; c.inGame = document.getElementById('char-ingame')?.checked || false;
+            c.hpAtual = parseInt(document.getElementById('char-hp-atual')?.value) || 0; c.mpAtual = parseInt(document.getElementById('char-mp-atual')?.value) || 0;
+            c.alloc = al; c.skills = playerSkills; c.inventory = playerInventory; c.spells = playerSpells; c.photo = currentPhoto; 
+        }
+        characters[currentCharId] = c;
+        try { localStorage.setItem('fatesheet_db', JSON.stringify(characters)); } catch(e){}
+        if (OBR.isAvailable) await OBR.room.setMetadata({ [`fatesheet_char_${currentCharId}`]: characters[currentCharId] });
+    } catch(e) { console.error("Erro no save:", e); }
 }
+
+let saveTimeout;
+document.addEventListener('input', (e) => {
+    if(e.target.id && e.target.id.startsWith('alloc')) return; 
+    clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(() => { if(currentCharId) window.saveData(); }, 800);
+});
 
 window.renderSkills = function() {
     const container = document.getElementById('skills-container'); if(!container) return; container.innerHTML = '';
@@ -805,14 +685,10 @@ window.rollSkill = function(skillName, attrName) {
     let classe = document.getElementById('char-class')?.value || 'Plebeu'; let isMonster = document.getElementById('char-category')?.value === 'Monstros';
     let isFora = document.getElementById('fora-combate') ? document.getElementById('fora-combate').checked : false;
 
-    // TRAVA NA PERÍCIA TAMBÉM SE ESTIVER EM COMBATE
     if (!isFora) {
         let inCombatChars = Object.values(characters).filter(ch => ch.inGame);
         let missing = inCombatChars.filter(ch => !ch.hasRolledTurn);
-        if (missing.length > 0) {
-            alert("Aguarde as seguintes fichas rolarem os atributos de turno:\n" + missing.map(m=>m.name).join(', '));
-            return;
-        }
+        if (missing.length > 0) { alert("Aguarde as seguintes fichas rolarem os atributos de turno:\n" + missing.map(m=>m.name).join(', ')); return; }
     }
 
     if(!isMonster) {
@@ -831,19 +707,23 @@ window.rollSkill = function(skillName, attrName) {
     if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", payload);
 }
 
+window.abrirModalCentral = function(data) {
+    if (OBR.isAvailable) {
+        const dataUrl = encodeURIComponent(JSON.stringify(data));
+        OBR.modal.open({ id: "fate-roll-modal", url: `https://seediam.github.io/FateSheet/resultado.html?data=${dataUrl}`, width: 450, height: (data.t === "spell" || data.t === "attr" || data.t === "clash") ? 550 : 250 });
+    }
+}
+
+// SINCRONIZAÇÃO A PROVA DE FALHAS
 function processRoomData(metadata) {
     let mudouAlgo = false;
     
-    if (metadata["fatesheet_log_v6"] !== undefined) {
-        combatLog = metadata["fatesheet_log_v6"];
-        window.renderMiniLog();
-    }
+    if (metadata["fatesheet_log_v8"] !== undefined) { combatLog = metadata["fatesheet_log_v8"]; window.renderMiniLog(); }
     
-    if (metadata["fatesheet_clash"] !== undefined) {
-        pendingClash = metadata["fatesheet_clash"];
-        window.checkClashStatus();
-    } else {
-        pendingClash = null;
+    if (metadata["fatesheet_clashes"] !== undefined) {
+        let allClashes = metadata["fatesheet_clashes"];
+        if (currentCharId && allClashes[currentCharId]) { pendingClash = allClashes[currentCharId]; } 
+        else { pendingClash = null; }
         window.checkClashStatus();
     }
 
@@ -853,44 +733,33 @@ function processRoomData(metadata) {
             if (metadata[key] === undefined || metadata[key] === null) {
                 if(characters[id]) { delete characters[id]; mudouAlgo = true; }
             } else { 
-                if (currentCharId === id && document.activeElement && document.activeElement.id.startsWith('char-')) {
-                    // Ignora
-                } else {
-                    characters[id] = metadata[key]; mudouAlgo = true; 
-                }
+                let isTyping = document.activeElement && document.activeElement.tagName === "INPUT";
+                if (currentCharId === id && isTyping) {
+                    // Mestre está digitando na ficha, pula para não apagar a palavra
+                } else { characters[id] = metadata[key]; mudouAlgo = true; }
             }
         }
     }
     if (mudouAlgo) {
-        window.renderCharacterList();
-        window.renderCombatTracker();
+        try { window.renderCharacterList(); } catch(e){}
+        try { window.renderCombatTracker(); } catch(e){}
         if (currentCharId) {
-            safeSetVal('char-hp-atual', characters[currentCharId].hpAtual);
-            safeSetVal('char-mp-atual', characters[currentCharId].mpAtual);
-            safeSetVal('char-runas', characters[currentCharId].runas);
+            let hpF = document.getElementById('char-hp-atual'); if (hpF && document.activeElement !== hpF) hpF.value = characters[currentCharId].hpAtual;
+            let mpF = document.getElementById('char-mp-atual'); if (mpF && document.activeElement !== mpF) mpF.value = characters[currentCharId].mpAtual;
+            let rnF = document.getElementById('char-runas'); if (rnF && document.activeElement !== rnF) rnF.value = characters[currentCharId].runas;
         }
     }
 }
 
 function initExtension() {
-    try {
-        const saved = localStorage.getItem('fatesheet_db');
-        if (saved) characters = JSON.parse(saved);
-        window.renderCharacterList();
-    } catch(e) {}
-
+    try { const saved = localStorage.getItem('fatesheet_db'); if (saved) characters = JSON.parse(saved); window.renderCharacterList(); } catch(e) {}
     if (OBR.isAvailable) {
         OBR.onReady(async () => {
             try {
                 const meta = await OBR.room.getMetadata();
                 processRoomData(meta);
                 OBR.room.onMetadataChange((metadata) => processRoomData(metadata));
-                
-                OBR.broadcast.onMessage("fatesheet-log-update", (event) => {
-                    combatLog = event.data;
-                    window.renderMiniLog();
-                });
-                
+                OBR.broadcast.onMessage("fatesheet-log-update", (event) => { combatLog = event.data; window.renderMiniLog(); });
                 OBR.broadcast.onMessage("fatesheet-rolls", (event) => { window.abrirModalCentral(event.data); });
             } catch(e) {}
         });
