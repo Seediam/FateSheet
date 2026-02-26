@@ -113,9 +113,9 @@
         
         @keyframes pulseAlert { 0% { box-shadow: 0 0 5px #ff4444; } 50% { box-shadow: 0 0 20px #ff4444; } 100% { box-shadow: 0 0 5px #ff4444; } }
         
+        /* OVERLAY DO POPUP DE ALVO */
         .modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:9999; justify-content:center; align-items:center; }
         .modal-content { background:var(--bg-panel); border:2px solid var(--accent-gold); padding:20px; border-radius:8px; width:85%; max-width:300px; box-shadow: 0 0 30px rgba(0,0,0,0.8); }
-        .section-title { color: var(--accent-gold); margin: 20px 0 10px 0; border-bottom: 1px solid var(--border-subtle); padding-bottom: 5px; font-size: 14px; }
     </style>
 </head>
 <body>
@@ -135,11 +135,7 @@
 
     <div class="app-container" id="app">
         <div id="screen-list" class="screen active">
-            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px; margin-bottom: 15px;">
-                <h3 class="section-title" style="margin: 0; border: none;">Mesa Global</h3>
-                <button class="btn-ctrl" style="width:auto; padding: 6px 12px; background:#1a1a24; color:#44aaff; font-size:12px; border: 1px solid #44aaff;" onclick="abrirJanelaDeLog()">📜 Abrir Log</button>
-            </div>
-            
+            <h3 class="section-title" style="text-align: center; margin-top: 5px; border:none;">Mesa Global</h3>
             <button class="btn-new" onclick="createNewCharacter()">+ Criar Novo Personagem</button>
             <input type="file" id="import-file" accept=".json" style="display: none;" onchange="importCharacter(event)">
             <button class="btn-import" onclick="document.getElementById('import-file').click()">📥 Importar Ficha (JSON)</button>
@@ -186,13 +182,13 @@
                     <div style="flex: 1;">
                         <div class="form-group" style="position: relative;">
                             <label>Nome</label>
-                            <input type="text" id="char-name" onchange="saveData()">
+                            <input type="text" id="char-name" onblur="saveData()">
                             <div id="char-fc-badge" style="display:none; color:#888; font-size:10px; font-weight:bold; position:absolute; top: 0; right: 0;">[ Fora de Combate ]</div>
                         </div>
                         <div style="display: flex; gap: 5px;">
                             <div class="form-group" style="flex: 2;">
                                 <label>Raça</label>
-                                <input type="text" id="char-race-player" value="Humano" onchange="saveData()">
+                                <input type="text" id="char-race-player" value="Humano" onblur="saveData()">
                                 <select id="char-race-monster" style="display: none;" onchange="saveData()">
                                     <option value="Terrestres">Terrestres</option><option value="Voadores">Voadores</option><option value="Aquáticos">Aquáticos</option>
                                 </select>
@@ -214,7 +210,7 @@
                                 <option value="Estrangeiro">Estrangeiro</option><option value="Nobre">Nobre</option>
                             </select>
                         </div>
-                        <div class="form-group" style="flex: 1;"><label>Profissão</label><input type="text" id="char-prof" onchange="saveData()"></div>
+                        <div class="form-group" style="flex: 1;"><label>Profissão</label><input type="text" id="char-prof" onblur="saveData()"></div>
                     </div>
                 </div>
 
@@ -229,17 +225,17 @@
                     <div class="status-item" id="hp-player-wrapper">
                         <label style="color:#ff4444">Vida</label>
                         <div style="display:flex; justify-content:center; align-items:baseline;">
-                            <input type="number" id="char-hp-atual" class="status-input" value="40" onchange="saveData()"> 
+                            <input type="number" id="char-hp-atual" class="status-input" value="40" onblur="saveData()"> 
                             <span style="margin: 0 5px;">/</span> 
                             <span id="val-vida-max" class="status-max">40</span>
                         </div>
                     </div>
-                    <input type="number" id="val-vida-monster" value="100" style="display:none; width: 100%; background: transparent; border: none; color: #fff; font-size: 18px; font-weight: bold; text-align: center; outline: none; border-bottom: 1px dashed #ff4444; margin-top: 5px;" onchange="saveData()">
+                    <input type="number" id="val-vida-monster" value="100" style="display:none; width: 100%; background: transparent; border: none; color: #fff; font-size: 18px; font-weight: bold; text-align: center; outline: none; border-bottom: 1px dashed #ff4444; margin-top: 5px;" onblur="saveData()">
                     
                     <div class="status-item">
                         <label style="color:#44aaff">Mana</label>
                         <div style="display:flex; justify-content:center; align-items:baseline;">
-                            <input type="number" id="char-mp-atual" class="status-input" value="25" onchange="saveData()"> 
+                            <input type="number" id="char-mp-atual" class="status-input" value="25" onblur="saveData()"> 
                             <span style="margin: 0 5px;">/</span> 
                             <span id="val-mana-max" class="status-max">25</span>
                         </div>
@@ -248,7 +244,7 @@
                     <div class="form-group" style="width: 50px; margin-bottom: 0;">
                         <label style="text-align: center; color:#a855f7;">Runas</label>
                         <div style="display:flex; align-items:center; background: var(--bg-panel); border: 1px solid var(--border-subtle); border-radius: 6px;">
-                            <input type="number" id="char-runas" value="0" style="border:none; background:transparent; padding: 8px 2px; text-align:center; color:#fff; width:100%;" onchange="saveData()">
+                            <input type="number" id="char-runas" value="0" style="border:none; background:transparent; padding: 8px 2px; text-align:center; color:#fff; width:100%;" onblur="saveData()">
                         </div>
                     </div>
                 </div>
@@ -291,9 +287,9 @@
                             <optgroup label="5 Folhas"><option value="Negação">Negação</option><option value="Criação">Criação</option><option value="Imaginação">Imaginação</option><option value="Realidade">Realidade</option></optgroup>
                         </select>
                     </div>
-                    <div class="form-group" style="flex: 1;"><label>DT</label><input type="number" id="grimoire-dt" value="10" onchange="saveData()"></div>
+                    <div class="form-group" style="flex: 1;"><label>DT</label><input type="number" id="grimoire-dt" value="10" onblur="saveData()"></div>
                 </div>
-                <div class="form-group"><label>🌟 Passiva do Grimório</label><textarea id="passiva" rows="4" onchange="saveData()"></textarea></div>
+                <div class="form-group"><label>🌟 Passiva do Grimório</label><textarea id="passiva" rows="4" onblur="saveData()"></textarea></div>
                 
                 <h4 class="section-title" style="display: flex; justify-content: space-between; align-items: center; margin-top: 30px;">
                     Habilidades Ativas <button class="btn-ctrl" style="width:auto; padding: 4px 12px; font-size: 11px;" onclick="addSpell()">+ Magia</button>
@@ -332,6 +328,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@2/lib/index.js"></script>
-    <script type="module" src="script.js?v=000212"></script>
+    <script type="module" src="script.js?v=999912"></script>
 </body>
 </html>
