@@ -5,7 +5,7 @@ const skillsData = [
     { name: "Intuição", attr: "Sorte" }, { name: "Medicina", attr: "Sorte" }, { name: "Percepção", attr: "Sorte" }, { name: "Sobrevivência", attr: "Sorte" },
     { name: "Atletismo", attr: "Força" }, { name: "Intimidação", attr: "Força" },
     { name: "Acrobacia", attr: "Agilidade" }, { name: "Furtividade", attr: "Agilidade" }, { name: "Prestidigitação", attr: "Agilidade" },
-    { name: "Atuação", attr: "Sorte" }, { name: "Enganação", attr: "Sorte" }, { name: "Persuasão", attr: "Sorte" } , { name: "Vigor", attr: "Sorte" } , { name: "Fortitude", attr: "Força" }
+    { name: "Atuação", attr: "Sorte" }, { name: "Enganação", attr: "Sorte" }, { name: "Persuasão", attr: "Sorte" }
 ];
 
 const grimoiresDb = {
@@ -47,6 +47,7 @@ const grimoiresDb = {
 let characters = {}; 
 let combatLog = []; 
 let currentCharId = null;
+let currentIsMine = true; 
 let playerSkills = {}; 
 let playerInventory = [];
 let playerSpells = []; 
@@ -165,26 +166,31 @@ window.updateSheetColor = function() {
 }
 
 window.updateCategoryUI = function() {
-    const cat = document.getElementById('char-category').value;
+    const cat = document.getElementById('char-category')?.value;
     const isMonster = (cat === 'Monstros');
-    document.getElementById('box-classe-prof').style.display = isMonster ? 'none' : 'block';
-    document.getElementById('char-race-player').style.display = isMonster ? 'none' : 'block';
-    document.getElementById('char-race-monster').style.display = isMonster ? 'block' : 'none';
-    document.getElementById('val-vida-player').style.display = isMonster ? 'none' : 'block';
-    document.getElementById('val-vida-monster').style.display = isMonster ? 'block' : 'none';
+    
+    const safeDisplay = (id, display) => { let el = document.getElementById(id); if(el) el.style.display = display; };
+
+    safeDisplay('box-classe-prof', isMonster ? 'none' : 'block');
+    safeDisplay('char-race-player', isMonster ? 'none' : 'block');
+    safeDisplay('char-race-monster', isMonster ? 'block' : 'none');
+    safeDisplay('hp-player-wrapper', isMonster ? 'none' : 'flex');
+    safeDisplay('val-vida-monster', isMonster ? 'block' : 'none');
+    
     window.calcVitals();
     window.saveData();
 }
 
 window.changeGrimoire = function() {
-    let val = document.getElementById('grimoire-select').value;
-    document.getElementById('passiva').value = grimoiresDb[val] || "";
+    let val = document.getElementById('grimoire-select')?.value;
+    if(val) document.getElementById('passiva').value = grimoiresDb[val] || "";
     window.saveData();
 }
 
 window.openCharacter = function(id) {
     currentCharId = id;
     const c = characters[id] || {};
+    currentIsMine = true;
     
     safeSetVal('char-avatar', c.avatar || '🧙‍♂️');
     safeSetVal('char-name', c.name || '');
@@ -245,38 +251,53 @@ window.openCharacter = function(id) {
 }
 
 window.calcVitals = function() {
-    let cat = document.getElementById('char-category').value;
-    let forcaBase = parseInt(document.getElementById('attr-forca').value) || 0;
-    let magiaBase = parseInt(document.getElementById('attr-magia').value) || 0;
-    let sorteBase = parseInt(document.getElementById('attr-sorte').value) || 0;
-    let classe = document.getElementById('char-class').value;
+    let cat = document.getElementById('char-category')?.value;
+    let forcaBase = parseInt(document.getElementById('attr-forca')?.value) || 0;
+    let magiaBase = parseInt(document.getElementById('attr-magia')?.value) || 0;
+    let sorteBase = parseInt(document.getElementById('attr-sorte')?.value) || 0;
+    let classe = document.getElementById('char-class')?.value || 'Plebeu';
+
+    let elVidaM = document.getElementById('val-vida-max');
+    let elManaM = document.getElementById('val-mana-max');
 
     if (cat !== 'Monstros') {
         let extraMana = 0;
         if(classe === 'Andarilho') extraMana = 50;
         if(classe === 'Estrangeiro') extraMana = 75;
         if(classe === 'Nobre') extraMana = 100;
-        document.getElementById('val-vida-max').innerText = 40 + (sorteBase * 5);
-        document.getElementById('val-mana-max').innerText = 25 + extraMana;
+        
+        if(elVidaM) elVidaM.innerText = 40 + (sorteBase * 5);
+        if(elManaM) elManaM.innerText = 25 + extraMana;
     } else {
-        document.getElementById('val-mana-max').innerText = 25;
+        if(elManaM) elManaM.innerText = 25;
+        if(elVidaM) {
+            let mv = document.getElementById('val-vida-monster')?.value || 100;
+            elVidaM.innerText = mv;
+        }
     }
 
-    document.getElementById('val-def-fisica').innerText = forcaBase * 5;
-    document.getElementById('val-def-magica').innerText = magiaBase * 5;
+    let dfFis = document.getElementById('val-def-fisica');
+    let dfMag = document.getElementById('val-def-magica');
+    if(dfFis) dfFis.innerText = forcaBase * 5;
+    if(dfMag) dfMag.innerText = magiaBase * 5;
 
     let maxWeight = forcaBase * 5;
     let currentWeight = playerInventory.reduce((acc, item) => acc + ((parseFloat(item.peso)||0) * (parseInt(item.qtd)||1)), 0);
-    document.getElementById('val-peso').innerText = `${currentWeight.toFixed(1)} / ${maxWeight}`;
     
+    let ep = document.getElementById('val-peso');
+    if(ep) ep.innerText = `${currentWeight.toFixed(1)} / ${maxWeight}`;
+    
+    let bp = document.getElementById('box-peso');
+    let pa = document.getElementById('peso-aviso');
+
     if (currentWeight > maxWeight) {
         isOverweight = true;
-        document.getElementById('box-peso').classList.add('overweight');
-        document.getElementById('peso-aviso').style.display = 'block';
+        if(bp) bp.classList.add('overweight');
+        if(pa) pa.style.display = 'block';
     } else {
         isOverweight = false;
-        document.getElementById('box-peso').classList.remove('overweight');
-        document.getElementById('peso-aviso').style.display = 'none';
+        if(bp) bp.classList.remove('overweight');
+        if(pa) pa.style.display = 'none';
     }
 }
 
@@ -289,7 +310,7 @@ window.renderCombatTracker = function() {
     for(let id in characters) {
         let c = characters[id];
         if(c.inGame) {
-            let hpM = c.category==='Monstros' ? c.vidaMonster : (40 + (c.sorte||0)*5);
+            let hpM = c.category==='Monstros' ? (c.vidaMonster||100) : (40 + (c.sorte||0)*5);
             let mpM = c.category==='Monstros' ? 25 : 25 + (c.classe==='Andarilho'?25:c.classe==='Estrangeiro'?50:c.classe==='Nobre'?75:0);
             
             html += `<div style="background:var(--bg-panel); padding:8px; margin-bottom:5px; border-left:4px solid ${c.color || '#fff'}; border-radius:4px; display:flex; justify-content:space-between; align-items:center;">
@@ -302,24 +323,27 @@ window.renderCombatTracker = function() {
             targetOptionsHTML += `<option value="${id}">${c.name}</option>`;
         }
     }
-    if(html === '') html = '<div style="color:#666; text-align:center; padding: 20px;">Ninguém marcado na Cena de Combate ainda.</div>';
+    if(html === '') html = '<div style="color:#666; text-align:center; padding: 20px;">Ninguém marcado na Cena de Combate.</div>';
     container.innerHTML = html;
 }
 
 window.updateAlloc = function() {
-    let isFora = document.getElementById('fora-combate') ? document.getElementById('fora-combate').checked : false;
-    document.getElementById('char-fc-badge').style.display = isFora ? 'block' : 'none'; 
-    let maxRunes = parseInt(document.getElementById('char-runas').value) || 0;
+    let cb = document.getElementById('fora-combate');
+    let isFora = cb ? cb.checked : false;
+    let bdg = document.getElementById('char-fc-badge');
+    if(bdg) bdg.style.display = isFora ? 'block' : 'none'; 
+    
+    let maxRunes = parseInt(document.getElementById('char-runas')?.value) || 0;
 
-    let f = parseInt(document.getElementById('alloc-forca').value) || 0;
-    let m = parseInt(document.getElementById('alloc-magia').value) || 0;
-    let a = parseInt(document.getElementById('alloc-agilidade').value) || 0;
-    let s = parseInt(document.getElementById('alloc-sorte').value) || 0;
+    let f = parseInt(document.getElementById('alloc-forca')?.value) || 0;
+    let m = parseInt(document.getElementById('alloc-magia')?.value) || 0;
+    let a = parseInt(document.getElementById('alloc-agilidade')?.value) || 0;
+    let s = parseInt(document.getElementById('alloc-sorte')?.value) || 0;
 
-    let maxF = parseInt(document.getElementById('attr-forca').value) || 0;
-    let maxM = parseInt(document.getElementById('attr-magia').value) || 0;
-    let maxA = parseInt(document.getElementById('attr-agilidade').value) || 0;
-    let maxS = parseInt(document.getElementById('attr-sorte').value) || 0;
+    let maxF = parseInt(document.getElementById('attr-forca')?.value) || 0;
+    let maxM = parseInt(document.getElementById('attr-magia')?.value) || 0;
+    let maxA = parseInt(document.getElementById('attr-agilidade')?.value) || 0;
+    let maxS = parseInt(document.getElementById('attr-sorte')?.value) || 0;
 
     if(f > maxF) { f = maxF; safeSetVal('alloc-forca', f); }
     if(m > maxM) { m = maxM; safeSetVal('alloc-magia', m); }
@@ -336,20 +360,23 @@ window.updateAlloc = function() {
 
 const getMultFromRoll = (val) => { if(val <= 4) return 0; if(val <= 11) return 0.5; return 1; };
 
+// ------ BLINDAGEM DO LOG: BUSCA NA NUVEM ANTES DE SALVAR (LIMITA EM 7) ------
 window.addCombatLog = async function(data) {
     if (OBR.isAvailable) {
         try {
             let meta = await OBR.room.getMetadata();
-            let nuvemLog = meta["fatesheet_log_v5"] || [];
+            let nuvemLog = meta["fatesheet_log_v6"] || [];
+            
             nuvemLog.unshift(data);
-            if(nuvemLog.length > 20) nuvemLog.pop();
+            if(nuvemLog.length > 7) nuvemLog.length = 7; // Mantém exatamente 7 rolagens!!!
+            
             combatLog = nuvemLog;
-            await OBR.room.setMetadata({ "fatesheet_log_v5": combatLog });
+            await OBR.room.setMetadata({ "fatesheet_log_v6": combatLog });
             OBR.broadcast.sendMessage("fatesheet-log-update", combatLog);
         } catch(e) {}
     } else {
         combatLog.unshift(data);
-        if(combatLog.length > 20) combatLog.pop();
+        if(combatLog.length > 7) combatLog.length = 7;
     }
     window.renderMiniLog();
 }
@@ -358,7 +385,7 @@ window.clearMiniLog = async function() {
     if(confirm('Tem certeza que deseja apagar o histórico de combate para toda a mesa?')) {
         combatLog = [];
         if (OBR.isAvailable) {
-            await OBR.room.setMetadata({ "fatesheet_log_v5": [] });
+            await OBR.room.setMetadata({ "fatesheet_log_v6": [] });
             OBR.broadcast.sendMessage("fatesheet-log-update", []);
         }
         window.renderMiniLog();
@@ -369,7 +396,6 @@ window.renderMiniLog = function() {
     const container = document.getElementById('mini-log-container');
     if(!container) return;
     container.innerHTML = '';
-    
     if (!Array.isArray(combatLog)) return; 
     
     combatLog.forEach(log => {
@@ -437,7 +463,8 @@ window.renderMiniLog = function() {
 }
 
 window.rollAttributes = function() {
-    let isFora = document.getElementById('fora-combate') ? document.getElementById('fora-combate').checked : false;
+    let cb = document.getElementById('fora-combate');
+    let isFora = cb ? cb.checked : false;
     let f = parseInt(document.getElementById('alloc-forca').value) || 0;
     let m = parseInt(document.getElementById('alloc-magia').value) || 0;
     let a = parseInt(document.getElementById('alloc-agilidade').value) || 0;
@@ -496,7 +523,7 @@ window.updateGlobalRune = function(idx, field, val) { characters[currentCharId].
 window.removeGlobalRune = function(idx) { characters[currentCharId].activeRunes.splice(idx, 1); window.saveData(); window.renderGlobalRunes(); }
 
 window.renderGlobalRunes = function() {
-    const container = document.getElementById('global-runes-container'); container.innerHTML = '';
+    const container = document.getElementById('global-runes-container'); if(!container) return; container.innerHTML = '';
     let c = characters[currentCharId];
     if(!c || !c.activeRunes || c.activeRunes.length === 0) {
         container.innerHTML = `<div style="display:flex; gap:8px;"><button class="btn-rune b-alpha" onclick="addGlobalRune('alpha')">+ α Azul</button><button class="btn-rune b-delta" onclick="addGlobalRune('delta')">+ δ Verm</button><button class="btn-rune b-beta" onclick="addGlobalRune('beta')">+ β Roxo</button><button class="btn-rune b-arma" onclick="addGlobalRune('arma')">+ ⚔️ Arma</button></div>`; return;
@@ -520,7 +547,7 @@ window.renderGlobalRunes = function() {
 window.toggleSpellInfo = function(index) { playerSpells[index].isOpen = !playerSpells[index].isOpen; window.renderSpells(); window.saveData(); }
 
 window.renderSpells = function() {
-    const container = document.getElementById('spells-container'); container.innerHTML = '';
+    const container = document.getElementById('spells-container'); if(!container) return; container.innerHTML = '';
     playerSpells.forEach((spell, index) => {
         if(spell.isOpen === undefined) spell.isOpen = true;
         spell.tipo = spell.tipo || "Dano"; spell.bQtd = spell.bQtd || 1; spell.bD = spell.bD || "d20"; spell.bMult = spell.bMult !== undefined ? spell.bMult : 1;
@@ -545,7 +572,8 @@ window.removeSpell = function(index) { if(confirm("Remover magia?")) { playerSpe
 window.rollSpellMagic = function(index) {
     const spell = playerSpells[index];
     if(!spell) return;
-    let isFora = document.getElementById('fora-combate') ? document.getElementById('fora-combate').checked : false;
+    let cb = document.getElementById('fora-combate');
+    let isFora = cb ? cb.checked : false;
 
     const charName = document.getElementById('char-name').value || 'Desconhecido';
     const charColor = document.getElementById('char-color') ? document.getElementById('char-color').value : '#d4af37';
@@ -593,7 +621,7 @@ window.rollSpellMagic = function(index) {
 
         if (spell.tipo === "Cura") {
             if(tgt) {
-                let maxH = tgt.category==='Monstros' ? tgt.vidaMonster : (40 + (tgt.sorte||0)*5);
+                let maxH = tgt.category==='Monstros' ? (tgt.vidaMonster||100) : (40 + (tgt.sorte||0)*5);
                 tgt.hpAtual = Math.min(maxH, (tgt.hpAtual||0) + grossDamage);
                 payload.healed = grossDamage;
             }
@@ -623,25 +651,27 @@ window.rollSpellMagic = function(index) {
 }
 
 window.checkClashStatus = function() {
+    let cp = document.getElementById('clash-panel');
+    let cd = document.getElementById('clash-desc');
     if(pendingClash && pendingClash.targetId === currentCharId) {
-        document.getElementById('clash-panel').style.display = 'block';
+        if(cp) cp.style.display = 'block';
         let dBruto = pendingClash.b.tot + (pendingClash.ru?pendingClash.ru.reduce((a,b)=>a+b.tot,0):0);
-        document.getElementById('clash-desc').innerText = `Oponente: ${pendingClash.c} | Dano Bruto: ${dBruto}`;
+        if(cd) cd.innerText = `Oponente: ${pendingClash.c} | Dano Bruto: ${dBruto}`;
     } else {
-        document.getElementById('clash-panel').style.display = 'none';
+        if(cp) cp.style.display = 'none';
     }
 }
 
 window.resolverDefesa = async function() {
     if(!pendingClash) return;
     let c = characters[currentCharId];
-    let usedRunes = parseInt(document.getElementById('clash-runes-used').value) || 0;
-    let defType = document.getElementById('clash-def-type').value;
+    let usedRunes = parseInt(document.getElementById('clash-runes-used')?.value) || 0;
+    let defType = document.getElementById('clash-def-type')?.value || 'fisica';
 
-    if (usedRunes > c.runas) return alert("Você não tem Runas suficientes!");
+    if (usedRunes > (c.runas||0)) return alert("Você não tem Runas suficientes!");
     c.runas -= usedRunes; safeSetVal('char-runas', c.runas);
 
-    let defTotal = usedRunes * (defType === 'fisica' ? (c.forca * 5) : (c.magia * 5));
+    let defTotal = usedRunes * (defType === 'fisica' ? ((c.forca||0) * 5) : ((c.magia||0) * 5));
     let grossDamage = pendingClash.b.tot + (pendingClash.ru?pendingClash.ru.reduce((a,b)=>a+b.tot,0):0);
     let netDamage = Math.max(0, grossDamage - defTotal);
     
@@ -665,7 +695,7 @@ window.resolverDefesa = async function() {
 }
 
 window.renderInventory = function() {
-    const container = document.getElementById('inventory-container'); container.innerHTML = '';
+    const container = document.getElementById('inventory-container'); if(!container) return; container.innerHTML = '';
     playerInventory.forEach((item, index) => {
         let row = document.createElement('div'); row.className = 'inv-item';
         row.innerHTML = `<div class="inv-row"><input type="text" class="inv-input" style="flex: 2;" placeholder="Item" value="${item.nome}" onchange="updateInv(${index}, 'nome', this.value)"><input type="number" class="inv-input" style="flex: 1;" placeholder="Peso" value="${item.peso}" onchange="updateInv(${index}, 'peso', this.value)"><input type="number" class="inv-input" style="flex: 1;" placeholder="Qtd" value="${item.qtd}" onchange="updateInv(${index}, 'qtd', this.value)"><button class="btn-danger" onclick="removeInv(${index})">X</button></div><div class="inv-row" style="margin-top: 5px;"><input type="text" class="inv-input" style="flex: 1;" placeholder="Descrição..." value="${item.desc}" onchange="updateInv(${index}, 'desc', this.value)"></div>`;
@@ -681,10 +711,10 @@ window.saveData = async function() {
     if (!currentCharId) return; 
     let isMonster = document.getElementById('char-category')?.value === 'Monstros';
     
-    let al = { f: parseInt(document.getElementById('alloc-forca').value)||0, m: parseInt(document.getElementById('alloc-magia').value)||0, a: parseInt(document.getElementById('alloc-agilidade').value)||0, s: parseInt(document.getElementById('alloc-sorte').value)||0 };
+    let al = { f: parseInt(document.getElementById('alloc-forca')?.value)||0, m: parseInt(document.getElementById('alloc-magia')?.value)||0, a: parseInt(document.getElementById('alloc-agilidade')?.value)||0, s: parseInt(document.getElementById('alloc-sorte')?.value)||0 };
     const sheetData = {
         name: document.getElementById('char-name')?.value || "Sem Nome", avatar: document.getElementById('char-avatar')?.value || "🧙‍♂️", color: document.getElementById('char-color')?.value || "#d4af37", category: document.getElementById('char-category')?.value || "Jogadores",
-        age: document.getElementById('char-age')?.value || "", race: isMonster ? document.getElementById('char-race-monster').value : document.getElementById('char-race-player').value,
+        age: document.getElementById('char-age')?.value || "", race: isMonster ? document.getElementById('char-race-monster')?.value : document.getElementById('char-race-player')?.value,
         classe: document.getElementById('char-class')?.value || "Plebeu", prof: document.getElementById('char-prof')?.value || "", profDesc: document.getElementById('char-prof-desc')?.value || "",
         vidaMonster: document.getElementById('val-vida-monster')?.value || 100, forca: document.getElementById('attr-forca')?.value || 1, magia: document.getElementById('attr-magia')?.value || 1, agilidade: document.getElementById('attr-agilidade')?.value || 1, sorte: document.getElementById('attr-sorte')?.value || 1,
         grimoireSelect: document.getElementById('grimoire-select')?.value || "", grimoireDT: document.getElementById('grimoire-dt')?.value || 10, mana: document.getElementById('mana-zone')?.value || "", passiva: document.getElementById('passiva')?.value || "", 
@@ -700,7 +730,7 @@ window.saveData = async function() {
 }
 
 window.renderSkills = function() {
-    const container = document.getElementById('skills-container'); container.innerHTML = '';
+    const container = document.getElementById('skills-container'); if(!container) return; container.innerHTML = '';
     skillsData.forEach(skill => {
         if (playerSkills[skill.name] === undefined) playerSkills[skill.name] = 0;
         let controls = `<button class="btn-ctrl" onclick="updateSkill('${skill.name}', -1, event)">-</button><span style="width: 20px; text-align: center;">${playerSkills[skill.name]}</span><button class="btn-ctrl" onclick="updateSkill('${skill.name}', 1, event)">+</button>`;
@@ -712,8 +742,8 @@ window.renderSkills = function() {
 window.updateSkill = function(skillName, change, event) { event.stopPropagation(); playerSkills[skillName] += change; if (playerSkills[skillName] < 0) playerSkills[skillName] = 0; window.renderSkills(); window.saveData(); }
 
 window.rollSkill = function(skillName, attrName) {
-    let idMapped = attrName.toLowerCase().replace('ç', 'c'); let baseAttr = parseInt(document.getElementById(`attr-${idMapped}`).value) || 1;
-    let classe = document.getElementById('char-class').value; let isMonster = document.getElementById('char-category').value === 'Monstros';
+    let idMapped = attrName.toLowerCase().replace('ç', 'c'); let baseAttr = parseInt(document.getElementById(`attr-${idMapped}`)?.value) || 1;
+    let classe = document.getElementById('char-class')?.value || 'Plebeu'; let isMonster = document.getElementById('char-category')?.value === 'Monstros';
     let isFora = document.getElementById('fora-combate') ? document.getElementById('fora-combate').checked : false;
 
     if(!isMonster) {
@@ -725,7 +755,7 @@ window.rollSkill = function(skillName, attrName) {
     if(baseAttr < 1) baseAttr = 1;
     let results = []; for (let i = 0; i < baseAttr; i++) { let die = Math.floor(Math.random() * 20) + 1; if (isOverweight) die -= 5; results.push(die); }
     
-    const payload = { t: "skill", av: document.getElementById('char-avatar').value, c: document.getElementById('char-name').value || 'Desconhecido', s: skillName, a: attrName, r: results.join(','), pen: isOverweight ? "true" : "false", col: document.getElementById('char-color').value || '#d4af37', mod: playerSkills[skillName] || 0, fc: isFora };
+    const payload = { t: "skill", av: document.getElementById('char-avatar')?.value, c: document.getElementById('char-name')?.value || 'Desconhecido', s: skillName, a: attrName, r: results.join(','), pen: isOverweight ? "true" : "false", col: document.getElementById('char-color')?.value || '#d4af37', mod: playerSkills[skillName] || 0, fc: isFora };
 
     window.abrirModalCentral(payload);
     window.addCombatLog(payload);
@@ -742,8 +772,8 @@ window.abrirModalCentral = function(data) {
 function processRoomData(metadata) {
     let mudouAlgo = false;
     
-    if (metadata["fatesheet_log_v5"] !== undefined) {
-        combatLog = metadata["fatesheet_log_v5"];
+    if (metadata["fatesheet_log_v6"] !== undefined) {
+        combatLog = metadata["fatesheet_log_v6"];
         window.renderMiniLog();
     }
     
@@ -762,7 +792,7 @@ function processRoomData(metadata) {
                 if(characters[id]) { delete characters[id]; mudouAlgo = true; }
             } else { 
                 if (currentCharId === id && document.activeElement && document.activeElement.id.startsWith('char-')) {
-                    // Evita sobrescrever se tiver digitando
+                    // Ignora pra não sobrescrever enquanto o cara digita
                 } else {
                     characters[id] = metadata[key]; mudouAlgo = true; 
                 }
