@@ -15,7 +15,7 @@ const grimoiresDb = {
     "Água": "🌊 Água — Passiva: Fluxo Adaptável\nUma vez por turno, pode converter 50% do dano recebido em redução de Mana ao invés de HP.\nSe terminar o turno sem sofrer dano, recupera 5 Mana.",
     "Planta": "🌱 Planta — Passiva: Enraizar\nQuando atingir o mesmo alvo duas vezes seguidas, ele fica com -10ft de movimento.\nSe o alvo já estiver com redução de movimento, sofre -2 em Agilidade.",
     "Roseira": "🌹 Roseira — Passiva: Espinhos Reativos\nSempre que sofrer dano corpo a corpo, o atacante recebe 1d6 de dano perfurante.\nSe você estiver com menos de 50% de HP, o dano reativo vira 1d10.",
-    "Constrição": "🧊 Constrição — Passiva: Pressão Constante\nSe um alvo estiver sob qualquer condição negativa aplicada por você, ele sofre -1 adicional em testes.\nSe tentar remover um efeito seu e falhar, recebe 1d6 de dano.",
+    "Constrição": "🧊 Constrição — Passiva: Pressão Constante\nSe um alvo estiver sob qualquer condition negativa aplicada por você, ele sofre -1 adicional em testes.\nSe tentar remover um efeito seu e falhar, recebe 1d6 de dano.",
     "Fumaça Arcana": "🌫 Fumaça Arcana — Passiva: Forma Intangível\nUma vez por turno, se sofrer dano, pode reduzir em 1d8.\nSe reduzir 6 ou mais, pode se mover 10ft sem gastar ação.",
     "Espinhos": "🌿 Espinhos — Passiva: Terreno Hostil\nAlvos que entrarem em alcance corpo a corpo sofrem 1d4.\nSe ficarem 2 turnos próximos, ficam com -2 em Movimento.",
     "Tecido": "🧵 Tecido — Passiva: Trama Viva\nSempre que usar habilidade defensiva, ganha +1 Runa temporária no próximo turno.\nSe bloquear totalmente um ataque (reduzir a 0), pode aplicar -2 no próximo teste do atacante.",
@@ -46,8 +46,8 @@ const grimoiresDb = {
 
 let characters = {}; 
 let combatLog = []; 
-let clashes = {}; 
-let activeDefenses = {}; 
+let clashes = {}; // Duelos em aberto
+let activeDefenses = {}; // Duelos locais sendo defendidos
 let currentCharId = null;
 let isLoadingSheet = false; 
 let playerSkills = {}; 
@@ -237,6 +237,7 @@ window.calcVitals = function() {
     else { isOverweight = false; if(bp) bp.classList.remove('overweight'); if(pa) pa.style.display = 'none'; }
 }
 
+// ------ COMBAT TRACKER INLINE ------
 window.renderCombatTracker = function() {
     const container = document.getElementById('combat-tracker-list');
     if(!container) return;
@@ -258,6 +259,7 @@ window.renderCombatTracker = function() {
             let clash = clashes[c.id];
             
             if (c.id === currentCharId) {
+                // Eu sou a Vítima! Mostrar botões de defesa
                 let defState = activeDefenses[c.id];
                 if (!defState) {
                     clashHtml = `
@@ -296,6 +298,7 @@ window.renderCombatTracker = function() {
                     </div>`;
                 }
             } else {
+                // Outro cara apanhando. Mostra para mim
                 clashHtml = `
                 <div style="background:#2a0a0a; border:1px dashed #ff4444; padding:8px; margin-top:8px; border-radius:4px; text-align:center;">
                     <span style="color:#ffaa00; font-size:12px; font-weight:bold; animation: pulseAlert 1.5s infinite;">⚠️ Em Duelo com ${clash.c}...</span>
@@ -415,14 +418,14 @@ window.addCombatLog = async function(data) {
     if (OBR.isAvailable) {
         try {
             let meta = await OBR.room.getMetadata();
-            let nuvemLog = meta["fatesheet_log_v13"] || [];
-            nuvemLog.unshift(data); if(nuvemLog.length > 7) nuvemLog.length = 7; 
+            let nuvemLog = meta["fatesheet_log_v14"] || [];
+            nuvemLog.unshift(data); if(nuvemLog.length > 15) nuvemLog.length = 15; 
             combatLog = nuvemLog;
-            await OBR.room.setMetadata({ "fatesheet_log_v13": combatLog });
+            await OBR.room.setMetadata({ "fatesheet_log_v14": combatLog });
             OBR.broadcast.sendMessage("fatesheet-log-update", combatLog);
         } catch(e) {}
     } else {
-        combatLog.unshift(data); if(combatLog.length > 7) combatLog.length = 7;
+        combatLog.unshift(data); if(combatLog.length > 15) combatLog.length = 15;
     }
     window.renderMiniLog();
 }
@@ -430,7 +433,7 @@ window.addCombatLog = async function(data) {
 window.clearMiniLog = async function() {
     if(confirm('Apagar o histórico de combate para toda a mesa?')) {
         combatLog = [];
-        if (OBR.isAvailable) { await OBR.room.setMetadata({ "fatesheet_log_v13": [] }); OBR.broadcast.sendMessage("fatesheet-log-update", []); }
+        if (OBR.isAvailable) { await OBR.room.setMetadata({ "fatesheet_log_v14": [] }); OBR.broadcast.sendMessage("fatesheet-log-update", []); }
         window.renderMiniLog();
     }
 }
@@ -492,12 +495,6 @@ window.renderMiniLog = function() {
             div.innerHTML = `<div class="log-header"><span class="log-name" style="color:${log.col || '#d4af37'}">${log.av || '🧙‍♂️'} ${log.c}</span><span class="log-action">${actHtml}</span></div><div class="log-result">${resHtml}</div>`; container.appendChild(div);
         } catch (e) {}
     });
-}
-
-window.abrirJanelaDeLog = function() {
-    if (OBR.isAvailable) {
-        OBR.popover.open({ id: "fatesheet-log-popover", url: `https://seediam.github.io/FateSheet/log.html?v=${Date.now()}`, width: 320, height: 450, disableClickAway: true, anchorOrigin: { horizontal: "RIGHT", vertical: "BOTTOM" }, transformOrigin: { horizontal: "RIGHT", vertical: "BOTTOM" } });
-    } else { alert("Log só funciona dentro da mesa do Owlbear!"); }
 }
 
 window.rollAttributes = function() {
@@ -617,24 +614,23 @@ window.confirmarAtaqueAlvo = async function() {
 
     if (targetId !== "") {
         let tgt = characters[targetId]; payload.targetId = targetId; payload.targetName = tgt ? tgt.name : "Desconhecido";
+        
+        // ROLA O DADO NA TELA E LOGA IMEDIATAMENTE (ANTES DA DEFESA)
+        window.abrirModalCentral(payload); 
+        window.addCombatLog(payload);
+        if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", payload);
+
         if (spell.tipo === "Cura") {
             if(tgt) { let maxH = tgt.category==='Monstros' ? (tgt.vidaMonster||100) : (40 + (tgt.sorte||0)*5); tgt.hpAtual = Math.min(maxH, (tgt.hpAtual||0) + grossDamage); payload.healed = grossDamage; }
-            window.abrirModalCentral(payload); window.addCombatLog(payload);
-            if (OBR.isAvailable) { OBR.broadcast.sendMessage("fatesheet-rolls", payload); OBR.room.setMetadata({ [`fatesheet_char_${targetId}`]: characters[targetId] }); }
+            if (OBR.isAvailable) { OBR.room.setMetadata({ [`fatesheet_char_${targetId}`]: characters[targetId] }); }
         } else if (spell.tipo === "Dano" || spell.tipo === "Controle") {
             payload.gross = grossDamage;
             if (OBR.isAvailable) { 
-                // Exibe o ataque pra todos PRIMEIRO!
-                window.abrirModalCentral(payload); window.addCombatLog(payload); OBR.broadcast.sendMessage("fatesheet-rolls", payload);
-                // Depois envia a notificação de duelo pro Alvo
                 let meta = await OBR.room.getMetadata();
                 let cls = meta.fatesheet_clashes || {};
                 cls[targetId] = payload;
                 await OBR.room.setMetadata({ fatesheet_clashes: cls }); 
-            } else { alert("O sistema precisa estar online no Owlbear!"); }
-        } else {
-             window.abrirModalCentral(payload); window.addCombatLog(payload);
-             if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", payload);
+            }
         }
     } else {
         window.abrirModalCentral(payload); window.addCombatLog(payload);
@@ -673,7 +669,11 @@ window.saveData = async function() {
         
         characters[currentCharId] = c;
         try { localStorage.setItem('fatesheet_db', JSON.stringify(characters)); } catch(e){}
-        if (OBR.isAvailable) await OBR.room.setMetadata({ [`fatesheet_char_${currentCharId}`]: characters[currentCharId] });
+        if (OBR.isAvailable) {
+            let metaUpdate = {};
+            metaUpdate[`fatesheet_char_${currentCharId}`] = characters[currentCharId];
+            await OBR.room.setMetadata(metaUpdate);
+        }
     } catch(e) { console.error("Erro no save:", e); }
 }
 
@@ -709,21 +709,26 @@ window.rollSkill = function(skillName, attrName) {
     if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", payload);
 }
 
+// ------ BLINDAGEM DE MODAL ABERTO ------
 window.abrirModalCentral = async function(data) {
     if (OBR.isAvailable) {
         const dataUrl = encodeURIComponent(JSON.stringify(data));
-        // Removemos o fechar marra pra não bugar
+        // FECHA O MODAL ANTIGO ANTES DE ABRIR O NOVO, PARA O OWLBEAR NÃO TRAVAR O NAVEGADOR!
+        try { await OBR.modal.close("fate-roll-modal").catch(()=>{}); } catch(e) {}
         try { OBR.modal.open({ id: "fate-roll-modal", url: `https://seediam.github.io/FateSheet/resultado.html?data=${dataUrl}`, width: 450, height: (data.t === "spell" || data.t === "attr" || data.t === "clash_result") ? 550 : 250 }); } catch(e) {}
     }
 }
 
 function processRoomData(metadata) {
     let mudouAlgo = false;
-    if (metadata["fatesheet_log_v12"] !== undefined) { combatLog = metadata["fatesheet_log_v12"]; window.renderMiniLog(); }
+    
+    if (metadata["fatesheet_log_v14"] !== undefined) { combatLog = metadata["fatesheet_log_v14"]; window.renderMiniLog(); }
     
     if (metadata["fatesheet_clashes"] !== undefined) {
         clashes = metadata["fatesheet_clashes"];
-        window.renderCombatTracker(); 
+        mudouAlgo = true;
+    } else {
+        clashes = {};
     }
 
     for (let key in metadata) {
@@ -734,19 +739,21 @@ function processRoomData(metadata) {
             } else { 
                 let isTyping = document.activeElement && document.activeElement.tagName === "INPUT";
                 if (currentCharId === id && isTyping) { 
-                    // ignora
+                    // ignora localmente para n apagar
                 } else {
                     characters[id] = metadata[key]; mudouAlgo = true; 
                 }
             }
         }
     }
+    
     if (mudouAlgo) {
-        try { window.renderCharacterList(); window.renderCombatTracker(); } catch(e){}
-        if (currentCharId && !isLoadingSheet) {
-            let hpF = document.getElementById('char-hp-atual'); if (hpF && document.activeElement !== hpF) hpF.value = characters[currentCharId].hpAtual;
-            let mpF = document.getElementById('char-mp-atual'); if (mpF && document.activeElement !== mpF) mpF.value = characters[currentCharId].mpAtual;
-            let rnF = document.getElementById('char-runas'); if (rnF && document.activeElement !== rnF) rnF.value = characters[currentCharId].runas;
+        try { window.renderCharacterList(); } catch(e){}
+        try { window.renderCombatTracker(); window.checkClashStatus(); } catch(e){}
+        
+        if (currentCharId && !isLoadingSheet && document.getElementById('screen-sheet').classList.contains('active')) {
+            let hpF = document.getElementById('char-hp-atual'); if (hpF && document.activeElement !== hpF) hpF.value = characters[currentCharId].hpAtual || 0;
+            let mpF = document.getElementById('char-mp-atual'); if (mpF && document.activeElement !== mpF) mpF.value = characters[currentCharId].mpAtual || 0;
         }
     }
 }
