@@ -56,6 +56,7 @@ let currentPhoto = "";
 let folderState = { "Jogadores": true, "NPCs": true, "Monstros": true };
 let isOverweight = false;
 let pendingSpellIndex = null; 
+let targetOptionsHTML = '<option value="">Sem Alvo / Automático</option>';
 
 window.onload = function() {
     document.getElementById('loading').style.display = 'none';
@@ -202,7 +203,7 @@ window.openCharacter = function(id) {
 
         document.getElementById('screen-list').classList.remove('active');
         document.getElementById('screen-sheet').classList.add('active');
-    } catch(e) { console.error("Erro ao abrir ficha:", e); }
+    } catch(e) { console.error(e); }
 }
 
 window.calcVitals = function() {
@@ -228,7 +229,7 @@ window.calcVitals = function() {
     else { isOverweight = false; if(bp) bp.classList.remove('overweight'); if(pa) pa.style.display = 'none'; }
 }
 
-// ------ COMBAT TRACKER COM DEFESA INCORPORADA ------
+// ------ COMBAT TRACKER INLINE (SEM O ANTIGO PAINEL SOLTO) ------
 window.renderCombatTracker = function() {
     const container = document.getElementById('combat-tracker-list');
     if(!container) return;
@@ -237,56 +238,62 @@ window.renderCombatTracker = function() {
     combatants.sort((a, b) => (b.initiative || 0) - (a.initiative || 0)); 
 
     let html = '';
+    targetOptionsHTML = '<option value="">Sem Alvo Especifico</option>';
     
     combatants.forEach((c, idx) => {
         let hpM = c.category==='Monstros' ? (c.vidaMonster||100) : (40 + (c.sorte||0)*5);
         let mpM = c.category==='Monstros' ? 25 : 25 + (c.classe==='Andarilho'?25:c.classe==='Estrangeiro'?50:c.classe==='Nobre'?75:0);
         let positionTag = c.hasRolledTurn ? `<span style="font-size:10px; color:var(--accent-gold); font-weight:bold; background:#000; padding:2px 4px; border-radius:3px;">${idx + 1}º a Atacar</span>` : `<span style="font-size:10px; color:#888; font-weight:bold; background:#000; padding:2px 4px; border-radius:3px;">⌛ Pendente</span>`;
+        targetOptionsHTML += `<option value="${c.id}">${c.name}</option>`;
 
         let clashHtml = '';
         if (clashes[c.id]) {
             let clash = clashes[c.id];
-            let defState = activeDefenses[c.id];
             
-            if (!defState) {
-                // Alerta de Ataque
-                clashHtml = `
-                <div style="background:#2a0a0a; border:1px dashed #ff4444; padding:8px; margin-top:8px; border-radius:4px;">
-                    <div style="color:#ff4444; font-size:12px; margin-bottom:5px;">⚠️ Atacado por <b>${clash.c}</b> (Dano: ${clash.gross})</div>
-                    <div style="display:flex; gap:5px;">
-                        <button class="btn-ctrl" style="background:#ff4444; color:#fff; flex:1;" onclick="window.aceitarDano('${c.id}')">Tomar Dano</button>
-                        <button class="btn-ctrl" style="background:#44aaff; color:#fff; flex:1;" onclick="window.iniciarDefesa('${c.id}')">Defender</button>
-                    </div>
-                </div>`;
-            } else {
-                // Tela de Defesa com Runas
-                let defFis = (c.forca || 0) * 5;
-                let defMag = (c.magia || 0) * 5;
-                let defHib = Math.floor((defFis + defMag) / 3);
-                
-                let runesHtml = (c.activeRunes || []).map((r, rIdx) => {
-                    let cHex = r.type==='alpha' ? '#44aaff' : (r.type==='delta' ? '#ff4444' : (r.type==='beta' ? '#a855f7' : '#ccc'));
-                    let sym = r.type==='alpha' ? 'α' : (r.type==='delta' ? 'δ' : (r.type==='beta' ? 'β' : '⚔️'));
-                    return `<div style="display:inline-flex; align-items:center; background:#111; border:1px solid ${cHex}; padding:2px 6px; border-radius:4px; margin-right:4px; margin-bottom:4px; font-size:11px;">
-                        <span style="color:${cHex}; margin-right:5px;">${sym}</span><span style="color:#fff; margin-right:5px;">${r.face}</span>
-                        <button style="background:transparent; border:none; color:#ff4444; font-weight:bold; cursor:pointer;" onclick="window.descartarRunaDefesa('${c.id}', ${rIdx})">X</button>
+            if (c.id === currentCharId) {
+                // Eu sou a Vítima! Mostrar botões de defesa
+                let defState = activeDefenses[c.id];
+                if (!defState) {
+                    clashHtml = `
+                    <div style="background:#2a0a0a; border:1px dashed #ff4444; padding:8px; margin-top:8px; border-radius:4px; animation: pulseAlert 1.5s infinite;">
+                        <div style="color:#ff4444; font-size:12px; margin-bottom:5px;">⚠️ Atacado por <b>${clash.c}</b> (Dano Bruto: ${clash.gross})</div>
+                        <div style="display:flex; gap:5px;">
+                            <button class="btn-ctrl" style="background:#ff4444; color:#fff; flex:1;" onclick="window.aceitarDano('${c.id}')">Aceitar Dano</button>
+                            <button class="btn-ctrl" style="background:#44aaff; color:#fff; flex:1;" onclick="window.iniciarDefesa('${c.id}')">Defender</button>
+                        </div>
                     </div>`;
-                }).join('');
-                if(runesHtml === '') runesHtml = '<span style="color:#666; font-size:11px;">Você não tem runas ativas.</span>';
+                } else {
+                    let defFis = (c.forca || 0) * 5; let defMag = (c.magia || 0) * 5; let defHib = Math.floor((defFis + defMag) / 3);
+                    let runesHtml = (c.activeRunes || []).map((r, rIdx) => {
+                        let cHex = r.type==='alpha' ? '#44aaff' : (r.type==='delta' ? '#ff4444' : (r.type==='beta' ? '#a855f7' : '#ccc'));
+                        let sym = r.type==='alpha' ? 'α' : (r.type==='delta' ? 'δ' : (r.type==='beta' ? 'β' : '⚔️'));
+                        return `<div style="display:inline-flex; align-items:center; background:#111; border:1px solid ${cHex}; padding:2px 6px; border-radius:4px; margin-right:4px; margin-bottom:4px; font-size:11px;">
+                            <span style="color:${cHex}; margin-right:5px;">${sym}</span><span style="color:#fff; margin-right:5px;">${r.face}</span>
+                            <button style="background:transparent; border:none; color:#ff4444; font-weight:bold; cursor:pointer;" onclick="window.descartarRunaDefesa('${c.id}', ${rIdx})">X</button>
+                        </div>`;
+                    }).join('');
+                    if(runesHtml === '') runesHtml = '<span style="color:#666; font-size:11px;">Você não tem runas para defesa.</span>';
 
+                    clashHtml = `
+                    <div style="background:#1a1a24; border:1px solid #44aaff; padding:8px; margin-top:8px; border-radius:4px;">
+                        <div style="color:#44aaff; font-size:12px; margin-bottom:5px; display:flex; justify-content:space-between;">
+                            <span>🛡️ Defendendo <b>${clash.c}</b> (Dano: ${clash.gross})</span>
+                            <span>Bloqueado: <b style="color:#39ff14; font-size:14px;">${defState.blocked}</b></span>
+                        </div>
+                        <select id="def-type-${c.id}" class="inv-input" style="width:100%; margin-bottom:5px;" onchange="window.updateDefType('${c.id}', this.value)">
+                            <option value="fisica" ${defState.type==='fisica'?'selected':''}>Defesa Física (${defFis}/runa)</option>
+                            <option value="magica" ${defState.type==='magica'?'selected':''}>Defesa Mágica (${defMag}/runa)</option>
+                            <option value="hibrida" ${defState.type==='hibrida'?'selected':''}>Defesa Híbrida (${defHib}/runa)</option>
+                        </select>
+                        <div style="margin-bottom:5px;">${runesHtml}</div>
+                        <button class="btn-ctrl" style="background:#39ff14; color:#000; width:100%; margin-top:5px;" onclick="window.confirmarDefesa('${c.id}')">Confirmar Resolução</button>
+                    </div>`;
+                }
+            } else {
+                // Outro cara apanhando. Mostra para mim
                 clashHtml = `
-                <div style="background:#1a1a24; border:1px solid #44aaff; padding:8px; margin-top:8px; border-radius:4px;">
-                    <div style="color:#44aaff; font-size:12px; margin-bottom:5px; display:flex; justify-content:space-between;">
-                        <span>🛡️ Defendendo <b>${clash.c}</b> (Dano: ${clash.gross})</span>
-                        <span>Bloqueado: <b style="color:#39ff14; font-size:14px;">${defState.blocked}</b></span>
-                    </div>
-                    <select id="def-type-${c.id}" class="inv-input" style="width:100%; margin-bottom:5px;" onchange="window.updateDefType('${c.id}', this.value)">
-                        <option value="fisica" ${defState.type==='fisica'?'selected':''}>Defesa Física (${defFis}/runa)</option>
-                        <option value="magica" ${defState.type==='magica'?'selected':''}>Defesa Mágica (${defMag}/runa)</option>
-                        <option value="hibrida" ${defState.type==='hibrida'?'selected':''}>Defesa Híbrida (${defHib}/runa)</option>
-                    </select>
-                    <div style="margin-bottom:5px;">${runesHtml}</div>
-                    <button class="btn-ctrl" style="background:#39ff14; color:#000; width:100%; margin-top:5px;" onclick="window.confirmarDefesa('${c.id}')">Confirmar Defesa</button>
+                <div style="background:#2a0a0a; border:1px dashed #ff4444; padding:8px; margin-top:8px; border-radius:4px; text-align:center;">
+                    <span style="color:#ffaa00; font-size:12px; font-weight:bold; animation: pulseAlert 1.5s infinite;">⚠️ Em Duelo com ${clash.c}...</span>
                 </div>`;
             }
         }
@@ -323,9 +330,7 @@ window.descartarRunaDefesa = async function(id, rIdx) {
     let c = characters[id]; if(!c) return;
     let st = activeDefenses[id]; if(!st) return;
     
-    let defFis = (c.forca || 0) * 5; let defMag = (c.magia || 0) * 5;
-    let defHib = Math.floor((defFis + defMag) / 3);
-    
+    let defFis = (c.forca || 0) * 5; let defMag = (c.magia || 0) * 5; let defHib = Math.floor((defFis + defMag) / 3);
     if (st.type === 'fisica') st.blocked += defFis;
     else if (st.type === 'magica') st.blocked += defMag;
     else st.blocked += defHib;
@@ -346,8 +351,7 @@ window.aceitarDano = async function(id) {
     if(OBR.isAvailable) {
         OBR.broadcast.sendMessage("fatesheet-rolls", clash);
         let meta = await OBR.room.getMetadata();
-        let cc = meta.fatesheet_clashes || {};
-        delete cc[id];
+        let cc = meta.fatesheet_clashes || {}; delete cc[id];
         await OBR.room.setMetadata({ fatesheet_clashes: cc });
     }
     delete clashes[id]; window.renderCombatTracker();
@@ -360,7 +364,6 @@ window.confirmarDefesa = async function(id) {
 
     let netDamage = Math.max(0, clash.gross - st.blocked);
     c.hpAtual = (c.hpAtual || 0) - netDamage;
-    
     clash.blocked = st.blocked; clash.net = netDamage; clash.t = 'clash';
     
     await window.saveData();
@@ -368,8 +371,7 @@ window.confirmarDefesa = async function(id) {
     if(OBR.isAvailable) {
         OBR.broadcast.sendMessage("fatesheet-rolls", clash);
         let meta = await OBR.room.getMetadata();
-        let cc = meta.fatesheet_clashes || {};
-        delete cc[id];
+        let cc = meta.fatesheet_clashes || {}; delete cc[id];
         await OBR.room.setMetadata({ fatesheet_clashes: cc });
     }
     delete activeDefenses[id]; delete clashes[id]; window.renderCombatTracker();
@@ -398,15 +400,14 @@ window.updateAlloc = function() {
 
 const getMultFromRoll = (val) => { if(val <= 4) return 0; if(val <= 11) return 0.5; return 1; };
 
-// ------ LOG SEGURO (Max 7) ------
 window.addCombatLog = async function(data) {
     if (OBR.isAvailable) {
         try {
             let meta = await OBR.room.getMetadata();
-            let nuvemLog = meta["fatesheet_log_v8"] || [];
+            let nuvemLog = meta["fatesheet_log_v9"] || [];
             nuvemLog.unshift(data); if(nuvemLog.length > 7) nuvemLog.length = 7; 
             combatLog = nuvemLog;
-            await OBR.room.setMetadata({ "fatesheet_log_v8": combatLog });
+            await OBR.room.setMetadata({ "fatesheet_log_v9": combatLog });
             OBR.broadcast.sendMessage("fatesheet-log-update", combatLog);
         } catch(e) {}
     } else {
@@ -418,7 +419,7 @@ window.addCombatLog = async function(data) {
 window.clearMiniLog = async function() {
     if(confirm('Apagar o histórico de combate para toda a mesa?')) {
         combatLog = [];
-        if (OBR.isAvailable) { await OBR.room.setMetadata({ "fatesheet_log_v8": [] }); OBR.broadcast.sendMessage("fatesheet-log-update", []); }
+        if (OBR.isAvailable) { await OBR.room.setMetadata({ "fatesheet_log_v9": [] }); OBR.broadcast.sendMessage("fatesheet-log-update", []); }
         window.renderMiniLog();
     }
 }
@@ -482,8 +483,6 @@ window.renderMiniLog = function() {
     });
 }
 
-window.closeTargetModal = function() { document.getElementById('target-modal').style.display = 'none'; pendingSpellIndex = null; }
-
 window.rollAttributes = function() {
     let cb = document.getElementById('fora-combate'); let isFora = cb ? cb.checked : false;
     let f = parseInt(document.getElementById('alloc-forca').value) || 0; let m = parseInt(document.getElementById('alloc-magia').value) || 0; let a = parseInt(document.getElementById('alloc-agilidade').value) || 0; let s = parseInt(document.getElementById('alloc-sorte').value) || 0;
@@ -534,13 +533,15 @@ window.renderSpells = function() {
         spell.tipo = spell.tipo || "Dano"; spell.bQtd = spell.bQtd || 1; spell.bD = spell.bD || "d20"; spell.bMult = spell.bMult !== undefined ? spell.bMult : 1; spell.isCrit = spell.isCrit || false; spell.statusName = spell.statusName || ""; spell.statusDT = spell.statusDT || ""; spell.audioUrl = spell.audioUrl || "";
         let isSelf = spell.tipo === "Self"; let row = document.createElement('div'); row.className = 'spell-item';
         let headerHtml = `<div class="spell-header" onclick="toggleSpellInfo(${index})"><div style="display: flex; align-items: center; gap: 10px;"><button class="btn-roll-spell" onclick="event.stopPropagation(); window.iniciarAtaqueMagia(${index})" title="Rolar Magia">🎲</button><span style="font-weight: bold; color: var(--accent-gold); font-size: 16px;">${spell.nome || 'Nova Magia'}</span></div><div style="display:flex; align-items:center; gap: 10px;"><button class="btn-danger" style="padding: 4px 8px;" onclick="event.stopPropagation(); removeSpell(${index})">X</button><span class="chevron">${spell.isOpen ? '▼' : '►'}</span></div></div>`;
-        let bodyHtml = `<div style="display: ${spell.isOpen ? 'flex' : 'none'}; flex-direction: column; gap: 5px; margin-top: 10px;"><div class="inv-row"><input type="text" class="inv-input" style="flex: 2; font-weight: bold;" placeholder="Habilidade" value="${spell.nome}" onchange="updateSpell(${index}, 'nome', this.value)"><input type="number" class="inv-input" style="flex: 1;" placeholder="Custo MP" value="${spell.custo}" onchange="updateSpell(${index}, 'custo', this.value)"><input type="text" class="inv-input" style="flex: 1;" placeholder="Alcance" value="${spell.alcance}" onchange="updateSpell(${index}, 'alcance', this.value)"></div><div class="inv-row" style="margin-top: 5px;"><textarea class="inv-input" style="flex: 1; resize: vertical;" rows="1" placeholder="Descrição e Efeitos..." onchange="updateSpell(${index}, 'desc', this.value)">${spell.desc}</textarea></div><div class="inv-row"><span style="font-size:16px;">🎵</span><input type="text" class="inv-input" style="flex: 1; border-color: #555;" placeholder="URL de Áudio Customizado (Discord Link .mp3)" value="${spell.audioUrl}" onchange="updateSpell(${index}, 'audioUrl', this.value)"></div><div class="dice-config-row"><select class="inv-input dice-sel" style="width:100% !important;" onchange="updateSpell(${index}, 'tipo', this.value); window.renderSpells();"><option value="Dano" ${spell.tipo==='Dano'?'selected':''}>Dano (Base + Runas Globais)</option><option value="Controle" ${spell.tipo==='Controle'?'selected':''}>Controle (Base + Runas Globais)</option><option value="Cura" ${spell.tipo==='Cura'?'selected':''}>Cura (Base + Runas Globais)</option><option value="Locomoção" ${spell.tipo==='Locomoção'?'selected':''}>Locomoção (Base + Runas Globais)</option><option value="Self" ${spell.tipo==='Self'?'selected':''}>Self (Apenas Efeito)</option></select>${(!isSelf) ? `<div class="dice-group"><span class="lbl" style="color:#fff">Base</span><input type="number" class="inv-input dice-qty" min="1" value="${spell.bQtd}" onchange="updateSpell(${index}, 'bQtd', this.value)"><select class="inv-input dice-sel" onchange="updateSpell(${index}, 'bD', this.value)"><option value="d4" ${spell.bD==='d4'?'selected':''}>d4</option><option value="d6" ${spell.bD==='d6'?'selected':''}>d6</option><option value="d8" ${spell.bD==='d8'?'selected':''}>d8</option><option value="d10" ${spell.bD==='d10'?'selected':''}>d10</option><option value="d12" ${spell.bD==='d12'?'selected':''}>d12</option><option value="d20" ${spell.bD==='d20'?'selected':''}>d20</option><option value="d100" ${spell.bD==='d100'?'selected':''}>d100</option></select><div class="mult-group"><span class="mult-btn m-red ${spell.bMult===0?'active':''}" onclick="updateSpell(${index}, 'bMult', 0)">X</span><span class="mult-btn m-white ${spell.bMult===0.5?'active':''}" onclick="updateSpell(${index}, 'bMult', 0.5)">X</span><span class="mult-btn m-green ${spell.bMult===1?'active':''}" onclick="updateSpell(${index}, 'bMult', 1)">X</span></div></div><div style="display:flex; align-items:center; gap:5px; margin-left: auto; width: 100%; justify-content: flex-end; margin-top: 5px;"><input type="checkbox" id="crit-${index}" ${spell.isCrit ? 'checked' : ''} onchange="updateSpell(${index}, 'isCrit', this.checked)"><label for="crit-${index}" style="color:#ffd700; margin:0; cursor:pointer;">Crítico (Base Máx x3)</label></div>` : ''}</div><div class="dice-config-row" style="margin-top: 5px; border-color: #a855f7;"><div style="display: flex; width: 100%; align-items: center; gap: 5px;"><span style="color:#a855f7; font-size: 11px; font-weight: bold; white-space: nowrap;">⚡ Status/Efeito</span><input type="text" class="inv-input" style="flex: 2;" placeholder="Ex: Queimar" value="${spell.statusName}" onchange="updateSpell(${index}, 'statusName', this.value)"><span style="color:#fff; font-size: 11px; font-weight: bold;">DT:</span><input type="number" class="inv-input dice-qty" placeholder="15" value="${spell.statusDT}" onchange="updateSpell(${index}, 'statusDT', this.value)"></div></div></div>`;
+        let bodyHtml = `<div style="display: ${spell.isOpen ? 'flex' : 'none'}; flex-direction: column; gap: 5px; margin-top: 10px;"><div class="inv-row"><input type="text" class="inv-input" style="flex: 2; font-weight: bold;" placeholder="Habilidade" value="${spell.nome}" onchange="updateSpell(${index}, 'nome', this.value)"><input type="number" class="inv-input" style="flex: 1;" placeholder="Custo MP" value="${spell.custo}" onchange="updateSpell(${index}, 'custo', this.value)"><input type="text" class="inv-input" style="flex: 1;" placeholder="Alcance" value="${spell.alcance}" onchange="updateSpell(${index}, 'alcance', this.value)"></div><div class="inv-row" style="margin-top: 5px;"><textarea class="inv-input" style="flex: 1; resize: vertical;" rows="1" placeholder="Descrição e Efeitos..." onchange="updateSpell(${index}, 'desc', this.value)">${spell.desc}</textarea></div><div class="inv-row"><span style="font-size:16px;">🎵</span><input type="text" class="inv-input" style="flex: 1; border-color: #555;" placeholder="URL de Áudio Customizado" value="${spell.audioUrl}" onchange="updateSpell(${index}, 'audioUrl', this.value)"></div><div class="dice-config-row"><select class="inv-input dice-sel" style="width:100% !important;" onchange="updateSpell(${index}, 'tipo', this.value); window.renderSpells();"><option value="Dano" ${spell.tipo==='Dano'?'selected':''}>Dano (Base + Runas Globais)</option><option value="Controle" ${spell.tipo==='Controle'?'selected':''}>Controle (Base + Runas Globais)</option><option value="Cura" ${spell.tipo==='Cura'?'selected':''}>Cura (Base + Runas Globais)</option><option value="Locomoção" ${spell.tipo==='Locomoção'?'selected':''}>Locomoção (Base + Runas Globais)</option><option value="Self" ${spell.tipo==='Self'?'selected':''}>Self (Apenas Efeito)</option></select>${(!isSelf) ? `<div class="dice-group"><span class="lbl" style="color:#fff">Base</span><input type="number" class="inv-input dice-qty" min="1" value="${spell.bQtd}" onchange="updateSpell(${index}, 'bQtd', this.value)"><select class="inv-input dice-sel" onchange="updateSpell(${index}, 'bD', this.value)"><option value="d4" ${spell.bD==='d4'?'selected':''}>d4</option><option value="d6" ${spell.bD==='d6'?'selected':''}>d6</option><option value="d8" ${spell.bD==='d8'?'selected':''}>d8</option><option value="d10" ${spell.bD==='d10'?'selected':''}>d10</option><option value="d12" ${spell.bD==='d12'?'selected':''}>d12</option><option value="d20" ${spell.bD==='d20'?'selected':''}>d20</option><option value="d100" ${spell.bD==='d100'?'selected':''}>d100</option></select><div class="mult-group"><span class="mult-btn m-red ${spell.bMult===0?'active':''}" onclick="updateSpell(${index}, 'bMult', 0)">X</span><span class="mult-btn m-white ${spell.bMult===0.5?'active':''}" onclick="updateSpell(${index}, 'bMult', 0.5)">X</span><span class="mult-btn m-green ${spell.bMult===1?'active':''}" onclick="updateSpell(${index}, 'bMult', 1)">X</span></div></div><div style="display:flex; align-items:center; gap:5px; margin-left: auto; width: 100%; justify-content: flex-end; margin-top: 5px;"><input type="checkbox" id="crit-${index}" ${spell.isCrit ? 'checked' : ''} onchange="updateSpell(${index}, 'isCrit', this.checked)"><label for="crit-${index}" style="color:#ffd700; margin:0; cursor:pointer;">Crítico (Base Máx x3)</label></div>` : ''}</div><div class="dice-config-row" style="margin-top: 5px; border-color: #a855f7;"><div style="display: flex; width: 100%; align-items: center; gap: 5px;"><span style="color:#a855f7; font-size: 11px; font-weight: bold; white-space: nowrap;">⚡ Status/Efeito</span><input type="text" class="inv-input" style="flex: 2;" placeholder="Ex: Queimar" value="${spell.statusName}" onchange="updateSpell(${index}, 'statusName', this.value)"><span style="color:#fff; font-size: 11px; font-weight: bold;">DT:</span><input type="number" class="inv-input dice-qty" placeholder="15" value="${spell.statusDT}" onchange="updateSpell(${index}, 'statusDT', this.value)"></div></div></div>`;
         row.innerHTML = headerHtml + bodyHtml; container.appendChild(row);
     });
 }
-window.addSpell = function() { playerSpells.push({ nome: "", desc: "", custo: "", alcance: "", tipo: "Dano", bQtd: 1, bD: "d20", bMult: 1, isOpen: true, isCrit: false, statusName: "", statusDT: "", audioUrl: "", target: "" }); window.renderSpells(); window.saveData(); }
+window.addSpell = function() { playerSpells.push({ nome: "", desc: "", custo: "", alcance: "", tipo: "Dano", bQtd: 1, bD: "d20", bMult: 1, isOpen: true, isCrit: false, statusName: "", statusDT: "", audioUrl: "" }); window.renderSpells(); window.saveData(); }
 window.updateSpell = function(index, field, value) { playerSpells[index][field] = value; window.saveData(); window.renderSpells(); }
 window.removeSpell = function(index) { if(confirm("Remover magia?")) { playerSpells.splice(index, 1); window.renderSpells(); window.saveData(); } }
+
+window.closeTargetModal = function() { document.getElementById('target-modal').style.display = 'none'; pendingSpellIndex = null; }
 
 window.iniciarAtaqueMagia = function(index) {
     let cb = document.getElementById('fora-combate'); let isFora = cb ? cb.checked : false;
@@ -560,7 +561,7 @@ window.iniciarAtaqueMagia = function(index) {
     }
 }
 
-window.confirmarAtaqueAlvo = function() {
+window.confirmarAtaqueAlvo = async function() {
     let sel = document.getElementById('modal-target-select'); let targetId = sel ? sel.value : "";
     let modal = document.getElementById('target-modal'); if(modal) modal.style.display = 'none';
     let index = pendingSpellIndex !== null ? pendingSpellIndex : -1; if (index === -1) return;
@@ -604,9 +605,11 @@ window.confirmarAtaqueAlvo = function() {
         } else if (spell.tipo === "Dano" || spell.tipo === "Controle") {
             payload.gross = grossDamage;
             if (OBR.isAvailable) { 
-                OBR.room.setMetadata({ fatesheet_clashes: { [targetId]: payload } }); 
-                alert(`Ataque enviado para ${payload.targetName}! Aguardando Defesa...`); 
-                window.abrirModalCentral(payload); // Atacante vê o dado tbm!
+                let meta = await OBR.room.getMetadata();
+                let cls = meta.fatesheet_clashes || {};
+                cls[targetId] = payload;
+                await OBR.room.setMetadata({ fatesheet_clashes: cls }); 
+                window.abrirModalCentral(payload); 
             } else { alert("O sistema precisa estar online no Owlbear!"); }
         } else {
              window.abrirModalCentral(payload); window.addCombatLog(payload);
@@ -622,63 +625,32 @@ window.confirmarAtaqueAlvo = function() {
     window.renderGlobalRunes(); window.renderSpells(); window.saveData(); window.renderCombatTracker();
 }
 
-window.renderInventory = function() {
-    const container = document.getElementById('inventory-container'); if(!container) return; container.innerHTML = '';
-    playerInventory.forEach((item, index) => {
-        let row = document.createElement('div'); row.className = 'inv-item';
-        row.innerHTML = `<div class="inv-row"><input type="text" class="inv-input" style="flex: 2;" placeholder="Item" value="${item.nome}" onchange="updateInv(${index}, 'nome', this.value)"><input type="number" class="inv-input" style="flex: 1;" placeholder="Peso" value="${item.peso}" onchange="updateInv(${index}, 'peso', this.value)"><input type="number" class="inv-input" style="flex: 1;" placeholder="Qtd" value="${item.qtd}" onchange="updateInv(${index}, 'qtd', this.value)"><button class="btn-danger" onclick="removeInv(${index})">X</button></div><div class="inv-row" style="margin-top: 5px;"><input type="text" class="inv-input" style="flex: 1;" placeholder="Descrição..." value="${item.desc}" onchange="updateInv(${index}, 'desc', this.value)"></div>`;
-        container.appendChild(row);
-    });
-    window.calcVitals();
-}
-window.addInventoryItem = function() { if(isOverweight) return alert("Sua mochila está pesada!"); playerInventory.push({ nome: "", desc: "", peso: 0, qtd: 1 }); window.renderInventory(); window.saveData(); }
-window.updateInv = function(index, field, value) { playerInventory[index][field] = value; window.renderInventory(); window.saveData(); }
-window.removeInv = function(index) { playerInventory.splice(index, 1); window.renderInventory(); window.saveData(); }
-
-// SALVAMENTO BLINDADO DE ERROS DE DIGITAÇÃO E CACHE
+// ------ SALVAMENTO SEGURO (FIM DO RESET DAS FICHAS) ------
 window.saveData = async function() {
     if (!currentCharId) return; 
-    try {
-        let c = characters[currentCharId] || {};
-        // Só puxa da tela se for a ficha que está ativamente aberta!
-        if (document.getElementById('screen-sheet').classList.contains('active')) {
-            let isMonster = document.getElementById('char-category')?.value === 'Monstros';
-            let al = { f: parseInt(document.getElementById('alloc-forca')?.value)||0, m: parseInt(document.getElementById('alloc-magia')?.value)||0, a: parseInt(document.getElementById('alloc-agilidade')?.value)||0, s: parseInt(document.getElementById('alloc-sorte')?.value)||0 };
-            
-            c.name = document.getElementById('char-name')?.value || "Sem Nome"; c.avatar = document.getElementById('char-avatar')?.value || "🧙‍♂️"; c.color = document.getElementById('char-color')?.value || "#d4af37"; c.category = document.getElementById('char-category')?.value || "Jogadores";
-            c.age = document.getElementById('char-age')?.value || ""; c.race = isMonster ? document.getElementById('char-race-monster')?.value : document.getElementById('char-race-player')?.value;
-            c.classe = document.getElementById('char-class')?.value || "Plebeu"; c.prof = document.getElementById('char-prof')?.value || ""; c.profDesc = document.getElementById('char-prof-desc')?.value || "";
-            c.vidaMonster = document.getElementById('val-vida-monster')?.value || 100; c.forca = document.getElementById('attr-forca')?.value || 1; c.magia = document.getElementById('attr-magia')?.value || 1; c.agilidade = document.getElementById('attr-agilidade')?.value || 1; c.sorte = document.getElementById('attr-sorte')?.value || 1;
-            c.grimoireSelect = document.getElementById('grimoire-select')?.value || ""; c.grimoireDT = document.getElementById('grimoire-dt')?.value || 10; c.mana = document.getElementById('mana-zone')?.value || ""; c.passiva = document.getElementById('passiva')?.value || ""; 
-            c.mov = document.getElementById('char-mov')?.value || 30; c.runas = document.getElementById('char-runas')?.value || 0;
-            c.foraCombate = document.getElementById('fora-combate')?.checked || false; c.inGame = document.getElementById('char-ingame')?.checked || false;
-            c.hpAtual = parseInt(document.getElementById('char-hp-atual')?.value) || 0; c.mpAtual = parseInt(document.getElementById('char-mp-atual')?.value) || 0;
-            c.alloc = al; c.skills = playerSkills; c.inventory = playerInventory; c.spells = playerSpells; c.photo = currentPhoto; 
-        }
-        characters[currentCharId] = c;
-        try { localStorage.setItem('fatesheet_db', JSON.stringify(characters)); } catch(e){}
-        if (OBR.isAvailable) await OBR.room.setMetadata({ [`fatesheet_char_${currentCharId}`]: characters[currentCharId] });
-    } catch(e) { console.error("Erro no save:", e); }
-}
+    let c = characters[currentCharId] || {};
+    c.hpAtual = parseInt(document.getElementById('char-hp-atual')?.value) || 0;
+    c.mpAtual = parseInt(document.getElementById('char-mp-atual')?.value) || 0;
+    c.runas = parseInt(document.getElementById('char-runas')?.value) || 0;
+    c.inGame = document.getElementById('char-ingame')?.checked || false;
+    c.foraCombate = document.getElementById('fora-combate')?.checked || false;
 
-let saveTimeout;
-document.addEventListener('input', (e) => {
-    if(e.target.id && e.target.id.startsWith('alloc')) return; 
-    clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(() => { if(currentCharId) window.saveData(); }, 800);
-});
-
-window.renderSkills = function() {
-    const container = document.getElementById('skills-container'); if(!container) return; container.innerHTML = '';
-    skillsData.forEach(skill => {
-        if (playerSkills[skill.name] === undefined) playerSkills[skill.name] = 0;
-        let controls = `<button class="btn-ctrl" onclick="updateSkill('${skill.name}', -1, event)">-</button><span style="width: 20px; text-align: center;">${playerSkills[skill.name]}</span><button class="btn-ctrl" onclick="updateSkill('${skill.name}', 1, event)">+</button>`;
-        let div = document.createElement('div'); div.className = 'skill-item';
-        div.innerHTML = `<div onclick="rollSkill('${skill.name}', '${skill.attr}')" style="flex:1;"><strong>${skill.name}</strong> <span style="font-size: 10px; color: var(--text-muted);">(${skill.attr})</span></div><div class="skill-controls">${controls}</div>`;
-        container.appendChild(div);
-    });
+    // Só reescreve textos se tivermos na tela de personagem ativa, evita apagar infos de outras abas
+    if (document.getElementById('personagem').classList.contains('active')) {
+        let isMonster = document.getElementById('char-category')?.value === 'Monstros';
+        let al = { f: parseInt(document.getElementById('alloc-forca').value)||0, m: parseInt(document.getElementById('alloc-magia').value)||0, a: parseInt(document.getElementById('alloc-agilidade').value)||0, s: parseInt(document.getElementById('alloc-sorte').value)||0 };
+        c.name = document.getElementById('char-name')?.value || "Sem Nome"; c.avatar = document.getElementById('char-avatar')?.value || "🧙‍♂️"; c.color = document.getElementById('char-color')?.value || "#d4af37"; c.category = document.getElementById('char-category')?.value || "Jogadores";
+        c.age = document.getElementById('char-age')?.value || ""; c.race = isMonster ? document.getElementById('char-race-monster').value : document.getElementById('char-race-player').value;
+        c.classe = document.getElementById('char-class')?.value || "Plebeu"; c.prof = document.getElementById('char-prof')?.value || ""; c.profDesc = document.getElementById('char-prof-desc')?.value || "";
+        c.vidaMonster = document.getElementById('val-vida-monster')?.value || 100; c.forca = document.getElementById('attr-forca')?.value || 1; c.magia = document.getElementById('attr-magia')?.value || 1; c.agilidade = document.getElementById('attr-agilidade')?.value || 1; c.sorte = document.getElementById('attr-sorte')?.value || 1;
+        c.grimoireSelect = document.getElementById('grimoire-select')?.value || ""; c.grimoireDT = document.getElementById('grimoire-dt')?.value || 10; c.mana = document.getElementById('mana-zone')?.value || ""; c.passiva = document.getElementById('passiva')?.value || ""; 
+        c.mov = document.getElementById('char-mov')?.value || 30; c.alloc = al; 
+    }
+    c.skills = playerSkills; c.inventory = playerInventory; c.spells = playerSpells; c.photo = currentPhoto; 
+    characters[currentCharId] = c;
+    try { localStorage.setItem('fatesheet_db', JSON.stringify(characters)); } catch(e){}
+    if (OBR.isAvailable) await OBR.room.setMetadata({ [`fatesheet_char_${currentCharId}`]: characters[currentCharId] });
 }
-window.updateSkill = function(skillName, change, event) { event.stopPropagation(); playerSkills[skillName] += change; if (playerSkills[skillName] < 0) playerSkills[skillName] = 0; window.renderSkills(); window.saveData(); }
 
 window.rollSkill = function(skillName, attrName) {
     let idMapped = attrName.toLowerCase().replace('ç', 'c'); let baseAttr = parseInt(document.getElementById(`attr-${idMapped}`)?.value) || 1;
@@ -690,7 +662,6 @@ window.rollSkill = function(skillName, attrName) {
         let missing = inCombatChars.filter(ch => !ch.hasRolledTurn);
         if (missing.length > 0) { alert("Aguarde as seguintes fichas rolarem os atributos de turno:\n" + missing.map(m=>m.name).join(', ')); return; }
     }
-
     if(!isMonster) {
         if (classe === 'Plebeu') { if(attrName === 'Força') baseAttr += 1; if(attrName === 'Magia') baseAttr -= 1; }
         if (classe === 'Andarilho' && attrName === 'Agilidade') baseAttr += 1;
@@ -702,8 +673,7 @@ window.rollSkill = function(skillName, attrName) {
     
     const payload = { t: "skill", av: document.getElementById('char-avatar')?.value, c: document.getElementById('char-name')?.value || 'Desconhecido', s: skillName, a: attrName, r: results.join(','), pen: isOverweight ? "true" : "false", col: document.getElementById('char-color')?.value || '#d4af37', mod: playerSkills[skillName] || 0, fc: isFora };
 
-    window.abrirModalCentral(payload);
-    window.addCombatLog(payload);
+    window.abrirModalCentral(payload); window.addCombatLog(payload);
     if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", payload);
 }
 
@@ -714,17 +684,14 @@ window.abrirModalCentral = function(data) {
     }
 }
 
-// SINCRONIZAÇÃO A PROVA DE FALHAS
+// SINCRONIZAÇÃO A PROVA DE BALAS NA NUVEM
 function processRoomData(metadata) {
     let mudouAlgo = false;
-    
-    if (metadata["fatesheet_log_v8"] !== undefined) { combatLog = metadata["fatesheet_log_v8"]; window.renderMiniLog(); }
+    if (metadata["fatesheet_log_v9"] !== undefined) { combatLog = metadata["fatesheet_log_v9"]; window.renderMiniLog(); }
     
     if (metadata["fatesheet_clashes"] !== undefined) {
-        let allClashes = metadata["fatesheet_clashes"];
-        if (currentCharId && allClashes[currentCharId]) { pendingClash = allClashes[currentCharId]; } 
-        else { pendingClash = null; }
-        window.checkClashStatus();
+        clashes = metadata["fatesheet_clashes"];
+        window.renderCombatTracker();
     }
 
     for (let key in metadata) {
@@ -733,20 +700,22 @@ function processRoomData(metadata) {
             if (metadata[key] === undefined || metadata[key] === null) {
                 if(characters[id]) { delete characters[id]; mudouAlgo = true; }
             } else { 
+                // Se sou eu e estou com um campo de input ativado, não substituo a minha ficha local pela da nuvem pra não apagar a palavra
                 let isTyping = document.activeElement && document.activeElement.tagName === "INPUT";
-                if (currentCharId === id && isTyping) {
-                    // Mestre está digitando na ficha, pula para não apagar a palavra
-                } else { characters[id] = metadata[key]; mudouAlgo = true; }
+                if (currentCharId === id && isTyping) { 
+                    // ignora localmente
+                } else {
+                    characters[id] = metadata[key]; mudouAlgo = true; 
+                }
             }
         }
     }
     if (mudouAlgo) {
-        try { window.renderCharacterList(); } catch(e){}
-        try { window.renderCombatTracker(); } catch(e){}
+        window.renderCharacterList(); window.renderCombatTracker();
         if (currentCharId) {
-            let hpF = document.getElementById('char-hp-atual'); if (hpF && document.activeElement !== hpF) hpF.value = characters[currentCharId].hpAtual;
-            let mpF = document.getElementById('char-mp-atual'); if (mpF && document.activeElement !== mpF) mpF.value = characters[currentCharId].mpAtual;
-            let rnF = document.getElementById('char-runas'); if (rnF && document.activeElement !== rnF) rnF.value = characters[currentCharId].runas;
+            safeSetVal('char-hp-atual', characters[currentCharId].hpAtual);
+            safeSetVal('char-mp-atual', characters[currentCharId].mpAtual);
+            safeSetVal('char-runas', characters[currentCharId].runas);
         }
     }
 }
