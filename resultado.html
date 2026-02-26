@@ -17,7 +17,6 @@
     </style>
 </head>
 <body>
-    
     <div id="popup-box" class="popup">
         <div class="avatar" id="c-av">🧙‍♂️</div>
         <div class="char-name" id="c-name">Rolando...</div>
@@ -57,7 +56,7 @@
                 document.getElementById('c-av').innerText = data.av || "🧙‍♂️";
                 let isGlobalCrit = false;
 
-                if (data.t === "clash") {
+                if (data.t === "clash_result") {
                     document.getElementById('c-name').innerText = `⚔️ ${data.c} atacou ${data.targetName} ⚔️`;
                     document.getElementById('c-action').innerHTML = `<span style="font-size:18px; color:#fff; font-weight:bold;">RESOLUÇÃO DO DUELO!</span><br><span style="font-size:11px; color:#888;">Magia: ${data.sn}</span>`;
                     
@@ -191,7 +190,8 @@
                     tocarAudio(isGlobalCrit, null);
                 }
             }
-            setTimeout(() => { OBR.modal.close('fate-roll-modal'); }, 7000);
+            // TEMPO AJUSTADO PARA NÃO TRAVAR O OWLBEAR
+            setTimeout(() => { try { OBR.modal.close('fate-roll-modal'); } catch(e){} }, 5500);
         });
     </script>
 </body>
