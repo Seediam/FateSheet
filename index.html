@@ -71,7 +71,7 @@
 
         .inv-item, .spell-item { display: flex; flex-direction: column; gap: 5px; background: var(--bg-panel); padding: 10px; border-radius: 6px; margin-bottom: 12px; }
         .inv-item { border-left: 3px solid #666; }
-        .spell-item { border-left: 3px solid #8a8a9e; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .spell-item { border-left: 3px solid #8a8a9e; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: 0.2s; }
         .inv-row { display: flex; gap: 5px; width: 100%; align-items: center; }
         .inv-input { padding: 8px !important; font-size: 12px; }
         .btn-danger { background: #3a1c1c; border: none; color: #fff; cursor: pointer; border-radius: 4px; padding: 6px 10px; transition: 0.2s; font-weight: bold;}
@@ -110,25 +110,9 @@
         .log-name { font-weight: bold; color: #d4af37; font-size: 14px; }
         .log-action { color: #888; font-size: 11px; text-align: right;}
         .log-result { color: #fff; margin-top: 4px; font-size: 12px;}
-        
-        @keyframes pulseAlert { 0% { box-shadow: 0 0 5px #ff4444; } 50% { box-shadow: 0 0 20px #ff4444; } 100% { box-shadow: 0 0 5px #ff4444; } }
-        
-        .modal-overlay { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.85); z-index:9999; justify-content:center; align-items:center; }
-        .modal-content { background:var(--bg-panel); border:2px solid var(--accent-gold); padding:20px; border-radius:8px; width:85%; max-width:300px; box-shadow: 0 0 30px rgba(0,0,0,0.8); }
     </style>
 </head>
 <body>
-
-    <div id="target-modal" class="modal-overlay">
-        <div class="modal-content">
-            <h3 style="color:var(--accent-gold); text-align:center; margin-top:0;">🎯 Selecione o Alvo</h3>
-            <select id="modal-target-select" class="inv-input" style="width:100%; padding:10px; margin-bottom:15px; font-size: 14px; font-weight: bold;"></select>
-            <div style="display:flex; gap:10px;">
-                <button onclick="window.closeTargetModal()" style="flex:1; padding:10px; background:#333; color:#fff; border:none; border-radius:4px; cursor:pointer;">Cancelar</button>
-                <button onclick="window.confirmarAtaqueAlvo()" style="flex:1; padding:10px; background:var(--danger); color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Atacar!</button>
-            </div>
-        </div>
-    </div>
 
     <div id="loading">📖 Carregando Mesa Global...</div>
 
@@ -327,6 +311,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@2/lib/index.js"></script>
-    <script type="module" src="script.js?v=9999999"></script>
+    <script type="module" src="script.js?v=2000000"></script>
 </body>
 </html>
