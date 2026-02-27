@@ -47,8 +47,6 @@ const grimoiresDb = {
 let characters = {}; 
 let combatLog = []; 
 let currentCharId = null;
-let myPlayerName = "Jogador";
-
 let playerSkills = {}; 
 let playerInventory = [];
 let playerSpells = []; 
@@ -56,7 +54,9 @@ let currentPhoto = "";
 let folderState = { "Jogadores": true, "NPCs": true, "Monstros": true };
 let isOverweight = false;
 let pendingSpellIndex = null; 
+let myPlayerName = "Jogador";
 
+// Carregamento Imediato (livre do bug do OBR)
 document.getElementById('loading').style.display = 'none';
 document.getElementById('app').style.display = 'block';
 initExtension();
@@ -117,7 +117,7 @@ window.renderCharacterList = function() {
 
 window.createNewCharacter = function() {
     const newId = 'char_' + Date.now();
-    characters[newId] = { name: "Novo Personagem", avatar: "🧙‍♂️", category: "Jogadores", classe: "Plebeu", skills: {}, inventory: [], spells: [], color: "#d4af37", mov: 30, runas: 0, activeRunes: [], alloc: {f:0, m:0, a:0, s:0}, foraCombate: false, inGame: false, hpAtual: 40, mpAtual: 25, hasRolledTurn: false, initiative: 0, shieldFis: 0, shieldMag: 0 };
+    characters[newId] = { name: "Novo Personagem", avatar: "🧙‍♂️", category: "Jogadores", classe: "Plebeu", skills: {}, inventory: [], spells: [], color: "#d4af37", mov: 30, runas: 0, activeRunes: [], alloc: {f:0, m:0, a:0, s:0}, foraCombate: false, inGame: false, hpAtual: 40, mpAtual: 25, hasRolledTurn: false, initiative: 0, shieldFis: 0, shieldMag: 0, playerName: myPlayerName };
     window.saveData(); 
     window.openCharacter(newId);
 }
@@ -176,12 +176,13 @@ window.updateCategoryUI = function() {
     window.calcVitals(); 
 }
 
+// ------ ABERTURA BLINDADA SEM TRAVAMENTOS E CADEADOS ------
 window.openCharacter = function(id) {
     try {
         currentCharId = id;
         const c = characters[id] || {};
         
-        c.playerName = myPlayerName; // Marca que eu sou o dono atual!
+        c.playerName = myPlayerName; // Marca o nome do jogador na aba combate
         
         try{ safeSetVal('char-avatar', c.avatar || '🧙‍♂️'); }catch(e){}
         try{ safeSetVal('char-name', c.name || ''); }catch(e){}
@@ -219,7 +220,7 @@ window.openCharacter = function(id) {
 
         document.getElementById('screen-list').classList.remove('active');
         document.getElementById('screen-sheet').classList.add('active');
-    } catch(e) { console.error("Falha ao abrir ficha:", e); alert("Houve um erro na ficha, verifique o console."); }
+    } catch(e) { console.error("Falha ao abrir ficha:", e); alert("Houve um erro na ficha, recarregue a aba."); }
 }
 
 window.calcVitals = function() {
@@ -245,12 +246,12 @@ window.calcVitals = function() {
     else { isOverweight = false; if(bp) bp.classList.remove('overweight'); if(pa) pa.style.display = 'none'; }
 }
 
-// ------ COMBAT TRACKER INLINE ------
+// ------ COMBAT TRACKER COM DEFESA MANUAL E MIRA ------
 window.renderCombatTracker = function() {
     const container = document.getElementById('combat-tracker-list');
     if(!container) return;
     
-    // Injeta a Identidade (ID) em todos que estão na cena
+    // Injeta ID para que a Espadinha saiba quem atacar!
     let combatants = [];
     for(let k in characters) {
         if(characters[k].inGame) {
@@ -266,18 +267,19 @@ window.renderCombatTracker = function() {
         let hpM = c.category==='Monstros' ? (c.vidaMonster||100) : (40 + (c.sorte||0)*5);
         let mpM = c.category==='Monstros' ? 25 : 25 + (c.classe==='Andarilho'?25:c.classe==='Estrangeiro'?50:c.classe==='Nobre'?75:0);
         let positionTag = c.hasRolledTurn ? `<span style="font-size:10px; color:var(--accent-gold); font-weight:bold; background:#000; padding:2px 4px; border-radius:3px;">${idx + 1}º a Atacar</span>` : `<span style="font-size:10px; color:#888; font-weight:bold; background:#000; padding:2px 4px; border-radius:3px;">⌛ Pendente</span>`;
-        let playerNameTag = c.playerName ? `<span style="font-size:10px; color:#888; margin-left:5px;">(🎮 ${c.playerName})</span>` : '';
+        
+        let playerNameDisplay = c.playerName ? `<span style="font-size:10px; color:#888; margin-left:8px;">(🎮 ${c.playerName})</span>` : '';
 
         // ESCUDOS ATIVOS DO TURNO (A Defesa Manual)
         let shieldFis = c.shieldFis || 0;
         let shieldMag = c.shieldMag || 0;
         let shieldDisplay = '';
         if (shieldFis > 0 || shieldMag > 0) {
-            shieldDisplay = `<div style="font-size:11px; color:#aaa; margin-top:4px;">🛡️ Escudo: <span style="color:#ff4444">${shieldFis} DF</span> | <span style="color:#44aaff">${shieldMag} DM</span></div>`;
+            shieldDisplay = `<div style="font-size:11px; color:#aaa; margin-top:4px;">🛡️ <span style="color:#ff4444">${shieldFis} DF</span> | <span style="color:#44aaff">${shieldMag} DM</span></div>`;
         }
 
         let attackButton = '';
-        // ESPADINHA RELÂMPAGO
+        // ESPADINHA RELÂMPAGO DO ATAQUE
         if (c.id !== currentCharId && pendingSpellIndex !== null) {
             let spell = playerSpells[pendingSpellIndex];
             if (spell && spell.tipo === 'Cura') {
@@ -294,14 +296,14 @@ window.renderCombatTracker = function() {
             }
         }
 
-        // MOSTRAR RUNAS DO JOGADOR NA TELA PARA QUEIMAR E VIRAR ESCUDO (DEFESA)
+        // MOSTRAR RUNAS DO JOGADOR NA TELA PARA QUEIMAR E VIRAR ESCUDO
         let runesHtml = '';
         if (c.activeRunes && c.activeRunes.length > 0) {
             runesHtml = `<div style="margin-top: 6px; display: flex; gap: 4px; flex-wrap: wrap;">`;
             c.activeRunes.forEach((r, rIdx) => {
                 let color = r.type === 'alpha' ? '#44aaff' : (r.type === 'delta' ? '#ff4444' : '#a855f7');
                 let symbol = r.type === 'alpha' ? 'α' : (r.type === 'delta' ? 'δ' : 'β');
-                // Botão Clicável para qualquer um
+                // O Mestre ou o próprio jogador podem queimar a runa
                 let onClick = `onclick="window.converterRunaEmDefesa('${c.id}', ${rIdx})"`;
                 runesHtml += `<button style="background:#111; color:${color}; border:1px solid ${color}; border-radius:4px; padding:4px 8px; font-size:12px; font-weight:bold; cursor:pointer; margin-right:4px;" ${onClick} title="Clique para queimar e converter em Defesa!">${symbol} ${r.face} <span style="color:#ff4444; margin-left:4px;">✖</span></button>`;
             });
@@ -313,7 +315,7 @@ window.renderCombatTracker = function() {
                 <div style="display:flex; align-items:center; gap:8px;">
                     <span style="font-size:20px;">${c.avatar || '🧙‍♂️'}</span> 
                     <div>
-                        <b style="font-size:14px; color:var(--accent-gold);">${c.name}</b> ${playerNameTag}<br>${positionTag}
+                        <b style="font-size:14px; color:var(--accent-gold);">${c.name}</b> ${playerNameDisplay}<br>${positionTag}
                         ${shieldDisplay}
                     </div>
                 </div>
@@ -379,6 +381,7 @@ window.converterRunaEmDefesa = async function(id, rIdx) {
     window.renderGlobalRunes();
 }
 
+// ------ MIRA E ATAQUE (NOVA ENGINE) ------
 window.toggleTargetMode = function(index) {
     let cb = document.getElementById('fora-combate'); let isFora = cb ? cb.checked : false;
     if (!isFora) {
@@ -406,7 +409,6 @@ window.toggleTargetMode = function(index) {
     }
 }
 
-// ------ O CORAÇÃO DO ATAQUE TÁTICO ------
 window.atacarAlvo = async function(targetId) {
     try {
         let index = pendingSpellIndex;
@@ -458,7 +460,7 @@ window.atacarAlvo = async function(targetId) {
             payload.t = "spell"; 
         } else if (spell.tipo === "Dano" || spell.tipo === "Controle") {
             
-            // ABATE DOS ESCUDOS DO ALVO
+            // ABATE DOS ESCUDOS DO ALVO (Simplificado para absorver de ambos)
             let totalShield = (tgt.shieldFis || 0) + (tgt.shieldMag || 0); 
             let netDamage = Math.max(0, grossDamage - totalShield);
 
@@ -484,7 +486,7 @@ window.atacarAlvo = async function(targetId) {
         
         pendingSpellIndex = null;
 
-        // SALVA AMBOS NA NUVEM IMEDIATAMENTE DE FORMA BLINDADA
+        // SALVA AMBOS NA NUVEM IMEDIATAMENTE (GARANTIA DE DADOS SALVOS)
         characters[currentCharId] = attacker;
         characters[targetId] = tgt;
         
@@ -494,8 +496,8 @@ window.atacarAlvo = async function(targetId) {
         
         if (OBR.isAvailable) await OBR.room.setMetadata(updates);
 
-        // EXPLODE O NEON NA TELA PARA TODOS VEREM!
-        window.abrirModalCentral(payload); 
+        // EXPLODE O NEON NA TELA E SALVA NO LOG PARA TODOS VEREM!
+        try { window.abrirModalCentral(payload); } catch(e){}
         window.addCombatLog(payload);
         if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", payload);
         
@@ -525,13 +527,13 @@ window.addSpell = function() { playerSpells.push({ nome: "", desc: "", custo: ""
 window.updateSpell = function(index, field, value) { playerSpells[index][field] = value; window.saveData(); window.renderSpells(); }
 window.removeSpell = function(index) { if(confirm("Remover magia?")) { playerSpells.splice(index, 1); window.renderSpells(); window.saveData(); } }
 
-
 window.saveData = async function() {
     if (isLoadingSheet) return; 
     if (!currentCharId) return; 
     
     try {
-        let c = characters[currentCharId] || {};
+        let oldC = characters[currentCharId] || {};
+        let c = { ...oldC };
         
         if (document.getElementById('screen-sheet').classList.contains('active')) {
             c.hpAtual = parseInt(document.getElementById('char-hp-atual')?.value) || 0;
@@ -550,6 +552,12 @@ window.saveData = async function() {
             c.grimoireSelect = document.getElementById('grimoire-select')?.value || ""; c.grimoireDT = document.getElementById('grimoire-dt')?.value || 10; c.mana = document.getElementById('mana-zone')?.value || ""; c.passiva = document.getElementById('passiva')?.value || ""; 
             c.mov = document.getElementById('char-mov')?.value || 30; c.alloc = al; 
         }
+        
+        c.shieldFis = oldC.shieldFis || 0;
+        c.shieldMag = oldC.shieldMag || 0;
+        c.initiative = oldC.initiative || 0;
+        c.hasRolledTurn = oldC.hasRolledTurn || false;
+        c.playerName = myPlayerName || "Jogador";
         
         c.skills = playerSkills; c.inventory = playerInventory; c.spells = playerSpells; c.photo = currentPhoto; 
         
@@ -591,6 +599,7 @@ window.rollSkill = function(skillName, attrName) {
     if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", payload);
 }
 
+// REMOVIDA A MARRETA DO OBR PRA PARAR DE TRAVAR POPUPS
 window.abrirModalCentral = function(data) {
     if (OBR.isAvailable) {
         const dataUrl = encodeURIComponent(JSON.stringify(data));
@@ -611,7 +620,7 @@ function processRoomData(metadata) {
             } else { 
                 let isTyping = document.activeElement && (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA");
                 if (currentCharId === id && isTyping) { 
-                    // ignora localmente
+                    // ignora localmente pra não apagar HP/MP se eu tiver digitando
                 } else {
                     characters[id] = metadata[key]; mudouAlgo = true; 
                 }
@@ -635,9 +644,13 @@ function initExtension() {
     try { const saved = localStorage.getItem('fatesheet_db'); if (saved) characters = JSON.parse(saved); window.renderCharacterList(); } catch(e) {}
     if (OBR.isAvailable) {
         OBR.onReady(async () => {
-            try { myPlayerName = await OBR.player.getName() || "Jogador"; } catch(e){}
+            try { myPlayerName = await OBR.player.getName() || "Jogador"; } catch(e) { myPlayerName = "Jogador"; }
+            
             try {
+                // LIMPEZA FORÇADA DA SUJEIRA DA NUVEM (Apaga antigos sistemas de alvo que travavam)
                 const meta = await OBR.room.getMetadata();
+                for (let k in meta) { if (k.startsWith('fatesheet_lock_') || k.startsWith('fatesheet_clashes')) OBR.room.setMetadata({ [k]: undefined }); }
+                
                 processRoomData(meta);
                 OBR.room.onMetadataChange((metadata) => processRoomData(metadata));
                 OBR.broadcast.onMessage("fatesheet-log-update", (event) => { combatLog = event.data; window.renderMiniLog(); });
