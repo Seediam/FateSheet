@@ -47,6 +47,7 @@ const grimoiresDb = {
 let characters = {}; 
 let combatLog = []; 
 let currentCharId = null;
+let isLoadingSheet = false; 
 let playerSkills = {}; 
 let playerInventory = [];
 let playerSpells = []; 
@@ -67,8 +68,8 @@ window.openTab = function(tabName, event) {
     if(tabName === 'combate-tab') window.renderCombatTracker();
 }
 
-window.backToList = function() {
-    window.saveData();
+window.backToList = async function() {
+    await window.saveData();
     currentCharId = null;
     document.getElementById('screen-sheet').classList.remove('active');
     document.getElementById('screen-list').classList.add('active');
@@ -99,6 +100,7 @@ window.renderCharacterList = function() {
             let isOpen = folderState[cat];
             let html = `<div class="folder-header" onclick="toggleFolder('${cat}')"><span class="chevron">${isOpen ? '▼' : '►'}</span> 📁 ${cat}</div><div class="folder-content" style="display: ${isOpen ? 'flex' : 'none'};">`;
             categories[cat].forEach(char => {
+                // Ficha 100% Livre para Abrir sem Cadeados que travam
                 html += `<div class="char-list-item" onclick="window.openCharacter('${char.id}')">
                             <div style="display:flex; align-items:center;">
                                 <span style="font-size:18px;">${char.av}</span> 
@@ -174,9 +176,10 @@ window.updateCategoryUI = function() {
     window.calcVitals(); 
 }
 
-// ------ ABERTURA SEGURA ------
+// ------ ABERTURA SEGURA COM TRY/CATCH ------
 window.openCharacter = function(id) {
     try {
+        isLoadingSheet = true;
         currentCharId = id;
         const c = characters[id] || {};
         
@@ -216,7 +219,9 @@ window.openCharacter = function(id) {
 
         document.getElementById('screen-list').classList.remove('active');
         document.getElementById('screen-sheet').classList.add('active');
-    } catch(e) { console.error("Falha na abertura:", e); alert("Houve um erro ao abrir a ficha. Tente novamente."); }
+    } catch(e) { console.error("Falha ao abrir ficha:", e); alert("Houve um erro na ficha, verifique o console."); } finally {
+        isLoadingSheet = false;
+    }
 }
 
 window.calcVitals = function() {
@@ -242,12 +247,19 @@ window.calcVitals = function() {
     else { isOverweight = false; if(bp) bp.classList.remove('overweight'); if(pa) pa.style.display = 'none'; }
 }
 
-// ------ COMBAT TRACKER MANUAL E TÁTICO ------
+// ------ COMBAT TRACKER COM DEFESA MANUAL INLINE ------
 window.renderCombatTracker = function() {
     const container = document.getElementById('combat-tracker-list');
     if(!container) return;
     
-    let combatants = Object.values(characters).filter(c => c.inGame);
+    // Injeta a Identidade antes de puxar, para não dar erro "undefined"
+    let combatants = [];
+    for(let k in characters) {
+        if(characters[k].inGame) {
+            characters[k].id = k; 
+            combatants.push(characters[k]);
+        }
+    }
     combatants.sort((a, b) => (b.initiative || 0) - (a.initiative || 0)); 
 
     let html = '';
@@ -261,10 +273,11 @@ window.renderCombatTracker = function() {
         let shieldMag = c.shieldMag || 0;
         let shieldDisplay = '';
         if (shieldFis > 0 || shieldMag > 0) {
-            shieldDisplay = `<div style="font-size:11px; color:#aaa; margin-top:2px;">🛡️ Def: <span style="color:#ff4444">${shieldFis} DF</span> | <span style="color:#44aaff">${shieldMag} DM</span></div>`;
+            shieldDisplay = `<div style="font-size:11px; color:#aaa; margin-top:4px;">🛡️ <span style="color:#ff4444">${shieldFis} DF</span> | <span style="color:#44aaff">${shieldMag} DM</span></div>`;
         }
 
         let attackButton = '';
+        // Mostra as Espadinhas se alguém está com uma magia mirando!
         if (c.id !== currentCharId && pendingSpellIndex !== null) {
             let spell = playerSpells[pendingSpellIndex];
             if (spell && spell.tipo === 'Cura') {
@@ -281,7 +294,7 @@ window.renderCombatTracker = function() {
             }
         }
 
-        // Runas para clicar e preparar Defesa
+        // Runas na tela para queimar em defesa!
         let runesHtml = '';
         if (c.activeRunes && c.activeRunes.length > 0) {
             runesHtml = `<div style="margin-top: 6px; display: flex; gap: 4px; flex-wrap: wrap;">`;
@@ -289,8 +302,8 @@ window.renderCombatTracker = function() {
                 let color = r.type === 'alpha' ? '#44aaff' : (r.type === 'delta' ? '#ff4444' : '#a855f7');
                 let symbol = r.type === 'alpha' ? 'α' : (r.type === 'delta' ? 'δ' : 'β');
                 let onClick = (c.id === currentCharId) ? `onclick="window.converterRunaEmDefesa('${c.id}', ${rIdx})"` : '';
-                let cursor = (c.id === currentCharId) ? 'cursor:pointer;' : '';
-                runesHtml += `<button style="background:#111; color:${color}; border:1px solid ${color}; border-radius:3px; padding:2px 6px; font-size:11px; font-weight:bold; ${cursor}" ${onClick} title="${c.id === currentCharId ? 'Clique para converter em Defesa' : 'Runa Preparada'}">${symbol} ${r.face} ${c.id === currentCharId ? '<span style="color:#ff4444; margin-left:3px;">✖</span>' : ''}</button>`;
+                let cursor = (c.id === currentCharId) ? 'cursor:pointer;' : 'cursor:default;';
+                runesHtml += `<button style="background:#111; color:${color}; border:1px solid ${color}; border-radius:4px; padding:4px 8px; font-size:12px; font-weight:bold; ${cursor} margin-right:4px;" ${onClick} title="${c.id === currentCharId ? 'Clique para queimar e virar Escudo!' : 'Runa Ativa do Turno'}">${symbol} ${r.face} ${c.id === currentCharId ? '<span style="color:#ff4444; margin-left:4px;">✖</span>' : ''}</button>`;
             });
             runesHtml += `</div>`;
         }
@@ -335,16 +348,14 @@ window.novaRodadaGlobal = async function() {
 }
 
 window.converterRunaEmDefesa = async function(id, rIdx) {
-    if (id !== currentCharId) { alert("Você só pode converter as suas próprias runas!"); return; }
-    
     let c = characters[id]; if(!c || !c.activeRunes || !c.activeRunes[rIdx]) return;
     let r = c.activeRunes[rIdx];
     
     c.shieldFis = c.shieldFis || 0;
     c.shieldMag = c.shieldMag || 0;
 
-    let defFis = (c.forca || 0) * 5;
-    let defMag = (c.magia || 0) * 5;
+    let defFis = parseInt(c.forca || 0) * 5;
+    let defMag = parseInt(c.magia || 0) * 5;
 
     if (r.type === 'delta') { c.shieldFis += defFis; }
     else if (r.type === 'alpha') { c.shieldMag += defMag; }
@@ -355,19 +366,20 @@ window.converterRunaEmDefesa = async function(id, rIdx) {
     }
     
     c.activeRunes.splice(rIdx, 1);
+    
     characters[id] = c;
-    
     if (OBR.isAvailable) await OBR.room.setMetadata({ [`fatesheet_char_${id}`]: c });
-    
+
     window.renderCombatTracker();
     window.renderGlobalRunes();
 }
 
-// ------ O ATAQUE DIRETO E RÁPIDO ------
-window.prepararAtaque = function(index) {
+// ------ O ATAQUE DIRETO COM ESPADA ------
+window.toggleTargetMode = function(index) {
     let cb = document.getElementById('fora-combate'); let isFora = cb ? cb.checked : false;
     if (!isFora) {
-        let inCombatChars = Object.values(characters).filter(ch => ch.inGame);
+        let inCombatChars = [];
+        for(let k in characters) { if(characters[k].inGame) inCombatChars.push(characters[k]); }
         let missing = inCombatChars.filter(ch => !ch.hasRolledTurn);
         if (missing.length > 0) { 
             alert("Aguarde as seguintes fichas rolarem os atributos de turno:\n" + missing.map(m=>m.name).join(', ')); 
@@ -377,20 +389,18 @@ window.prepararAtaque = function(index) {
 
     const spell = playerSpells[index];
     if (pendingSpellIndex === index) {
-        pendingSpellIndex = null; // Desmarca se clicar de novo
+        pendingSpellIndex = null; // desmarca se clicar 2x
+        window.renderSpells();
+        window.renderCombatTracker();
     } else {
         pendingSpellIndex = index;
         if(spell.tipo === "Self" || spell.tipo === "Locomoção") {
-             // Não precisa de alvo! Executa direto
              window.atacarAlvo(currentCharId); 
-             return;
         } else {
-             // Abre a aba de combate
+             window.renderSpells();
              window.openTab('combate-tab'); 
         }
     }
-    window.renderSpells();
-    window.renderCombatTracker();
 }
 
 window.atacarAlvo = async function(targetId) {
@@ -441,12 +451,11 @@ window.atacarAlvo = async function(targetId) {
         payload.t = "spell"; 
     } else if (spell.tipo === "Dano" || spell.tipo === "Controle") {
         
-        // ABATE DOS ESCUDOS DO ALVO (Simplificado para absorver de ambos)
         let totalShield = (tgt.shieldFis || 0) + (tgt.shieldMag || 0); 
         let netDamage = Math.max(0, grossDamage - totalShield);
 
         if (totalShield > 0) {
-            tgt.shieldFis = 0; tgt.shieldMag = 0; // Consome o escudo.
+            tgt.shieldFis = 0; tgt.shieldMag = 0;
         }
 
         tgt.hpAtual = (tgt.hpAtual || 0) - netDamage;
@@ -463,7 +472,6 @@ window.atacarAlvo = async function(targetId) {
     
     pendingSpellIndex = null;
 
-    // SALVA AMBOS NA NUVEM NA MESMA HORA (Sem Lock, Sem Travar)
     characters[currentCharId] = attacker;
     characters[targetId] = tgt;
     
@@ -472,7 +480,6 @@ window.atacarAlvo = async function(targetId) {
     if (currentCharId !== targetId) { updates[`fatesheet_char_${targetId}`] = tgt; }
     if (OBR.isAvailable) await OBR.room.setMetadata(updates);
 
-    // EXPLODE O NEON NA TELA PARA TODOS VEREM!
     window.abrirModalCentral(payload); 
     window.addCombatLog(payload);
     if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", payload);
@@ -480,7 +487,6 @@ window.atacarAlvo = async function(targetId) {
     window.renderGlobalRunes(); window.renderSpells(); window.renderCombatTracker();
     window.openTab('personagem'); 
 }
-
 
 window.updateAlloc = function() {
     let cb = document.getElementById('fora-combate'); let isFora = cb ? cb.checked : false;
@@ -504,19 +510,19 @@ window.updateAlloc = function() {
 
 const getMultFromRoll = (val) => { if(val <= 4) return 0; if(val <= 11) return 0.5; return 1; };
 
-// ------ LOG SEGURO ------
+// ------ LOG SEGURO (Max 10) ------
 window.addCombatLog = async function(data) {
     if (OBR.isAvailable) {
         try {
             let meta = await OBR.room.getMetadata();
-            let nuvemLog = meta["fatesheet_log_v26"] || [];
-            nuvemLog.unshift(data); if(nuvemLog.length > 15) nuvemLog.length = 15; 
+            let nuvemLog = meta["fatesheet_log_v28"] || [];
+            nuvemLog.unshift(data); if(nuvemLog.length > 10) nuvemLog.length = 10; 
             combatLog = nuvemLog;
-            await OBR.room.setMetadata({ "fatesheet_log_v26": combatLog });
+            await OBR.room.setMetadata({ "fatesheet_log_v28": combatLog });
             OBR.broadcast.sendMessage("fatesheet-log-update", combatLog);
         } catch(e) {}
     } else {
-        combatLog.unshift(data); if(combatLog.length > 15) combatLog.length = 15;
+        combatLog.unshift(data); if(combatLog.length > 10) combatLog.length = 10;
     }
     window.renderMiniLog();
 }
@@ -524,7 +530,7 @@ window.addCombatLog = async function(data) {
 window.clearMiniLog = async function() {
     if(confirm('Apagar o histórico de combate para toda a mesa?')) {
         combatLog = [];
-        if (OBR.isAvailable) { await OBR.room.setMetadata({ "fatesheet_log_v26": [] }); OBR.broadcast.sendMessage("fatesheet-log-update", []); }
+        if (OBR.isAvailable) { await OBR.room.setMetadata({ "fatesheet_log_v28": [] }); OBR.broadcast.sendMessage("fatesheet-log-update", []); }
         window.renderMiniLog();
     }
 }
@@ -642,7 +648,7 @@ window.renderSpells = function() {
         let btnIcon = isSelected ? '⚔️' : '🎯';
         
         let isSelf = spell.tipo === "Self"; let row = document.createElement('div'); row.className = 'spell-item';
-        let headerHtml = `<div class="spell-header" onclick="toggleSpellInfo(${index})"><div style="display: flex; align-items: center; gap: 10px;"><button class="btn-roll-spell" style="background:${btnColor}; border-color:${btnColor};" onclick="event.stopPropagation(); window.prepararAtaque(${index})" title="Preparar Magia">${btnIcon}</button><span style="font-weight: bold; color: var(--accent-gold); font-size: 16px;">${spell.nome || 'Nova Magia'}</span></div><div style="display:flex; align-items:center; gap: 10px;"><button class="btn-danger" style="padding: 4px 8px;" onclick="event.stopPropagation(); removeSpell(${index})">X</button><span class="chevron">${spell.isOpen ? '▼' : '►'}</span></div></div>`;
+        let headerHtml = `<div class="spell-header" onclick="toggleSpellInfo(${index})"><div style="display: flex; align-items: center; gap: 10px;"><button class="btn-roll-spell" style="background:${btnColor}; border-color:${btnColor}; color:${isSelected?'#fff':'var(--accent-gold)'};" onclick="event.stopPropagation(); window.prepararAtaque(${index})" title="Preparar Magia">${btnIcon}</button><span style="font-weight: bold; color: var(--accent-gold); font-size: 16px;">${spell.nome || 'Nova Magia'}</span></div><div style="display:flex; align-items:center; gap: 10px;"><button class="btn-danger" style="padding: 4px 8px;" onclick="event.stopPropagation(); removeSpell(${index})">X</button><span class="chevron">${spell.isOpen ? '▼' : '►'}</span></div></div>`;
         let bodyHtml = `<div style="display: ${spell.isOpen ? 'flex' : 'none'}; flex-direction: column; gap: 5px; margin-top: 10px;"><div class="inv-row"><input type="text" class="inv-input" style="flex: 2; font-weight: bold;" placeholder="Habilidade" value="${spell.nome}" onchange="updateSpell(${index}, 'nome', this.value)"><input type="number" class="inv-input" style="flex: 1;" placeholder="Custo MP" value="${spell.custo}" onchange="updateSpell(${index}, 'custo', this.value)"><input type="text" class="inv-input" style="flex: 1;" placeholder="Alcance" value="${spell.alcance}" onchange="updateSpell(${index}, 'alcance', this.value)"></div><div class="inv-row" style="margin-top: 5px;"><textarea class="inv-input" style="flex: 1; resize: vertical;" rows="1" placeholder="Descrição e Efeitos..." onchange="updateSpell(${index}, 'desc', this.value)">${spell.desc}</textarea></div><div class="inv-row"><span style="font-size:16px;">🎵</span><input type="text" class="inv-input" style="flex: 1; border-color: #555;" placeholder="URL de Áudio Customizado" value="${spell.audioUrl}" onchange="updateSpell(${index}, 'audioUrl', this.value)"></div><div class="dice-config-row"><select class="inv-input dice-sel" style="width:100% !important;" onchange="updateSpell(${index}, 'tipo', this.value); window.renderSpells();"><option value="Dano" ${spell.tipo==='Dano'?'selected':''}>Dano (Base + Runas Globais)</option><option value="Controle" ${spell.tipo==='Controle'?'selected':''}>Controle (Base + Runas Globais)</option><option value="Cura" ${spell.tipo==='Cura'?'selected':''}>Cura (Base + Runas Globais)</option><option value="Locomoção" ${spell.tipo==='Locomoção'?'selected':''}>Locomoção (Base + Runas Globais)</option><option value="Self" ${spell.tipo==='Self'?'selected':''}>Self (Apenas Efeito)</option></select>${(!isSelf) ? `<div class="dice-group"><span class="lbl" style="color:#fff">Base</span><input type="number" class="inv-input dice-qty" min="1" value="${spell.bQtd}" onchange="updateSpell(${index}, 'bQtd', this.value)"><select class="inv-input dice-sel" onchange="updateSpell(${index}, 'bD', this.value)"><option value="d4" ${spell.bD==='d4'?'selected':''}>d4</option><option value="d6" ${spell.bD==='d6'?'selected':''}>d6</option><option value="d8" ${spell.bD==='d8'?'selected':''}>d8</option><option value="d10" ${spell.bD==='d10'?'selected':''}>d10</option><option value="d12" ${spell.bD==='d12'?'selected':''}>d12</option><option value="d20" ${spell.bD==='d20'?'selected':''}>d20</option><option value="d100" ${spell.bD==='d100'?'selected':''}>d100</option></select><div class="mult-group"><span class="mult-btn m-red ${spell.bMult===0?'active':''}" onclick="updateSpell(${index}, 'bMult', 0)">X</span><span class="mult-btn m-white ${spell.bMult===0.5?'active':''}" onclick="updateSpell(${index}, 'bMult', 0.5)">X</span><span class="mult-btn m-green ${spell.bMult===1?'active':''}" onclick="updateSpell(${index}, 'bMult', 1)">X</span></div></div><div style="display:flex; align-items:center; gap:5px; margin-left: auto; width: 100%; justify-content: flex-end; margin-top: 5px;"><input type="checkbox" id="crit-${index}" ${spell.isCrit ? 'checked' : ''} onchange="updateSpell(${index}, 'isCrit', this.checked)"><label for="crit-${index}" style="color:#ffd700; margin:0; cursor:pointer;">Crítico (Base Máx x3)</label></div>` : ''}</div><div class="dice-config-row" style="margin-top: 5px; border-color: #a855f7;"><div style="display: flex; width: 100%; align-items: center; gap: 5px;"><span style="color:#a855f7; font-size: 11px; font-weight: bold; white-space: nowrap;">⚡ Status/Efeito</span><input type="text" class="inv-input" style="flex: 2;" placeholder="Ex: Queimar" value="${spell.statusName}" onchange="updateSpell(${index}, 'statusName', this.value)"><span style="color:#fff; font-size: 11px; font-weight: bold;">DT:</span><input type="number" class="inv-input dice-qty" placeholder="15" value="${spell.statusDT}" onchange="updateSpell(${index}, 'statusDT', this.value)"></div></div></div>`;
         row.innerHTML = headerHtml + bodyHtml; container.appendChild(row);
     });
@@ -651,37 +657,17 @@ window.addSpell = function() { playerSpells.push({ nome: "", desc: "", custo: ""
 window.updateSpell = function(index, field, value) { playerSpells[index][field] = value; window.saveData(); window.renderSpells(); }
 window.removeSpell = function(index) { if(confirm("Remover magia?")) { playerSpells.splice(index, 1); window.renderSpells(); window.saveData(); } }
 
-window.prepararAtaque = function(index) {
-    let cb = document.getElementById('fora-combate'); let isFora = cb ? cb.checked : false;
-    if (!isFora) {
-        let inCombatChars = Object.values(characters).filter(ch => ch.inGame);
-        let missing = inCombatChars.filter(ch => !ch.hasRolledTurn);
-        if (missing.length > 0) { 
-            alert("Aguarde as seguintes fichas rolarem os atributos de turno:\n" + missing.map(m=>m.name).join(', ')); 
-            return; 
-        }
-    }
-    const spell = playerSpells[index];
-    if (pendingSpellIndex === index) {
-        pendingSpellIndex = null; // desmarca
-        window.renderSpells();
-        window.renderCombatTracker();
-    } else {
-        pendingSpellIndex = index;
-        if(spell.tipo === "Self" || spell.tipo === "Locomoção") {
-             window.atacarAlvo(currentCharId); 
-        } else {
-             window.renderSpells();
-             window.openTab('combate-tab'); 
-        }
-    }
-}
-
 window.saveData = async function() {
+    if (isLoadingSheet) return; 
     if (!currentCharId) return; 
+    
     try {
         let c = characters[currentCharId] || {};
-        // Salva preenchimentos da tela se ela estiver aberta (sem apagar as Defesas que preparamos!)
+        let sFis = c.shieldFis || 0;
+        let sMag = c.shieldMag || 0;
+        let ini = c.initiative || 0;
+        let hrt = c.hasRolledTurn || false;
+
         if (document.getElementById('screen-sheet').classList.contains('active')) {
             c.hpAtual = parseInt(document.getElementById('char-hp-atual')?.value) || 0;
             c.mpAtual = parseInt(document.getElementById('char-mp-atual')?.value) || 0;
@@ -699,6 +685,12 @@ window.saveData = async function() {
             c.grimoireSelect = document.getElementById('grimoire-select')?.value || ""; c.grimoireDT = document.getElementById('grimoire-dt')?.value || 10; c.mana = document.getElementById('mana-zone')?.value || ""; c.passiva = document.getElementById('passiva')?.value || ""; 
             c.mov = document.getElementById('char-mov')?.value || 30; c.alloc = al; 
         }
+        
+        c.shieldFis = sFis;
+        c.shieldMag = sMag;
+        c.initiative = ini;
+        c.hasRolledTurn = hrt;
+        
         c.skills = playerSkills; c.inventory = playerInventory; c.spells = playerSpells; c.photo = currentPhoto; 
         
         characters[currentCharId] = c;
@@ -720,7 +712,8 @@ window.rollSkill = function(skillName, attrName) {
     let isFora = document.getElementById('fora-combate') ? document.getElementById('fora-combate').checked : false;
 
     if (!isFora) {
-        let inCombatChars = Object.values(characters).filter(ch => ch.inGame);
+        let inCombatChars = [];
+        for(let k in characters) { if(characters[k].inGame) inCombatChars.push(characters[k]); }
         let missing = inCombatChars.filter(ch => !ch.hasRolledTurn);
         if (missing.length > 0) { alert("Aguarde as seguintes fichas rolarem os atributos de turno:\n" + missing.map(m=>m.name).join(', ')); return; }
     }
@@ -739,16 +732,18 @@ window.rollSkill = function(skillName, attrName) {
     if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", payload);
 }
 
-window.abrirModalCentral = function(data) {
+window.abrirModalCentral = async function(data) {
     if (OBR.isAvailable) {
         const dataUrl = encodeURIComponent(JSON.stringify(data));
-        // Remove erro de travamento do Popup do Owlbear
+        // FECHA O MODAL ANTIGO ANTES DE ABRIR O NOVO PARA NÃO TRAVAR O NAVEGADOR
+        try { await OBR.modal.close("fate-roll-modal").catch(()=>{}); } catch(e) {}
         try { OBR.modal.open({ id: "fate-roll-modal", url: `https://seediam.github.io/FateSheet/resultado.html?data=${dataUrl}`, width: 450, height: (data.t === "spell" || data.t === "attr" || data.t === "clash_result") ? 550 : 250 }); } catch(e) {}
     }
 }
 
 function processRoomData(metadata) {
     let mudouAlgo = false;
+    
     if (metadata["fatesheet_log_v26"] !== undefined) { combatLog = metadata["fatesheet_log_v26"]; window.renderMiniLog(); }
 
     for (let key in metadata) {
@@ -759,7 +754,7 @@ function processRoomData(metadata) {
             } else { 
                 let isTyping = document.activeElement && (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA");
                 if (currentCharId === id && isTyping) { 
-                    // ignora
+                    // ignora para não apagar o que eu to escrevendo
                 } else {
                     characters[id] = metadata[key]; mudouAlgo = true; 
                 }
@@ -771,7 +766,7 @@ function processRoomData(metadata) {
         try { window.renderCharacterList(); } catch(e){}
         try { window.renderCombatTracker(); } catch(e){}
         
-        if (currentCharId && document.getElementById('screen-sheet').classList.contains('active')) {
+        if (currentCharId && document.getElementById('screen-sheet').classList.contains('active') && !isLoadingSheet) {
             let hpF = document.getElementById('char-hp-atual'); if (hpF && document.activeElement !== hpF) hpF.value = characters[currentCharId].hpAtual || 0;
             let mpF = document.getElementById('char-mp-atual'); if (mpF && document.activeElement !== mpF) mpF.value = characters[currentCharId].mpAtual || 0;
             let runF = document.getElementById('char-runas'); if (runF && document.activeElement !== runF) runF.value = characters[currentCharId].runas || 0;
@@ -784,7 +779,7 @@ function initExtension() {
     if (OBR.isAvailable) {
         OBR.onReady(async () => {
             try {
-                // EXTERMINADOR DE CADEADOS. LIMPANDO O CACHE:
+                // LIMPEZA FORÇADA DE CADEADOS FANTASMAS E DUELOS ANTIGOS
                 const meta = await OBR.room.getMetadata();
                 for (let k in meta) { if (k.startsWith('fatesheet_lock_') || k.startsWith('fatesheet_clash_')) OBR.room.setMetadata({ [k]: undefined }); }
                 
