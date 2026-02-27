@@ -76,6 +76,7 @@
         .inv-input { padding: 8px !important; font-size: 12px; }
         .btn-danger { background: #3a1c1c; border: none; color: #fff; cursor: pointer; border-radius: 4px; padding: 6px 10px; transition: 0.2s; font-weight: bold;}
         .btn-danger:hover { background: var(--danger); }
+        .overweight { border-color: var(--danger) !important; color: var(--danger) !important; }
 
         .spell-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding: 2px 0;}
         .dice-config-row { display: flex; flex-direction: column; gap: 5px; margin-top: 5px; background: #15151e; padding: 8px; border-radius: 4px; border: 1px dashed var(--border-subtle);}
@@ -95,13 +96,23 @@
         .m-green { color: var(--success); border: 1px solid var(--success); }
         .m-green.active, .m-green:hover { background: var(--success); color: #000; opacity: 1; }
         
+        .btn-rune { background: transparent; border: 1px dashed; border-radius: 4px; font-size: 10px; padding: 6px 10px; cursor: pointer; transition: 0.2s; font-weight: bold; }
+        .b-alpha { color: #44aaff; border-color: #44aaff; }
+        .b-alpha:hover { background: #44aaff; color: #000; }
+        .b-delta { color: #ff4444; border-color: #ff4444; }
+        .b-delta:hover { background: #ff4444; color: #000; }
+        .b-beta { color: #a855f7; border-color: #a855f7; }
+        .b-beta:hover { background: #a855f7; color: #000; }
+        .b-arma { color: #ccc; border-color: #ccc; }
+        .b-arma:hover { background: #ccc; color: #000; }
+
         .log-entry { background: #15151e; border-left: 3px solid #d4af37; padding: 8px 10px; margin-bottom: 8px; border-radius: 4px; font-size: 13px; box-shadow: 0 2px 4px rgba(0,0,0,0.3); animation: fadeIn 0.3s ease;}
         .log-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px; border-bottom: 1px dashed #333; padding-bottom: 4px;}
         .log-name { font-weight: bold; color: #d4af37; font-size: 14px; }
         .log-action { color: #888; font-size: 11px; text-align: right;}
         .log-result { color: #fff; margin-top: 4px; font-size: 12px;}
         
-        .section-title { color: var(--accent-gold); margin: 20px 0 10px 0; border-bottom: 1px solid var(--border-subtle); padding-bottom: 5px; font-size: 14px; }
+        .section-title { color: var(--accent-gold); margin: 20px 0 10px 0; border-bottom: 1px solid var(--border-subtle); padding-bottom: 5px; font-size: 14px;}
     </style>
 </head>
 <body>
@@ -157,13 +168,13 @@
                     <div style="flex: 1;">
                         <div class="form-group" style="position: relative;">
                             <label>Nome</label>
-                            <input type="text" id="char-name" onchange="saveData()">
+                            <input type="text" id="char-name" onblur="saveData()">
                             <div id="char-fc-badge" style="display:none; color:#888; font-size:10px; font-weight:bold; position:absolute; top: 0; right: 0;">[ Fora de Combate ]</div>
                         </div>
                         <div style="display: flex; gap: 5px;">
                             <div class="form-group" style="flex: 2;">
                                 <label>Raça</label>
-                                <input type="text" id="char-race-player" value="Humano" onchange="saveData()">
+                                <input type="text" id="char-race-player" value="Humano" onblur="saveData()">
                                 <select id="char-race-monster" style="display: none;" onchange="saveData()">
                                     <option value="Terrestres">Terrestres</option><option value="Voadores">Voadores</option><option value="Aquáticos">Aquáticos</option>
                                 </select>
@@ -185,7 +196,7 @@
                                 <option value="Estrangeiro">Estrangeiro</option><option value="Nobre">Nobre</option>
                             </select>
                         </div>
-                        <div class="form-group" style="flex: 1;"><label>Profissão</label><input type="text" id="char-prof" onchange="saveData()"></div>
+                        <div class="form-group" style="flex: 1;"><label>Profissão</label><input type="text" id="char-prof" onblur="saveData()"></div>
                     </div>
                 </div>
 
@@ -200,17 +211,17 @@
                     <div class="status-item" id="hp-player-wrapper">
                         <label style="color:#ff4444">Vida</label>
                         <div style="display:flex; justify-content:center; align-items:baseline;">
-                            <input type="number" id="char-hp-atual" class="status-input" value="40" onchange="saveData()"> 
+                            <input type="number" id="char-hp-atual" class="status-input" value="40" onblur="saveData()"> 
                             <span style="margin: 0 5px;">/</span> 
                             <span id="val-vida-max" class="status-max">40</span>
                         </div>
                     </div>
-                    <input type="number" id="val-vida-monster" value="100" style="display:none; width: 100%; background: transparent; border: none; color: #fff; font-size: 18px; font-weight: bold; text-align: center; outline: none; border-bottom: 1px dashed #ff4444; margin-top: 5px;" onchange="saveData()">
+                    <input type="number" id="val-vida-monster" value="100" style="display:none; width: 100%; background: transparent; border: none; color: #fff; font-size: 18px; font-weight: bold; text-align: center; outline: none; border-bottom: 1px dashed #ff4444; margin-top: 5px;" onblur="saveData()">
                     
                     <div class="status-item">
                         <label style="color:#44aaff">Mana</label>
                         <div style="display:flex; justify-content:center; align-items:baseline;">
-                            <input type="number" id="char-mp-atual" class="status-input" value="25" onchange="saveData()"> 
+                            <input type="number" id="char-mp-atual" class="status-input" value="25" onblur="saveData()"> 
                             <span style="margin: 0 5px;">/</span> 
                             <span id="val-mana-max" class="status-max">25</span>
                         </div>
@@ -219,7 +230,15 @@
                     <div class="form-group" style="width: 50px; margin-bottom: 0;">
                         <label style="text-align: center; color:#a855f7;">Runas</label>
                         <div style="display:flex; align-items:center; background: var(--bg-panel); border: 1px solid var(--border-subtle); border-radius: 6px;">
-                            <input type="number" id="char-runas" value="0" style="border:none; background:transparent; padding: 8px 2px; text-align:center; color:#fff; width:100%;" onchange="saveData()">
+                            <input type="number" id="char-runas" value="0" style="border:none; background:transparent; padding: 8px 2px; text-align:center; color:#fff; width:100%;" onblur="saveData()">
+                        </div>
+                    </div>
+
+                    <div class="form-group" style="width: 60px; margin-bottom: 0;">
+                        <label style="text-align: center;">Mov</label>
+                        <div style="display:flex; align-items:center; background: var(--bg-panel); border: 1px solid var(--border-subtle); border-radius: 6px; padding-right: 5px;">
+                            <input type="number" id="char-mov" value="30" style="border:none; background:transparent; padding: 8px 2px; text-align:center; color:#fff; width:100%;" onblur="saveData()">
+                            <span style="font-size:10px; color:#888; font-weight:bold;">ft</span>
                         </div>
                     </div>
                 </div>
@@ -262,9 +281,9 @@
                             <optgroup label="5 Folhas"><option value="Negação">Negação</option><option value="Criação">Criação</option><option value="Imaginação">Imaginação</option><option value="Realidade">Realidade</option></optgroup>
                         </select>
                     </div>
-                    <div class="form-group" style="flex: 1;"><label>DT</label><input type="number" id="grimoire-dt" value="10" onchange="saveData()"></div>
+                    <div class="form-group" style="flex: 1;"><label>DT</label><input type="number" id="grimoire-dt" value="10" onblur="saveData()"></div>
                 </div>
-                <div class="form-group"><label>🌟 Passiva do Grimório</label><textarea id="passiva" rows="4" onchange="saveData()"></textarea></div>
+                <div class="form-group"><label>🌟 Passiva do Grimório</label><textarea id="passiva" rows="4" onblur="saveData()"></textarea></div>
                 
                 <h4 class="section-title" style="display: flex; justify-content: space-between; align-items: center; margin-top: 30px;">
                     Habilidades Ativas <button class="btn-ctrl" style="width:auto; padding: 4px 12px; font-size: 11px;" onclick="addSpell()">+ Magia</button>
@@ -303,6 +322,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@2/lib/index.js"></script>
-    <script type="module" src="script.js?v=9000100"></script>
+    <script type="module" src="script.js?v=9999999"></script>
 </body>
 </html>
