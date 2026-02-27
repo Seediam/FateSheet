@@ -71,7 +71,7 @@
 
         .inv-item, .spell-item { display: flex; flex-direction: column; gap: 5px; background: var(--bg-panel); padding: 10px; border-radius: 6px; margin-bottom: 12px; }
         .inv-item { border-left: 3px solid #666; }
-        .spell-item { border-left: 3px solid #8a8a9e; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .spell-item { border-left: 3px solid #8a8a9e; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: 0.2s; }
         .inv-row { display: flex; gap: 5px; width: 100%; align-items: center; }
         .inv-input { padding: 8px !important; font-size: 12px; }
         .btn-danger { background: #3a1c1c; border: none; color: #fff; cursor: pointer; border-radius: 4px; padding: 6px 10px; transition: 0.2s; font-weight: bold;}
@@ -95,21 +95,13 @@
         .m-green { color: var(--success); border: 1px solid var(--success); }
         .m-green.active, .m-green:hover { background: var(--success); color: #000; opacity: 1; }
         
-        .btn-rune { background: transparent; border: 1px dashed; border-radius: 4px; font-size: 10px; padding: 6px 10px; cursor: pointer; transition: 0.2s; font-weight: bold; }
-        .b-alpha { color: #44aaff; border-color: #44aaff; }
-        .b-alpha:hover { background: #44aaff; color: #000; }
-        .b-delta { color: #ff4444; border-color: #ff4444; }
-        .b-delta:hover { background: #ff4444; color: #000; }
-        .b-beta { color: #a855f7; border-color: #a855f7; }
-        .b-beta:hover { background: #a855f7; color: #000; }
-        .b-arma { color: #ccc; border-color: #ccc; }
-        .b-arma:hover { background: #ccc; color: #000; }
-
         .log-entry { background: #15151e; border-left: 3px solid #d4af37; padding: 8px 10px; margin-bottom: 8px; border-radius: 4px; font-size: 13px; box-shadow: 0 2px 4px rgba(0,0,0,0.3); animation: fadeIn 0.3s ease;}
         .log-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px; border-bottom: 1px dashed #333; padding-bottom: 4px;}
         .log-name { font-weight: bold; color: #d4af37; font-size: 14px; }
         .log-action { color: #888; font-size: 11px; text-align: right;}
         .log-result { color: #fff; margin-top: 4px; font-size: 12px;}
+        
+        .section-title { color: var(--accent-gold); margin: 20px 0 10px 0; border-bottom: 1px solid var(--border-subtle); padding-bottom: 5px; font-size: 14px; }
     </style>
 </head>
 <body>
@@ -311,6 +303,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@2/lib/index.js"></script>
-    <script type="module" src="script.js?v=9999333"></script>
+    <script type="module" src="script.js?v=9000100"></script>
 </body>
 </html>
