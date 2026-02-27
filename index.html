@@ -71,11 +71,12 @@
 
         .inv-item, .spell-item { display: flex; flex-direction: column; gap: 5px; background: var(--bg-panel); padding: 10px; border-radius: 6px; margin-bottom: 12px; }
         .inv-item { border-left: 3px solid #666; }
-        .spell-item { border-left: 3px solid #8a8a9e; box-shadow: 0 4px 6px rgba(0,0,0,0.3); transition: 0.2s; }
+        .spell-item { border-left: 3px solid #8a8a9e; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         .inv-row { display: flex; gap: 5px; width: 100%; align-items: center; }
         .inv-input { padding: 8px !important; font-size: 12px; }
         .btn-danger { background: #3a1c1c; border: none; color: #fff; cursor: pointer; border-radius: 4px; padding: 6px 10px; transition: 0.2s; font-weight: bold;}
         .btn-danger:hover { background: var(--danger); }
+        .overweight { border-color: var(--danger) !important; color: var(--danger) !important; }
 
         .spell-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding: 2px 0;}
         .dice-config-row { display: flex; flex-direction: column; gap: 5px; margin-top: 5px; background: #15151e; padding: 8px; border-radius: 4px; border: 1px dashed var(--border-subtle);}
@@ -110,6 +111,7 @@
         .log-name { font-weight: bold; color: #d4af37; font-size: 14px; }
         .log-action { color: #888; font-size: 11px; text-align: right;}
         .log-result { color: #fff; margin-top: 4px; font-size: 12px;}
+        .section-title { color: var(--accent-gold); margin: 20px 0 10px 0; border-bottom: 1px solid var(--border-subtle); padding-bottom: 5px; font-size: 14px;}
     </style>
 </head>
 <body>
@@ -311,6 +313,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@2/lib/index.js"></script>
-    <script type="module" src="script.js?v=2000000"></script>
+    <script type="module" src="script.js?v=9999222"></script>
 </body>
 </html>
