@@ -15,7 +15,7 @@ const grimoiresDb = {
     "Água": "🌊 Água — Passiva: Fluxo Adaptável\nUma vez por turno, pode converter 50% do dano recebido em redução de Mana ao invés de HP.\nSe terminar o turno sem sofrer dano, recupera 5 Mana.",
     "Planta": "🌱 Planta — Passiva: Enraizar\nQuando atingir o mesmo alvo duas vezes seguidas, ele fica com -10ft de movimento.\nSe o alvo já estiver com redução de movimento, sofre -2 em Agilidade.",
     "Roseira": "🌹 Roseira — Passiva: Espinhos Reativos\nSempre que sofrer dano corpo a corpo, o atacante recebe 1d6 de dano perfurante.\nSe você estiver com menos de 50% de HP, o dano reativo vira 1d10.",
-    "Constrição": "🧊 Constrição — Passiva: Pressão Constante\nSe um alvo estiver sob qualquer condition negativa aplicada por você, ele sofre -1 adicional em testes.\nSe tentar remover um efeito seu e falhar, recebe 1d6 de dano.",
+    "Constrição": "🧊 Constrição — Passiva: Pressão Constante\nSe um alvo estiver sob qualquer condição negativa aplicada por você, ele sofre -1 adicional em testes.\nSe tentar remover um efeito seu e falhar, recebe 1d6 de dano.",
     "Fumaça Arcana": "🌫 Fumaça Arcana — Passiva: Forma Intangível\nUma vez por turno, se sofrer dano, pode reduzir em 1d8.\nSe reduzir 6 ou mais, pode se mover 10ft sem gastar ação.",
     "Espinhos": "🌿 Espinhos — Passiva: Terreno Hostil\nAlvos que entrarem em alcance corpo a corpo sofrem 1d4.\nSe ficarem 2 turnos próximos, ficam com -2 em Movimento.",
     "Tecido": "🧵 Tecido — Passiva: Trama Viva\nSempre que usar habilidade defensiva, ganha +1 Runa temporária no próximo turno.\nSe bloquear totalmente um ataque (reduzir a 0), pode aplicar -2 no próximo teste do atacante.",
@@ -47,7 +47,7 @@ const grimoiresDb = {
 let characters = {}; 
 let combatLog = []; 
 let clashes = {}; // Duelos da Nuvem
-let activeDefenses = {}; // Duelos locais abertos
+let activeDefenses = {}; // Duelos locais
 let currentCharId = null;
 let playerSkills = {}; 
 let playerInventory = [];
@@ -56,9 +56,8 @@ let currentPhoto = "";
 let folderState = { "Jogadores": true, "NPCs": true, "Monstros": true };
 let isOverweight = false;
 let pendingSpellIndex = null; 
-let targetOptionsHTML = '<option value="">Sem Alvo / Automático</option>';
 
-// O Código inicia RÁPIDO para não travar no Loading
+// RETIRADO o onload travado. Inicia direto:
 document.getElementById('loading').style.display = 'none';
 document.getElementById('app').style.display = 'block';
 initExtension();
@@ -105,18 +104,16 @@ window.renderCharacterList = function() {
             
             categories[cat].forEach(char => {
                 let clashBadge = "";
-                // Verifica se este char está sendo atacado
                 if (clashes[char.id]) {
                     clashBadge = `<div style="color:#ff4444; font-size:11px; font-weight:bold; animation: pulseAlert 1.5s infinite; margin-bottom: 4px;">⚠️ ABRIR FICHA PARA DEFENDER!</div>`;
                 } else {
-                    // Verifica se este char está atacando alguem
                     let isAttacking = Object.values(clashes).find(cls => cls.attackerId === char.id);
                     if (isAttacking) {
                         clashBadge = `<div style="color:var(--accent-gold); font-size:11px; font-weight:bold; margin-bottom: 4px;">⚔️ Atacando ${isAttacking.targetName}...</div>`;
                     }
                 }
-
-                // SEM CADEADO. Clicou, abriu, liso e rápido!
+                
+                // Abre a ficha imediatamente (Sem travar com o Cadeado antigo)
                 html += `<div class="char-list-item" onclick="window.openCharacter('${char.id}')">
                             ${clashBadge}
                             <div style="display:flex; align-items:center;">
@@ -135,6 +132,7 @@ window.renderCharacterList = function() {
 window.createNewCharacter = function() {
     const newId = 'char_' + Date.now();
     characters[newId] = { name: "Novo Personagem", avatar: "🧙‍♂️", category: "Jogadores", classe: "Plebeu", skills: {}, inventory: [], spells: [], color: "#d4af37", mov: 30, runas: 0, activeRunes: [], alloc: {f:0, m:0, a:0, s:0}, foraCombate: false, inGame: false, hpAtual: 40, mpAtual: 25, hasRolledTurn: false, initiative: 0 };
+    currentCharId = newId;
     window.saveData(); 
     window.openCharacter(newId);
 }
@@ -143,6 +141,7 @@ window.deleteCharacter = async function() {
     if(confirm("Apagar esta ficha permanentemente para TODOS na mesa?")) {
         const idToDelete = currentCharId;
         delete characters[idToDelete]; 
+        try { localStorage.setItem('fatesheet_db', JSON.stringify(characters)); } catch(e){}
         if (OBR.isAvailable) await OBR.room.setMetadata({ [`fatesheet_char_${idToDelete}`]: undefined });
         currentCharId = null;
         window.backToList();
@@ -167,6 +166,7 @@ window.importCharacter = function(event) {
         try {
             const importedData = JSON.parse(e.target.result);
             const newId = 'char_' + Date.now();
+            currentCharId = newId;
             characters[newId] = importedData;
             window.saveData();
             alert("Ficha importada com sucesso!");
@@ -190,51 +190,46 @@ window.updateCategoryUI = function() {
     safeDisplay('char-race-monster', isMonster ? 'block' : 'none');
     safeDisplay('hp-player-wrapper', isMonster ? 'none' : 'flex');
     safeDisplay('val-vida-monster', isMonster ? 'block' : 'none');
-    window.calcVitals(); window.saveData();
+    window.calcVitals(); 
 }
 
+// Abertura com Try/Catch e sem Lock!
 window.openCharacter = function(id) {
     try {
         currentCharId = id;
         const c = characters[id] || {};
         
-        try { safeSetVal('char-avatar', c.avatar || '🧙‍♂️'); } catch(e){}
-        try { safeSetVal('char-name', c.name || ''); } catch(e){}
-        try { safeSetVal('char-color', c.color || '#d4af37'); document.documentElement.style.setProperty('--accent-gold', c.color || '#d4af37'); } catch(e){}
-        try { safeSetVal('char-category', c.category || 'Jogadores'); } catch(e){}
-        try { safeSetVal('char-age', c.age || ''); } catch(e){}
-        try { safeSetVal('char-class', c.classe || 'Plebeu'); } catch(e){}
-        try { safeSetVal('char-prof', c.prof || ''); } catch(e){}
-        try { if(c.category === 'Monstros') safeSetVal('char-race-monster', c.race || 'Terrestres'); else safeSetVal('char-race-player', c.race || 'Humano'); } catch(e){}
+        safeSetVal('char-avatar', c.avatar || '🧙‍♂️'); safeSetVal('char-name', c.name || ''); safeSetVal('char-color', c.color || '#d4af37');
+        document.documentElement.style.setProperty('--accent-gold', c.color || '#d4af37');
+        safeSetVal('char-category', c.category || 'Jogadores'); safeSetVal('char-age', c.age || ''); safeSetVal('char-class', c.classe || 'Plebeu'); safeSetVal('char-prof', c.prof || ''); safeSetVal('char-prof-desc', c.profDesc || '');
+        if(c.category === 'Monstros') safeSetVal('char-race-monster', c.race || 'Terrestres'); else safeSetVal('char-race-player', c.race || 'Humano');
         
-        try { safeSetVal('char-hp-atual', c.hpAtual !== undefined ? c.hpAtual : 40); } catch(e){}
-        try { safeSetVal('char-mp-atual', c.mpAtual !== undefined ? c.mpAtual : 25); } catch(e){}
-        try { safeSetVal('val-vida-monster', c.vidaMonster || 100); } catch(e){}
-        try { safeSetVal('attr-forca', c.forca || 1); safeSetVal('attr-magia', c.magia || 1); safeSetVal('attr-agilidade', c.agilidade || 1); safeSetVal('attr-sorte', c.sorte || 1); } catch(e){}
-        try { safeSetVal('grimoire-select', c.grimoireSelect || ''); safeSetVal('grimoire-dt', c.grimoireDT || 10); safeSetVal('mana-zone', c.mana || ''); safeSetVal('passiva', c.passiva || ''); } catch(e){}
-        try { safeSetVal('char-mov', c.mov || 30); safeSetVal('char-runas', c.runas || 0); } catch(e){}
+        safeSetVal('char-hp-atual', c.hpAtual !== undefined ? c.hpAtual : 40);
+        safeSetVal('char-mp-atual', c.mpAtual !== undefined ? c.mpAtual : 25);
+        safeSetVal('val-vida-monster', c.vidaMonster || 100);
+        safeSetVal('attr-forca', c.forca || 1); safeSetVal('attr-magia', c.magia || 1); safeSetVal('attr-agilidade', c.agilidade || 1); safeSetVal('attr-sorte', c.sorte || 1);
+        safeSetVal('grimoire-select', c.grimoireSelect || ''); safeSetVal('grimoire-dt', c.grimoireDT || 10); safeSetVal('mana-zone', c.mana || ''); safeSetVal('passiva', c.passiva || ''); 
+        safeSetVal('char-mov', c.mov || 30); safeSetVal('char-runas', c.runas || 0); 
         
-        try { safeSetCheck('fora-combate', c.foraCombate || false); safeSetCheck('char-ingame', c.inGame || false); } catch(e){}
+        safeSetCheck('fora-combate', c.foraCombate || false); safeSetCheck('char-ingame', c.inGame || false);
         
-        try {
-            let al = c.alloc || {f:0, m:0, a:0, s:0};
-            safeSetVal('alloc-forca', al.f); safeSetVal('alloc-magia', al.m); safeSetVal('alloc-agilidade', al.a); safeSetVal('alloc-sorte', al.s);
-        } catch(e){}
+        let al = c.alloc || {f:0, m:0, a:0, s:0};
+        safeSetVal('alloc-forca', al.f); safeSetVal('alloc-magia', al.m); safeSetVal('alloc-agilidade', al.a); safeSetVal('alloc-sorte', al.s);
 
         playerSkills = c.skills || {}; playerInventory = c.inventory || []; playerSpells = c.spells || []; 
         
-        try { window.updateCategoryUI(); } catch(e){}
-        try { window.renderSkills(); } catch(e){}
-        try { window.renderInventory(); } catch(e){}
-        try { window.renderCombatTracker(); } catch(e){}
-        try { window.renderGlobalRunes(); } catch(e){}
-        try { window.renderSpells(); } catch(e){}
-        try { window.calcVitals(); } catch(e){}
-        try { window.updateAlloc(); } catch(e){}
+        try{ window.updateCategoryUI(); }catch(e){}
+        try{ window.renderSkills(); }catch(e){}
+        try{ window.renderInventory(); }catch(e){}
+        try{ window.renderCombatTracker(); }catch(e){}
+        try{ window.renderGlobalRunes(); }catch(e){}
+        try{ window.renderSpells(); }catch(e){}
+        try{ window.calcVitals(); }catch(e){}
+        try{ window.updateAlloc(); }catch(e){}
 
         document.getElementById('screen-list').classList.remove('active');
         document.getElementById('screen-sheet').classList.add('active');
-    } catch(e) { console.error("Falha ao abrir ficha:", e); }
+    } catch(e) { console.error("Falha na abertura:", e); }
 }
 
 window.calcVitals = function() {
@@ -260,7 +255,6 @@ window.calcVitals = function() {
     else { isOverweight = false; if(bp) bp.classList.remove('overweight'); if(pa) pa.style.display = 'none'; }
 }
 
-// ------ COMBAT TRACKER COM DEFESA INCORPORADA ------
 window.renderCombatTracker = function() {
     const container = document.getElementById('combat-tracker-list');
     if(!container) return;
@@ -269,22 +263,17 @@ window.renderCombatTracker = function() {
     combatants.sort((a, b) => (b.initiative || 0) - (a.initiative || 0)); 
 
     let html = '';
-    targetOptionsHTML = '<option value="">Sem Alvo Especifico</option>';
     
     combatants.forEach((c, idx) => {
         let hpM = c.category==='Monstros' ? (c.vidaMonster||100) : (40 + (c.sorte||0)*5);
         let mpM = c.category==='Monstros' ? 25 : 25 + (c.classe==='Andarilho'?25:c.classe==='Estrangeiro'?50:c.classe==='Nobre'?75:0);
         let positionTag = c.hasRolledTurn ? `<span style="font-size:10px; color:var(--accent-gold); font-weight:bold; background:#000; padding:2px 4px; border-radius:3px;">${idx + 1}º a Atacar</span>` : `<span style="font-size:10px; color:#888; font-weight:bold; background:#000; padding:2px 4px; border-radius:3px;">⌛ Pendente</span>`;
-        targetOptionsHTML += `<option value="${c.id}">${c.name}</option>`;
 
         let clashHtml = '';
-        let isAttacking = Object.values(clashes).find(cls => cls.attackerId === c.id);
-
         if (clashes[c.id]) {
             let clash = clashes[c.id];
             
             if (c.id === currentCharId) {
-                // Eu sou a Vítima! Mostrar botões de defesa
                 let defState = activeDefenses[c.id];
                 if (!defState) {
                     clashHtml = `
@@ -296,11 +285,7 @@ window.renderCombatTracker = function() {
                         </div>
                     </div>`;
                 } else {
-                    // Tela de Defesa com Runas
-                    let defFis = (c.forca || 0) * 5;
-                    let defMag = (c.magia || 0) * 5;
-                    let defHib = Math.floor((defFis + defMag) / 3);
-                    
+                    let defFis = (c.forca || 0) * 5; let defMag = (c.magia || 0) * 5; let defHib = Math.floor((defFis + defMag) / 3);
                     let runesHtml = (c.activeRunes || []).map((r, rIdx) => {
                         let cHex = r.type==='alpha' ? '#44aaff' : (r.type==='delta' ? '#ff4444' : (r.type==='beta' ? '#a855f7' : '#ccc'));
                         let sym = r.type==='alpha' ? 'α' : (r.type==='delta' ? 'δ' : (r.type==='beta' ? 'β' : '⚔️'));
@@ -309,7 +294,7 @@ window.renderCombatTracker = function() {
                             <button style="background:transparent; border:none; color:#ff4444; font-weight:bold; cursor:pointer;" onclick="window.descartarRunaDefesa('${c.id}', ${rIdx})">X</button>
                         </div>`;
                     }).join('');
-                    if(runesHtml === '') runesHtml = '<span style="color:#666; font-size:11px;">Você não tem runas ativas.</span>';
+                    if(runesHtml === '') runesHtml = '<span style="color:#666; font-size:11px;">Sem runas de defesa ativas.</span>';
 
                     clashHtml = `
                     <div style="background:#1a1a24; border:1px solid #44aaff; padding:8px; margin-top:8px; border-radius:4px;">
@@ -327,17 +312,11 @@ window.renderCombatTracker = function() {
                     </div>`;
                 }
             } else {
-                // Outro cara apanhando. Mostra para mim
                 clashHtml = `
                 <div style="background:#2a0a0a; border:1px dashed #ff4444; padding:8px; margin-top:8px; border-radius:4px; text-align:center;">
-                    <span style="color:#ffaa00; font-size:12px; font-weight:bold; animation: pulseAlert 1.5s infinite;">⚠️ Defendendo ataque de ${clash.c}...</span>
+                    <span style="color:#ffaa00; font-size:12px; font-weight:bold; animation: pulseAlert 1.5s infinite;">⚠️ Em Duelo com ${clash.c}...</span>
                 </div>`;
             }
-        } else if (isAttacking) {
-            clashHtml = `
-            <div style="background:#1a1a24; border:1px dashed var(--accent-gold); padding:8px; margin-top:8px; border-radius:4px; text-align:center;">
-                <span style="color:var(--accent-gold); font-size:12px; font-weight:bold;">⚔️ Atacando ${isAttacking.targetName}...</span>
-            </div>`;
         }
 
         html += `<div style="background:var(--bg-panel); padding:8px; margin-bottom:5px; border-left:4px solid ${c.color || '#fff'}; border-radius:4px;">
@@ -361,8 +340,6 @@ window.renderCombatTracker = function() {
 
 window.novaRodadaGlobal = async function() {
     if(!confirm("Iniciar nova rodada? Todos precisarão rolar os Atributos novamente.")) return;
-    
-    // Atualiza todo mundo para não rolado (Nuvem em Bloco para não engasgar)
     let updates = {};
     for(let id in characters) { 
         characters[id].hasRolledTurn = false; 
@@ -380,12 +357,8 @@ window.descartarRunaDefesa = async function(id, rIdx) {
     let c = characters[id]; if(!c) return;
     let st = activeDefenses[id]; if(!st) return;
     
-    let defFis = (c.forca || 0) * 5; let defMag = (c.magia || 0) * 5;
-    let defHib = Math.floor((defFis + defMag) / 3);
-    
-    if (st.type === 'fisica') st.blocked += defFis;
-    else if (st.type === 'magica') st.blocked += defMag;
-    else st.blocked += defHib;
+    let defFis = (c.forca || 0) * 5; let defMag = (c.magia || 0) * 5; let defHib = Math.floor((defFis + defMag) / 3);
+    if (st.type === 'fisica') st.blocked += defFis; else if (st.type === 'magica') st.blocked += defMag; else st.blocked += defHib;
 
     c.activeRunes.splice(rIdx, 1);
     await window.saveData(); window.renderCombatTracker();
@@ -402,10 +375,7 @@ window.aceitarDano = async function(id) {
     window.abrirModalCentral(clash); window.addCombatLog(clash);
     if(OBR.isAvailable) {
         OBR.broadcast.sendMessage("fatesheet-rolls", clash);
-        let meta = await OBR.room.getMetadata();
-        let cc = meta.fatesheet_clashes || {};
-        delete cc[id];
-        await OBR.room.setMetadata({ fatesheet_clashes: cc });
+        await OBR.room.setMetadata({ [`fatesheet_clash_${id}`]: undefined });
     }
     delete clashes[id]; window.renderCombatTracker(); window.renderCharacterList();
 }
@@ -424,10 +394,7 @@ window.confirmarDefesa = async function(id) {
     window.abrirModalCentral(clash); window.addCombatLog(clash);
     if(OBR.isAvailable) {
         OBR.broadcast.sendMessage("fatesheet-rolls", clash);
-        let meta = await OBR.room.getMetadata();
-        let cc = meta.fatesheet_clashes || {};
-        delete cc[id];
-        await OBR.room.setMetadata({ fatesheet_clashes: cc });
+        await OBR.room.setMetadata({ [`fatesheet_clash_${id}`]: undefined });
     }
     delete activeDefenses[id]; delete clashes[id]; window.renderCombatTracker(); window.renderCharacterList();
 }
@@ -455,15 +422,14 @@ window.updateAlloc = function() {
 
 const getMultFromRoll = (val) => { if(val <= 4) return 0; if(val <= 11) return 0.5; return 1; };
 
-// ------ LOG SEGURO (Max 10) ------
 window.addCombatLog = async function(data) {
     if (OBR.isAvailable) {
         try {
             let meta = await OBR.room.getMetadata();
-            let nuvemLog = meta["fatesheet_log_v21"] || [];
+            let nuvemLog = meta["fatesheet_log_final"] || [];
             nuvemLog.unshift(data); if(nuvemLog.length > 10) nuvemLog.length = 10; 
             combatLog = nuvemLog;
-            await OBR.room.setMetadata({ "fatesheet_log_v21": combatLog });
+            await OBR.room.setMetadata({ "fatesheet_log_final": combatLog });
             OBR.broadcast.sendMessage("fatesheet-log-update", combatLog);
         } catch(e) {}
     } else {
@@ -475,7 +441,7 @@ window.addCombatLog = async function(data) {
 window.clearMiniLog = async function() {
     if(confirm('Apagar o histórico de combate para toda a mesa?')) {
         combatLog = [];
-        if (OBR.isAvailable) { await OBR.room.setMetadata({ "fatesheet_log_v21": [] }); OBR.broadcast.sendMessage("fatesheet-log-update", []); }
+        if (OBR.isAvailable) { await OBR.room.setMetadata({ "fatesheet_log_final": [] }); OBR.broadcast.sendMessage("fatesheet-log-update", []); }
         window.renderMiniLog();
     }
 }
@@ -612,7 +578,10 @@ window.iniciarAtaqueMagia = function(index) {
         let sel = document.getElementById('modal-target-select'); 
         if(!sel) return;
         sel.innerHTML = '<option value="">Sem Alvo Especifico</option>';
-        Object.keys(characters).forEach(k => { let ch = characters[k]; if (ch.inGame) sel.innerHTML += `<option value="${k}">${ch.name}</option>`; });
+        
+        let combatants = Object.values(characters).filter(c => c.inGame);
+        combatants.forEach(ch => { sel.innerHTML += `<option value="${ch.id}">${ch.name}</option>`; });
+        
         document.getElementById('target-modal').style.display = 'flex';
     } else {
         pendingSpellIndex = index; window.confirmarAtaqueAlvo(); 
@@ -624,6 +593,7 @@ window.confirmarAtaqueAlvo = async function() {
     let modal = document.getElementById('target-modal'); if(modal) modal.style.display = 'none';
     let index = pendingSpellIndex !== null ? pendingSpellIndex : -1; if (index === -1) return;
     pendingSpellIndex = null;
+    
     const spell = playerSpells[index]; let c = characters[currentCharId];
     let isFora = document.getElementById('fora-combate') ? document.getElementById('fora-combate').checked : false;
     
@@ -650,24 +620,23 @@ window.confirmarAtaqueAlvo = async function() {
     let grossDamage = bTot; runesPack.forEach(r => grossDamage += r.tot);
 
     const payload = {
-        t: "spell", av: document.getElementById('char-avatar').value, c: document.getElementById('char-name').value || 'Desconhecido', attackerId: currentCharId, col: document.getElementById('char-color').value || '#d4af37', sn: spell.nome || "Habilidade", cost: spell.custo || "0", rg: spell.alcance || "Self", desc: spell.desc || "", st: spell.tipo || "Dano",
-        b: { f: spell.bD, m: spell.bMult, r: bRolls, tot: bTot }, ru: runesPack, crit: spell.isCrit ? "true" : "false", stName: spell.statusName || "", stDT: spell.statusDT || "0", stRoll: stRoll, audio: spell.audioUrl || "", fc: isFora
+        t: "spell", av: document.getElementById('char-avatar').value, c: document.getElementById('char-name').value || 'Desconhecido', col: document.getElementById('char-color').value || '#d4af37', sn: spell.nome || "Habilidade", cost: spell.custo || "0", rg: spell.alcance || "Self", desc: spell.desc || "", st: spell.tipo || "Dano",
+        b: { f: spell.bD, m: spell.bMult, r: bRolls, tot: bTot }, ru: runesPack, crit: spell.isCrit ? "true" : "false", stName: spell.statusName || "", stDT: spell.statusDT || "0", stRoll: stRoll, audio: spell.audioUrl || "", fc: isFora, attackerId: currentCharId
     };
 
     if (targetId !== "") {
         let tgt = characters[targetId]; payload.targetId = targetId; payload.targetName = tgt ? tgt.name : "Desconhecido";
         
-        // ROLA O DADO NA TELA E LOGA IMEDIATAMENTE (ANTES DA DEFESA)
-        window.abrirModalCentral(payload); 
-        window.addCombatLog(payload);
-        if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", payload);
-
         if (spell.tipo === "Cura") {
             if(tgt) { let maxH = tgt.category==='Monstros' ? (tgt.vidaMonster||100) : (40 + (tgt.sorte||0)*5); tgt.hpAtual = Math.min(maxH, (tgt.hpAtual||0) + grossDamage); payload.healed = grossDamage; }
-            if (OBR.isAvailable) { OBR.room.setMetadata({ [`fatesheet_char_${targetId}`]: characters[targetId] }); }
+            window.abrirModalCentral(payload); window.addCombatLog(payload);
+            if (OBR.isAvailable) { OBR.broadcast.sendMessage("fatesheet-rolls", payload); OBR.room.setMetadata({ [`fatesheet_char_${targetId}`]: characters[targetId] }); }
         } else if (spell.tipo === "Dano" || spell.tipo === "Controle") {
             payload.gross = grossDamage;
             if (OBR.isAvailable) { 
+                window.abrirModalCentral(payload); window.addCombatLog(payload); OBR.broadcast.sendMessage("fatesheet-rolls", payload);
+                
+                // Dispara o alerta para a Vítima defender
                 let meta = await OBR.room.getMetadata();
                 let cls = meta.fatesheet_clashes || {};
                 cls[targetId] = payload;
@@ -686,9 +655,9 @@ window.confirmarAtaqueAlvo = async function() {
 
 window.saveData = async function() {
     if (!currentCharId) return; 
-    
     try {
         let c = characters[currentCharId] || {};
+        // Salva preenchimentos diretos na tela e envia pro objeto!
         if (document.getElementById('screen-sheet').classList.contains('active')) {
             c.hpAtual = parseInt(document.getElementById('char-hp-atual')?.value) || 0;
             c.mpAtual = parseInt(document.getElementById('char-mp-atual')?.value) || 0;
@@ -710,11 +679,7 @@ window.saveData = async function() {
         
         characters[currentCharId] = c;
         try { localStorage.setItem('fatesheet_db', JSON.stringify(characters)); } catch(e){}
-        if (OBR.isAvailable) {
-            let meta = await OBR.room.getMetadata();
-            meta[`fatesheet_char_${currentCharId}`] = characters[currentCharId];
-            await OBR.room.setMetadata(meta);
-        }
+        if (OBR.isAvailable) await OBR.room.setMetadata({ [`fatesheet_char_${currentCharId}`]: characters[currentCharId] });
     } catch(e) { console.error("Erro no save:", e); }
 }
 
@@ -722,41 +687,18 @@ let saveTimeout;
 document.addEventListener('input', (e) => {
     if(e.target.id && e.target.id.startsWith('alloc')) return; 
     clearTimeout(saveTimeout);
-    saveTimeout = setTimeout(() => { if(currentCharId) window.saveData(); }, 800);
+    saveTimeout = setTimeout(() => { if(currentCharId) window.saveData(); }, 600);
 });
-
-window.rollSkill = function(skillName, attrName) {
-    let idMapped = attrName.toLowerCase().replace('ç', 'c'); let baseAttr = parseInt(document.getElementById(`attr-${idMapped}`)?.value) || 1;
-    let classe = document.getElementById('char-class')?.value || 'Plebeu'; let isMonster = document.getElementById('char-category')?.value === 'Monstros';
-    let isFora = document.getElementById('fora-combate') ? document.getElementById('fora-combate').checked : false;
-
-    if (!isFora) {
-        let inCombatChars = Object.values(characters).filter(ch => ch.inGame);
-        let missing = inCombatChars.filter(ch => !ch.hasRolledTurn);
-        if (missing.length > 0) { alert("Aguarde as seguintes fichas rolarem os atributos de turno:\n" + missing.map(m=>m.name).join(', ')); return; }
-    }
-    if(!isMonster) {
-        if (classe === 'Plebeu') { if(attrName === 'Força') baseAttr += 1; if(attrName === 'Magia') baseAttr -= 1; }
-        if (classe === 'Andarilho' && attrName === 'Agilidade') baseAttr += 1;
-        if (classe === 'Estrangeiro' && attrName === 'Sorte') baseAttr += 1;
-        if (classe === 'Nobre' && attrName === 'Magia') baseAttr += 1;
-    }
-    if(baseAttr < 1) baseAttr = 1;
-    let results = []; for (let i = 0; i < baseAttr; i++) { let die = Math.floor(Math.random() * 20) + 1; if (isOverweight) die -= 5; results.push(die); }
-    
-    const payload = { t: "skill", av: document.getElementById('char-avatar')?.value, c: document.getElementById('char-name')?.value || 'Desconhecido', s: skillName, a: attrName, r: results.join(','), pen: isOverweight ? "true" : "false", col: document.getElementById('char-color')?.value || '#d4af37', mod: playerSkills[skillName] || 0, fc: isFora };
-
-    window.abrirModalCentral(payload); window.addCombatLog(payload);
-    if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", payload);
-}
 
 window.abrirModalCentral = function(data) {
     if (OBR.isAvailable) {
         const dataUrl = encodeURIComponent(JSON.stringify(data));
+        // Manda o Owlbear abrir. Ele NÃO TRAVA se a tela já estiver aberta, ele só substitui a página.
         try { OBR.modal.open({ id: "fate-roll-modal", url: `https://seediam.github.io/FateSheet/resultado.html?data=${dataUrl}`, width: 450, height: (data.t === "spell" || data.t === "attr" || data.t === "clash_result") ? 550 : 250 }); } catch(e) {}
     }
 }
 
+// ------ COFRE DE SEGURANÇA NA NUVEM ------
 function processRoomData(metadata) {
     let mudouAlgo = false;
     
@@ -775,7 +717,7 @@ function processRoomData(metadata) {
             } else { 
                 let isTyping = document.activeElement && (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA");
                 if (currentCharId === id && isTyping) { 
-                    // ignora localmente para n apagar
+                    // ignora localmente para não apagar o que eu to escrevendo
                 } else {
                     characters[id] = metadata[key]; mudouAlgo = true; 
                 }
@@ -785,11 +727,12 @@ function processRoomData(metadata) {
     
     if (mudouAlgo) {
         try { window.renderCharacterList(); } catch(e){}
-        try { window.checkClashStatus(); window.renderCombatTracker(); } catch(e){}
+        try { window.renderCombatTracker(); } catch(e){}
         
         if (currentCharId && document.getElementById('screen-sheet').classList.contains('active')) {
             let hpF = document.getElementById('char-hp-atual'); if (hpF && document.activeElement !== hpF) hpF.value = characters[currentCharId].hpAtual || 0;
             let mpF = document.getElementById('char-mp-atual'); if (mpF && document.activeElement !== mpF) mpF.value = characters[currentCharId].mpAtual || 0;
+            let runF = document.getElementById('char-runas'); if (runF && document.activeElement !== runF) runF.value = characters[currentCharId].runas || 0;
         }
     }
 }
@@ -799,7 +742,7 @@ function initExtension() {
     if (OBR.isAvailable) {
         OBR.onReady(async () => {
             try {
-                // LIMPEZA FORÇADA DE CADEADOS FANTASMAS AO INICIAR A SALA:
+                // Remove qualquer lixo de clash ou cadeado fantasma velho na inicialização do mestre:
                 const meta = await OBR.room.getMetadata();
                 for (let k in meta) { if (k.startsWith('fatesheet_lock_')) OBR.room.setMetadata({ [k]: undefined }); }
                 
