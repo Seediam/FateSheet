@@ -15,7 +15,7 @@ const grimoiresDb = {
     "Água": "🌊 Água — Passiva: Fluxo Adaptável\nUma vez por turno, pode converter 50% do dano recebido em redução de Mana ao invés de HP.\nSe terminar o turno sem sofrer dano, recupera 5 Mana.",
     "Planta": "🌱 Planta — Passiva: Enraizar\nQuando atingir o mesmo alvo duas vezes seguidas, ele fica com -10ft de movimento.\nSe o alvo já estiver com redução de movimento, sofre -2 em Agilidade.",
     "Roseira": "🌹 Roseira — Passiva: Espinhos Reativos\nSempre que sofrer dano corpo a corpo, o atacante recebe 1d6 de dano perfurante.\nSe você estiver com menos de 50% de HP, o dano reativo vira 1d10.",
-    "Constrição": "🧊 Constrição — Passiva: Pressão Constante\nSe um alvo estiver sob qualquer condição negativa aplicada por você, ele sofre -1 adicional em testes.\nSe tentar remover um efeito seu e falhar, recebe 1d6 de dano.",
+    "Constrição": "🧊 Constrição — Passiva: Pressão Constante\nSe um alvo estiver sob qualquer condition negativa aplicada por você, ele sofre -1 adicional em testes.\nSe tentar remover um efeito seu e falhar, recebe 1d6 de dano.",
     "Fumaça Arcana": "🌫 Fumaça Arcana — Passiva: Forma Intangível\nUma vez por turno, se sofrer dano, pode reduzir em 1d8.\nSe reduzir 6 ou mais, pode se mover 10ft sem gastar ação.",
     "Espinhos": "🌿 Espinhos — Passiva: Terreno Hostil\nAlvos que entrarem em alcance corpo a corpo sofrem 1d4.\nSe ficarem 2 turnos próximos, ficam com -2 em Movimento.",
     "Tecido": "🧵 Tecido — Passiva: Trama Viva\nSempre que usar habilidade defensiva, ganha +1 Runa temporária no próximo turno.\nSe bloquear totalmente um ataque (reduzir a 0), pode aplicar -2 no próximo teste do atacante.",
@@ -53,8 +53,6 @@ let playerSpells = [];
 let currentPhoto = "";
 let folderState = { "Jogadores": true, "NPCs": true, "Monstros": true };
 let isOverweight = false;
-
-// O Pulo do Gato: Variável que guarda a Magia selecionada para atacar!
 let pendingSpellIndex = null; 
 
 document.getElementById('loading').style.display = 'none';
@@ -173,38 +171,52 @@ window.updateCategoryUI = function() {
     safeDisplay('char-race-monster', isMonster ? 'block' : 'none');
     safeDisplay('hp-player-wrapper', isMonster ? 'none' : 'flex');
     safeDisplay('val-vida-monster', isMonster ? 'block' : 'none');
-    window.calcVitals(); window.saveData();
+    window.calcVitals(); 
 }
 
+// Abertura com Try/Catch e sem Lock!
 window.openCharacter = function(id) {
     try {
         currentCharId = id;
         const c = characters[id] || {};
         
-        safeSetVal('char-avatar', c.avatar || '🧙‍♂️'); safeSetVal('char-name', c.name || ''); safeSetVal('char-color', c.color || '#d4af37');
-        document.documentElement.style.setProperty('--accent-gold', c.color || '#d4af37');
-        safeSetVal('char-category', c.category || 'Jogadores'); safeSetVal('char-age', c.age || ''); safeSetVal('char-class', c.classe || 'Plebeu'); safeSetVal('char-prof', c.prof || ''); safeSetVal('char-prof-desc', c.profDesc || '');
-        if(c.category === 'Monstros') safeSetVal('char-race-monster', c.race || 'Terrestres'); else safeSetVal('char-race-player', c.race || 'Humano');
+        try{ safeSetVal('char-avatar', c.avatar || '🧙‍♂️'); }catch(e){}
+        try{ safeSetVal('char-name', c.name || ''); }catch(e){}
+        try{ safeSetVal('char-color', c.color || '#d4af37'); document.documentElement.style.setProperty('--accent-gold', c.color || '#d4af37'); }catch(e){}
+        try{ safeSetVal('char-category', c.category || 'Jogadores'); }catch(e){}
+        try{ safeSetVal('char-age', c.age || ''); }catch(e){}
+        try{ safeSetVal('char-class', c.classe || 'Plebeu'); }catch(e){}
+        try{ safeSetVal('char-prof', c.prof || ''); }catch(e){}
+        try{ if(c.category === 'Monstros') safeSetVal('char-race-monster', c.race || 'Terrestres'); else safeSetVal('char-race-player', c.race || 'Humano'); }catch(e){}
         
-        safeSetVal('char-hp-atual', c.hpAtual !== undefined ? c.hpAtual : 40);
-        safeSetVal('char-mp-atual', c.mpAtual !== undefined ? c.mpAtual : 25);
-        safeSetVal('val-vida-monster', c.vidaMonster || 100);
-        safeSetVal('attr-forca', c.forca || 1); safeSetVal('attr-magia', c.magia || 1); safeSetVal('attr-agilidade', c.agilidade || 1); safeSetVal('attr-sorte', c.sorte || 1);
-        safeSetVal('grimoire-select', c.grimoireSelect || ''); safeSetVal('grimoire-dt', c.grimoireDT || 10); safeSetVal('mana-zone', c.mana || ''); safeSetVal('passiva', c.passiva || ''); 
-        safeSetVal('char-mov', c.mov || 30); safeSetVal('char-runas', c.runas || 0); 
+        try{ safeSetVal('char-hp-atual', c.hpAtual !== undefined ? c.hpAtual : 40); }catch(e){}
+        try{ safeSetVal('char-mp-atual', c.mpAtual !== undefined ? c.mpAtual : 25); }catch(e){}
+        try{ safeSetVal('val-vida-monster', c.vidaMonster || 100); }catch(e){}
+        try{ safeSetVal('attr-forca', c.forca || 1); safeSetVal('attr-magia', c.magia || 1); safeSetVal('attr-agilidade', c.agilidade || 1); safeSetVal('attr-sorte', c.sorte || 1); }catch(e){}
+        try{ safeSetVal('grimoire-select', c.grimoireSelect || ''); safeSetVal('grimoire-dt', c.grimoireDT || 10); safeSetVal('mana-zone', c.mana || ''); safeSetVal('passiva', c.passiva || ''); }catch(e){}
+        try{ safeSetVal('char-mov', c.mov || 30); safeSetVal('char-runas', c.runas || 0); }catch(e){}
         
-        safeSetCheck('fora-combate', c.foraCombate || false); safeSetCheck('char-ingame', c.inGame || false);
+        try{ safeSetCheck('fora-combate', c.foraCombate || false); safeSetCheck('char-ingame', c.inGame || false); }catch(e){}
         
-        let al = c.alloc || {f:0, m:0, a:0, s:0};
-        safeSetVal('alloc-forca', al.f); safeSetVal('alloc-magia', al.m); safeSetVal('alloc-agilidade', al.a); safeSetVal('alloc-sorte', al.s);
+        try{
+            let al = c.alloc || {f:0, m:0, a:0, s:0};
+            safeSetVal('alloc-forca', al.f); safeSetVal('alloc-magia', al.m); safeSetVal('alloc-agilidade', al.a); safeSetVal('alloc-sorte', al.s);
+        }catch(e){}
 
         playerSkills = c.skills || {}; playerInventory = c.inventory || []; playerSpells = c.spells || []; 
         
-        window.updateCategoryUI(); window.renderSkills(); window.renderInventory(); window.renderCombatTracker(); window.renderGlobalRunes(); window.renderSpells(); window.calcVitals(); window.updateAlloc(); 
+        try{ window.updateCategoryUI(); }catch(e){}
+        try{ window.renderSkills(); }catch(e){}
+        try{ window.renderInventory(); }catch(e){}
+        try{ window.renderCombatTracker(); }catch(e){}
+        try{ window.renderGlobalRunes(); }catch(e){}
+        try{ window.renderSpells(); }catch(e){}
+        try{ window.calcVitals(); }catch(e){}
+        try{ window.updateAlloc(); }catch(e){}
 
         document.getElementById('screen-list').classList.remove('active');
         document.getElementById('screen-sheet').classList.add('active');
-    } catch(e) { console.error("Falha na abertura:", e); }
+    } catch(e) { console.error("Falha ao abrir ficha:", e); }
 }
 
 window.calcVitals = function() {
@@ -230,7 +242,7 @@ window.calcVitals = function() {
     else { isOverweight = false; if(bp) bp.classList.remove('overweight'); if(pa) pa.style.display = 'none'; }
 }
 
-// ------ COMBAT TRACKER: SISTEMA MANUAL DE PREPARAÇÃO E ATAQUE ------
+// ------ COMBAT TRACKER COM SISTEMA MANUAL ------
 window.renderCombatTracker = function() {
     const container = document.getElementById('combat-tracker-list');
     if(!container) return;
@@ -249,7 +261,7 @@ window.renderCombatTracker = function() {
         let shieldMag = c.shieldMag || 0;
         let shieldDisplay = '';
         if (shieldFis > 0 || shieldMag > 0) {
-            shieldDisplay = `<div style="font-size:11px; color:#aaa; margin-top:2px;">🛡️ Def: <span style="color:#ff4444">${shieldFis} DF</span> | <span style="color:#44aaff">${shieldMag} DM</span></div>`;
+            shieldDisplay = `<div style="font-size:11px; color:#aaa; margin-top:4px;">🛡️ <span style="color:#ff4444">${shieldFis} DF</span> | <span style="color:#44aaff">${shieldMag} DM</span></div>`;
         }
 
         let attackButton = '';
@@ -257,17 +269,19 @@ window.renderCombatTracker = function() {
             let spell = playerSpells[pendingSpellIndex];
             if (spell && spell.tipo === 'Cura') {
                 attackButton = `<button style="background:#39ff14; border:none; border-radius:4px; padding:6px 10px; cursor:pointer; font-size:16px; box-shadow: 0 0 10px #39ff14;" onclick="window.atacarAlvo('${c.id}')" title="Curar Alvo">💚</button>`;
-            } else {
+            } else if (spell && spell.tipo !== 'Self') {
                 attackButton = `<button style="background:#ff4444; border:none; border-radius:4px; padding:6px 10px; cursor:pointer; font-size:16px; box-shadow: 0 0 10px #ff4444;" onclick="window.atacarAlvo('${c.id}')" title="Atacar Alvo!">⚔️</button>`;
             }
         } else if (c.id === currentCharId && pendingSpellIndex !== null) {
             let spell = playerSpells[pendingSpellIndex];
             if (spell && spell.tipo === 'Cura') {
                 attackButton = `<button style="background:#39ff14; border:none; border-radius:4px; padding:6px 10px; cursor:pointer; font-size:16px; box-shadow: 0 0 10px #39ff14;" onclick="window.atacarAlvo('${c.id}')" title="Curar a si mesmo">💚</button>`;
+            } else if (spell && spell.tipo === 'Self') {
+                attackButton = `<button style="background:#44aaff; border:none; border-radius:4px; padding:6px 10px; cursor:pointer; font-size:16px; box-shadow: 0 0 10px #44aaff;" onclick="window.atacarAlvo('${c.id}')" title="Usar em si">✨</button>`;
             }
         }
 
-        // Runas para clicar e preparar Defesa
+        // Exibe runas disponíveis para queimar e virar escudo (Apenas a própria pessoa vê o "X")
         let runesHtml = '';
         if (c.activeRunes && c.activeRunes.length > 0) {
             runesHtml = `<div style="margin-top: 6px; display: flex; gap: 4px; flex-wrap: wrap;">`;
@@ -276,7 +290,7 @@ window.renderCombatTracker = function() {
                 let symbol = r.type === 'alpha' ? 'α' : (r.type === 'delta' ? 'δ' : 'β');
                 let onClick = (c.id === currentCharId) ? `onclick="window.converterRunaEmDefesa('${c.id}', ${rIdx})"` : '';
                 let cursor = (c.id === currentCharId) ? 'cursor:pointer;' : '';
-                runesHtml += `<span style="background:#111; color:${color}; border:1px solid ${color}; border-radius:3px; padding:2px 6px; font-size:11px; font-weight:bold; ${cursor}" ${onClick} title="${c.id === currentCharId ? 'Clique para converter em Defesa' : 'Runa Preparada'}">${symbol} ${r.face}</span>`;
+                runesHtml += `<span style="background:#111; color:${color}; border:1px solid ${color}; border-radius:3px; padding:2px 6px; font-size:11px; font-weight:bold; ${cursor}" ${onClick} title="${c.id === currentCharId ? 'Clique para converter em Defesa' : 'Runa Ativa'}">${symbol} ${r.face} ${c.id === currentCharId ? '<b style="color:#ff4444; margin-left:3px;">X</b>' : ''}</span>`;
             });
             runesHtml += `</div>`;
         }
@@ -324,8 +338,8 @@ window.converterRunaEmDefesa = async function(id, rIdx) {
     let c = characters[id]; if(!c || !c.activeRunes || !c.activeRunes[rIdx]) return;
     let r = c.activeRunes[rIdx];
     
-    c.shieldFis = c.shieldFis || 0;
-    c.shieldMag = c.shieldMag || 0;
+    if(!c.shieldFis) c.shieldFis = 0;
+    if(!c.shieldMag) c.shieldMag = 0;
 
     let defFis = (c.forca || 0) * 5;
     let defMag = (c.magia || 0) * 5;
@@ -375,7 +389,7 @@ window.atacarAlvo = async function(targetId) {
     
     let manaCost = parseInt(spell.custo) || 0;
     if (manaCost > 0) {
-        if (attacker.mpAtual < manaCost) { if(!confirm("Mana insuficiente! Deseja castar a magia mesmo assim?")) return; } 
+        if ((attacker.mpAtual||0) < manaCost) { if(!confirm("Mana insuficiente! Deseja castar a magia mesmo assim?")) return; } 
         else { attacker.mpAtual -= manaCost; safeSetVal('char-mp-atual', attacker.mpAtual); }
     }
 
@@ -395,25 +409,26 @@ window.atacarAlvo = async function(targetId) {
         });
     }
     let stRoll = (spell.statusName && spell.statusDT > 0) ? Math.floor(Math.random() * 20) + 1 : 0;
-    let grossDamage = bTot; runesPack.forEach(r => grossDamage += r.tot);
+    let grossDamage = bTot; (runesPack||[]).forEach(r => grossDamage += r.tot);
 
     const payload = {
-        t: "spell", av: document.getElementById('char-avatar').value, c: document.getElementById('char-name').value || 'Desconhecido', col: document.getElementById('char-color').value || '#d4af37', sn: spell.nome || "Habilidade", cost: spell.custo || "0", rg: spell.alcance || "Self", desc: spell.desc || "", st: spell.tipo || "Dano",
-        b: { f: spell.bD, m: spell.bMult, r: bRolls, tot: bTot }, ru: runesPack, crit: spell.isCrit ? "true" : "false", stName: spell.statusName || "", stDT: spell.statusDT || "0", stRoll: stRoll, audio: spell.audioUrl || "", fc: isFora, targetName: tgt.name
+        t: "clash_result", // Mostra o duelo final na tela!
+        av: attacker.avatar || '🧙‍♂️', c: attacker.name || 'Desconhecido', targetName: tgt.name, col: attacker.color || '#d4af37', sn: spell.nome || "Habilidade", cost: spell.custo || "0", rg: spell.alcance || "Self", desc: spell.desc || "", st: spell.tipo || "Dano",
+        b: { f: spell.bD, m: spell.bMult, r: bRolls, tot: bTot }, ru: runesPack, crit: spell.isCrit ? "true" : "false", stName: spell.statusName || "", stDT: spell.statusDT || "0", stRoll: stRoll, audio: spell.audioUrl || "", fc: isFora
     };
 
     if (spell.tipo === "Cura") {
         let maxH = tgt.category==='Monstros' ? (tgt.vidaMonster||100) : (40 + (tgt.sorte||0)*5); 
         tgt.hpAtual = Math.min(maxH, (tgt.hpAtual||0) + grossDamage); 
         payload.healed = grossDamage;
+        payload.t = "spell"; 
     } else if (spell.tipo === "Dano" || spell.tipo === "Controle") {
         
-        // ABATE DOS ESCUDOS DO ALVO
-        let totalShield = (tgt.shieldFis || 0) + (tgt.shieldMag || 0); // Simplificado para absorver de ambos
+        // ABATE DOS ESCUDOS DO ALVO (Soma Físico e Mágico para simplificar combate tático)
+        let totalShield = (tgt.shieldFis || 0) + (tgt.shieldMag || 0); 
         let netDamage = Math.max(0, grossDamage - totalShield);
 
         if (totalShield > 0) {
-            // Consome o escudo. (Zero para simplificar o combate rápido)
             tgt.shieldFis = 0;
             tgt.shieldMag = 0;
         }
@@ -422,7 +437,8 @@ window.atacarAlvo = async function(targetId) {
         payload.gross = grossDamage;
         payload.blocked = Math.min(grossDamage, totalShield);
         payload.net = netDamage;
-        payload.t = "clash_result"; 
+    } else {
+        payload.t = "spell";
     }
 
     attacker.activeRunes = []; attacker.alloc = {f:0, m:0, a:0, s:0}; 
@@ -431,11 +447,11 @@ window.atacarAlvo = async function(targetId) {
     
     pendingSpellIndex = null;
 
-    // SALVA AMBOS NA NUVEM NA MESMA HORA
-    await window.saveData(); 
-    if (OBR.isAvailable && targetId !== currentCharId) {
-        await OBR.room.setMetadata({ [`fatesheet_char_${targetId}`]: tgt });
-    }
+    // SALVA AMBOS NA NUVEM NA MESMA HORA (Sem Lock, Sem Travar)
+    let updates = {};
+    updates[`fatesheet_char_${currentCharId}`] = attacker;
+    if (currentCharId !== targetId) { updates[`fatesheet_char_${targetId}`] = tgt; }
+    if (OBR.isAvailable) await OBR.room.setMetadata(updates);
 
     // EXPLODE O NEON NA TELA PARA TODOS VEREM!
     window.abrirModalCentral(payload); 
@@ -443,8 +459,8 @@ window.atacarAlvo = async function(targetId) {
     if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", payload);
     
     window.renderGlobalRunes(); window.renderSpells(); window.renderCombatTracker();
+    window.openTab('personagem'); // Volta para a ficha após atacar
 }
-
 
 window.updateAlloc = function() {
     let cb = document.getElementById('fora-combate'); let isFora = cb ? cb.checked : false;
@@ -464,20 +480,19 @@ window.updateAlloc = function() {
         alert(`EM COMBATE: Você só pode alocar dados até o limite das suas Runas (${maxRunes})!`);
         safeSetVal('alloc-forca', 0); safeSetVal('alloc-magia', 0); safeSetVal('alloc-agilidade', 0); safeSetVal('alloc-sorte', 0);
     }
-    window.saveData();
 }
 
 const getMultFromRoll = (val) => { if(val <= 4) return 0; if(val <= 11) return 0.5; return 1; };
 
-// ------ LOG SEGURO (Max 10) ------
+// ------ LOG SEGURO ------
 window.addCombatLog = async function(data) {
     if (OBR.isAvailable) {
         try {
             let meta = await OBR.room.getMetadata();
-            let nuvemLog = meta["fatesheet_log_v22"] || [];
+            let nuvemLog = meta["fatesheet_log_v25"] || [];
             nuvemLog.unshift(data); if(nuvemLog.length > 10) nuvemLog.length = 10; 
             combatLog = nuvemLog;
-            await OBR.room.setMetadata({ "fatesheet_log_v22": combatLog });
+            await OBR.room.setMetadata({ "fatesheet_log_v25": combatLog });
             OBR.broadcast.sendMessage("fatesheet-log-update", combatLog);
         } catch(e) {}
     } else {
@@ -489,7 +504,7 @@ window.addCombatLog = async function(data) {
 window.clearMiniLog = async function() {
     if(confirm('Apagar o histórico de combate para toda a mesa?')) {
         combatLog = [];
-        if (OBR.isAvailable) { await OBR.room.setMetadata({ "fatesheet_log_v22": [] }); OBR.broadcast.sendMessage("fatesheet-log-update", []); }
+        if (OBR.isAvailable) { await OBR.room.setMetadata({ "fatesheet_log_v25": [] }); OBR.broadcast.sendMessage("fatesheet-log-update", []); }
         window.renderMiniLog();
     }
 }
@@ -524,7 +539,7 @@ window.renderMiniLog = function() {
                     }
                     if(log.beta && log.beta.r && log.beta.r.length > 0) { let betTot = log.beta.r.reduce((a,b)=>a+b, 0); parts.push(`<span style="color:#a855f7">B: ${betTot}</span>`); totalDano += betTot; }
                     resHtml = `${parts.join(" ")} <b style="color:${log.crit === 'true' ? '#ffd700' : log.col}">=> ${totalDano}</b>`;
-                } else if (log.st === "Cura") { resHtml = `<span style="color:#39ff14;">💚 Curou: ${log.b.tot} HP</span>`; } else { resHtml = `<span style="color:#888;">Efeito Conjurado.</span>`; }
+                } else if (log.st === "Cura") { resHtml = `<span style="color:#39ff14;">💚 Curou: ${log.healed} HP</span>`; } else { resHtml = `<span style="color:#888;">Efeito Conjurado.</span>`; }
                 
                 if (log.stName && log.stDT > 0) {
                     let stRoll = parseInt(log.stRoll); let dt = parseInt(log.stDT); let stCor = stRoll >= dt ? "#44aaff" : "#ff4444";
@@ -551,12 +566,6 @@ window.renderMiniLog = function() {
             div.innerHTML = `<div class="log-header"><span class="log-name" style="color:${log.col || '#d4af37'}">${log.av || '🧙‍♂️'} ${log.c}</span><span class="log-action">${actHtml}</span></div><div class="log-result">${resHtml}</div>`; container.appendChild(div);
         } catch (e) {}
     });
-}
-
-window.abrirJanelaDeLog = function() {
-    if (OBR.isAvailable) {
-        OBR.popover.open({ id: "fatesheet-log-popover", url: `https://seediam.github.io/FateSheet/log.html?v=${Date.now()}`, width: 320, height: 450, disableClickAway: true, anchorOrigin: { horizontal: "RIGHT", vertical: "BOTTOM" }, transformOrigin: { horizontal: "RIGHT", vertical: "BOTTOM" } });
-    } else { alert("Log só funciona dentro da mesa do Owlbear!"); }
 }
 
 window.rollAttributes = function() {
@@ -622,6 +631,41 @@ window.addSpell = function() { playerSpells.push({ nome: "", desc: "", custo: ""
 window.updateSpell = function(index, field, value) { playerSpells[index][field] = value; window.saveData(); window.renderSpells(); }
 window.removeSpell = function(index) { if(confirm("Remover magia?")) { playerSpells.splice(index, 1); window.renderSpells(); window.saveData(); } }
 
+window.saveData = async function() {
+    if (!currentCharId) return; 
+    try {
+        let c = characters[currentCharId] || {};
+        if (document.getElementById('screen-sheet').classList.contains('active')) {
+            c.hpAtual = parseInt(document.getElementById('char-hp-atual')?.value) || 0;
+            c.mpAtual = parseInt(document.getElementById('char-mp-atual')?.value) || 0;
+            c.runas = parseInt(document.getElementById('char-runas')?.value) || 0;
+            c.inGame = document.getElementById('char-ingame')?.checked || false;
+            c.foraCombate = document.getElementById('fora-combate')?.checked || false;
+            
+            let isMonster = document.getElementById('char-category')?.value === 'Monstros';
+            let al = { f: parseInt(document.getElementById('alloc-forca').value)||0, m: parseInt(document.getElementById('alloc-magia').value)||0, a: parseInt(document.getElementById('alloc-agilidade').value)||0, s: parseInt(document.getElementById('alloc-sorte').value)||0 };
+            
+            c.name = document.getElementById('char-name')?.value || "Sem Nome"; c.avatar = document.getElementById('char-avatar')?.value || "🧙‍♂️"; c.color = document.getElementById('char-color')?.value || "#d4af37"; c.category = document.getElementById('char-category')?.value || "Jogadores";
+            c.age = document.getElementById('char-age')?.value || ""; c.race = isMonster ? document.getElementById('char-race-monster').value : document.getElementById('char-race-player').value;
+            c.classe = document.getElementById('char-class')?.value || "Plebeu"; c.prof = document.getElementById('char-prof')?.value || ""; c.profDesc = document.getElementById('char-prof-desc')?.value || "";
+            c.vidaMonster = document.getElementById('val-vida-monster')?.value || 100; c.forca = document.getElementById('attr-forca')?.value || 1; c.magia = document.getElementById('attr-magia')?.value || 1; c.agilidade = document.getElementById('attr-agilidade')?.value || 1; c.sorte = document.getElementById('attr-sorte')?.value || 1;
+            c.grimoireSelect = document.getElementById('grimoire-select')?.value || ""; c.grimoireDT = document.getElementById('grimoire-dt')?.value || 10; c.mana = document.getElementById('mana-zone')?.value || ""; c.passiva = document.getElementById('passiva')?.value || ""; 
+            c.mov = document.getElementById('char-mov')?.value || 30; c.alloc = al; 
+        }
+        c.skills = playerSkills; c.inventory = playerInventory; c.spells = playerSpells; c.photo = currentPhoto; 
+        characters[currentCharId] = c;
+        try { localStorage.setItem('fatesheet_db', JSON.stringify(characters)); } catch(e){}
+        if (OBR.isAvailable) await OBR.room.setMetadata({ [`fatesheet_char_${currentCharId}`]: characters[currentCharId] });
+    } catch(e) { console.error("Erro no save:", e); }
+}
+
+let saveTimeout;
+document.addEventListener('input', (e) => {
+    if(e.target.id && e.target.id.startsWith('alloc')) return; 
+    clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(() => { if(currentCharId) window.saveData(); }, 800);
+});
+
 window.rollSkill = function(skillName, attrName) {
     let idMapped = attrName.toLowerCase().replace('ç', 'c'); let baseAttr = parseInt(document.getElementById(`attr-${idMapped}`)?.value) || 1;
     let classe = document.getElementById('char-class')?.value || 'Plebeu'; let isMonster = document.getElementById('char-category')?.value === 'Monstros';
@@ -659,7 +703,7 @@ window.abrirModalCentral = function(data) {
 function processRoomData(metadata) {
     let mudouAlgo = false;
     
-    if (metadata["fatesheet_log_v22"] !== undefined) { combatLog = metadata["fatesheet_log_v22"]; window.renderMiniLog(); }
+    if (metadata["fatesheet_log_v25"] !== undefined) { combatLog = metadata["fatesheet_log_v25"]; window.renderMiniLog(); }
 
     for (let key in metadata) {
         if (key.startsWith('fatesheet_char_')) {
@@ -669,7 +713,7 @@ function processRoomData(metadata) {
             } else { 
                 let isTyping = document.activeElement && (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA");
                 if (currentCharId === id && isTyping) { 
-                    // ignora localmente para n apagar o que eu to escrevendo
+                    // ignora localmente para n apagar
                 } else {
                     characters[id] = metadata[key]; mudouAlgo = true; 
                 }
@@ -684,7 +728,6 @@ function processRoomData(metadata) {
         if (currentCharId && document.getElementById('screen-sheet').classList.contains('active')) {
             let hpF = document.getElementById('char-hp-atual'); if (hpF && document.activeElement !== hpF) hpF.value = characters[currentCharId].hpAtual || 0;
             let mpF = document.getElementById('char-mp-atual'); if (mpF && document.activeElement !== mpF) mpF.value = characters[currentCharId].mpAtual || 0;
-            let rnF = document.getElementById('char-runas'); if (rnF && document.activeElement !== rnF) rnF.value = characters[currentCharId].runas || 0;
         }
     }
 }
