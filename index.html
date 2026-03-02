@@ -76,7 +76,6 @@
         .inv-input { padding: 8px !important; font-size: 12px; }
         .btn-danger { background: #3a1c1c; border: none; color: #fff; cursor: pointer; border-radius: 4px; padding: 6px 10px; transition: 0.2s; font-weight: bold;}
         .btn-danger:hover { background: var(--danger); }
-        .overweight { border-color: var(--danger) !important; color: var(--danger) !important; }
 
         .spell-header { display: flex; justify-content: space-between; align-items: center; cursor: pointer; padding: 2px 0;}
         .dice-config-row { display: flex; flex-direction: column; gap: 5px; margin-top: 5px; background: #15151e; padding: 8px; border-radius: 4px; border: 1px dashed var(--border-subtle);}
@@ -121,7 +120,11 @@
 
     <div class="app-container" id="app">
         <div id="screen-list" class="screen active">
-            <h3 class="section-title" style="text-align: center; margin-top: 5px; border:none;">Mesa Global</h3>
+            <div style="display:flex; justify-content:space-between; align-items:center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 10px; margin-bottom: 15px;">
+                <h3 class="section-title" style="margin: 0; border: none;">Mesa Global</h3>
+                <button class="btn-ctrl" style="width:auto; padding: 6px 12px; background:#1a1a24; color:#44aaff; font-size:12px; border: 1px solid #44aaff;" onclick="window.abrirJanelaDeLog()">📜 Abrir Log</button>
+            </div>
+            
             <button class="btn-new" onclick="window.createNewCharacter()">+ Criar Novo Personagem</button>
             <input type="file" id="import-file" accept=".json" style="display: none;" onchange="window.importCharacter(event)">
             <button class="btn-import" onclick="document.getElementById('import-file').click()">📥 Importar Ficha (JSON)</button>
@@ -314,6 +317,6 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@2/lib/index.js"></script>
-    <script type="module" src="script.js?v=9999999000"></script>
+    <script type="module" src="script.js?v=3000000"></script>
 </body>
 </html>
