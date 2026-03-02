@@ -5,8 +5,8 @@
   "description": "Ficha dinâmica e interativa para o sistema Fate.",
   "action": {
     "title": "Fate Tracker",
-    "icon": "/icon.svg",
-    "popover": "/index.html",
+    "icon": "https://seediam.github.io/fatesheet//icon.svg",
+    "popover": "https://seediam.github.io/fatesheet/index.html",
     "width": 450,
     "height": 650
   }
