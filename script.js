@@ -47,7 +47,6 @@ const grimoiresDb = {
 let characters = {}; 
 let combatLog = []; 
 let currentCharId = null;
-let isLoadingSheet = false; 
 let playerSkills = {}; 
 let playerInventory = [];
 let playerSpells = []; 
@@ -57,7 +56,7 @@ let isOverweight = false;
 let pendingSpellIndex = null; 
 let myPlayerName = "Jogador";
 
-// Carregamento Imediato Sem Bug
+// CARREGAMENTO DIRETO E VELOZ
 document.getElementById('loading').style.display = 'none';
 document.getElementById('app').style.display = 'block';
 initExtension();
@@ -102,7 +101,6 @@ window.renderCharacterList = function() {
             let isOpen = folderState[cat];
             let html = `<div class="folder-header" onclick="window.toggleFolder('${cat}')"><span class="chevron">${isOpen ? '▼' : '►'}</span> 📁 ${cat}</div><div class="folder-content" style="display: ${isOpen ? 'flex' : 'none'};">`;
             categories[cat].forEach(char => {
-                // Ficha 100% Livre para Abrir
                 html += `<div class="char-list-item" onclick="window.openCharacter('${char.id}')">
                             <div style="display:flex; align-items:center;">
                                 <span style="font-size:18px;">${char.av}</span> 
@@ -119,7 +117,6 @@ window.renderCharacterList = function() {
 
 window.createNewCharacter = function() {
     const newId = 'char_' + Date.now();
-    currentCharId = newId; 
     characters[newId] = { name: "Novo Personagem", avatar: "🧙‍♂️", category: "Jogadores", classe: "Plebeu", skills: {}, inventory: [], spells: [], color: "#d4af37", mov: 30, runas: 0, activeRunes: [], alloc: {f:0, m:0, a:0, s:0}, foraCombate: false, inGame: false, hpAtual: 40, mpAtual: 25, hasRolledTurn: false, initiative: 0, shieldFis: 0, shieldMag: 0, playerName: myPlayerName };
     window.saveData(); 
     window.openCharacter(newId);
@@ -153,7 +150,6 @@ window.importCharacter = function(event) {
         try {
             const importedData = JSON.parse(e.target.result);
             const newId = 'char_' + Date.now();
-            currentCharId = newId;
             characters[newId] = importedData;
             window.saveData();
             alert("Ficha importada com sucesso!");
@@ -183,7 +179,6 @@ window.updateCategoryUI = function() {
 // ------ ABERTURA BLINDADA ------
 window.openCharacter = function(id) {
     try {
-        isLoadingSheet = true;
         currentCharId = id;
         const c = characters[id] || {};
         
@@ -227,9 +222,7 @@ window.openCharacter = function(id) {
         document.getElementById('screen-sheet').classList.add('active');
         
         window.saveData(); 
-    } catch(e) { console.error("Falha ao abrir ficha:", e); alert("Houve um erro na ficha, verifique o console."); } finally {
-        isLoadingSheet = false;
-    }
+    } catch(e) { console.error("Falha ao abrir ficha:", e); alert("Houve um erro na ficha. Recarregue a janela."); }
 }
 
 window.calcVitals = function() {
@@ -255,16 +248,15 @@ window.calcVitals = function() {
     else { isOverweight = false; if(bp) bp.classList.remove('overweight'); if(pa) pa.style.display = 'none'; }
 }
 
-// ------ COMBAT TRACKER INLINE ------
+// ------ COMBAT TRACKER INLINE (COM INJEÇÃO CORRETA DE ID) ------
 window.renderCombatTracker = function() {
     const container = document.getElementById('combat-tracker-list');
     if(!container) return;
     
-    // Injeta a Identidade (ID) em todos que estão na cena pra espadinha funcionar!
     let combatants = [];
     for(let k in characters) {
         if(characters[k].inGame) {
-            characters[k].id = k; 
+            characters[k].id = k; // INJEÇÃO DA IDENTIDADE VITAL AQUI!
             combatants.push(characters[k]);
         }
     }
@@ -276,18 +268,19 @@ window.renderCombatTracker = function() {
         let hpM = c.category==='Monstros' ? (c.vidaMonster||100) : (40 + (c.sorte||0)*5);
         let mpM = c.category==='Monstros' ? 25 : 25 + (c.classe==='Andarilho'?25:c.classe==='Estrangeiro'?50:c.classe==='Nobre'?75:0);
         let positionTag = c.hasRolledTurn ? `<span style="font-size:10px; color:var(--accent-gold); font-weight:bold; background:#000; padding:2px 4px; border-radius:3px;">${idx + 1}º a Atacar</span>` : `<span style="font-size:10px; color:#888; font-weight:bold; background:#000; padding:2px 4px; border-radius:3px;">⌛ Pendente</span>`;
+        
         let playerNameTag = c.playerName ? `<span style="font-size:10px; color:#888; margin-left:8px;">(🎮 ${c.playerName})</span>` : '';
 
-        // ESCUDOS ATIVOS DO TURNO (A Defesa Manual)
+        // ESCUDOS ATIVOS DO TURNO
         let shieldFis = c.shieldFis || 0;
         let shieldMag = c.shieldMag || 0;
         let shieldDisplay = '';
         if (shieldFis > 0 || shieldMag > 0) {
-            shieldDisplay = `<div style="font-size:12px; font-weight:bold; background:#111; border:1px solid var(--accent-gold); display:inline-block; padding:2px 6px; border-radius:4px; margin-top:4px; margin-bottom:4px;">🛡️ <span style="color:#ff4444">${shieldFis} DF</span> | <span style="color:#44aaff">${shieldMag} DM</span></div>`;
+            shieldDisplay = `<div style="font-size:11px; color:#aaa; margin-top:4px;">🛡️ <span style="color:#ff4444">${shieldFis} DF</span> | <span style="color:#44aaff">${shieldMag} DM</span></div>`;
         }
 
         let attackButton = '';
-        // ESPADINHA RELÂMPAGO (AGORA FUNCIONAL)
+        // ESPADINHA DO ATAQUE MIRA
         if (c.id !== currentCharId && pendingSpellIndex !== null) {
             let spell = playerSpells[pendingSpellIndex];
             if (spell && spell.tipo === 'Cura') {
@@ -304,7 +297,7 @@ window.renderCombatTracker = function() {
             }
         }
 
-        // MOSTRAR RUNAS DO JOGADOR NA TELA PARA QUEIMAR E VIRAR ESCUDO (DEFESA)
+        // RUNAS NA TELA PARA QUEIMAR E VIRAR ESCUDO
         let runesHtml = '';
         if (c.activeRunes && c.activeRunes.length > 0) {
             runesHtml = `<div style="margin-top: 6px; display: flex; gap: 4px; flex-wrap: wrap;">`;
@@ -312,7 +305,7 @@ window.renderCombatTracker = function() {
                 let color = r.type === 'alpha' ? '#44aaff' : (r.type === 'delta' ? '#ff4444' : '#a855f7');
                 let symbol = r.type === 'alpha' ? 'α' : (r.type === 'delta' ? 'δ' : 'β');
                 let onClick = `onclick="window.converterRunaEmDefesa('${c.id}', ${rIdx})"`;
-                runesHtml += `<button style="background:#111; color:${color}; border:1px solid ${color}; border-radius:4px; padding:4px 8px; font-size:12px; font-weight:bold; cursor:pointer; box-shadow: 0 0 5px ${color}; margin-right:4px;" ${onClick} title="Clique para queimar e converter em Defesa!">${symbol} ${r.face} <span style="color:#ff4444; margin-left:4px;">✖</span></button>`;
+                runesHtml += `<button style="background:#111; color:${color}; border:1px solid ${color}; border-radius:4px; padding:4px 8px; font-size:12px; font-weight:bold; cursor:pointer; margin-right:4px;" ${onClick} title="Clique para queimar e converter em Defesa!">${symbol} ${r.face} <span style="color:#ff4444; margin-left:4px;">✖</span></button>`;
             });
             runesHtml += `</div>`;
         }
@@ -322,7 +315,7 @@ window.renderCombatTracker = function() {
                 <div style="display:flex; align-items:center; gap:8px;">
                     <span style="font-size:20px;">${c.avatar || '🧙‍♂️'}</span> 
                     <div>
-                        <b style="font-size:14px; color:var(--accent-gold);">${c.name}</b> ${playerNameTag}<br>${positionTag}<br>
+                        <b style="font-size:14px; color:var(--accent-gold);">${c.name}</b> ${playerNameTag}<br>${positionTag}
                         ${shieldDisplay}
                     </div>
                 </div>
@@ -350,7 +343,7 @@ window.novaRodadaGlobal = async function() {
         characters[id].initiative = 0; 
         characters[id].shieldFis = 0;
         characters[id].shieldMag = 0;
-        updates[`fatesheet_char_${id}`] = JSON.parse(JSON.stringify(characters[id]));
+        updates[`fatesheet_char_${id}`] = characters[id];
     }
     if (OBR.isAvailable) await OBR.room.setMetadata(updates);
     window.renderCombatTracker();
@@ -360,10 +353,6 @@ window.converterRunaEmDefesa = async function(id, rIdx) {
     try {
         let c = characters[id]; if(!c || !c.activeRunes || !c.activeRunes[rIdx]) return;
         
-        if (id !== currentCharId) {
-            if(!confirm(`Deseja queimar a runa de ${c.name}?`)) return;
-        }
-
         let r = c.activeRunes[rIdx];
         
         if(!c.shieldFis) c.shieldFis = 0;
@@ -383,14 +372,13 @@ window.converterRunaEmDefesa = async function(id, rIdx) {
         c.activeRunes.splice(rIdx, 1);
         
         characters[id] = c;
-        if (OBR.isAvailable) await OBR.room.setMetadata({ [`fatesheet_char_${id}`]: JSON.parse(JSON.stringify(c)) });
+        if (OBR.isAvailable) await OBR.room.setMetadata({ [`fatesheet_char_${id}`]: c });
 
         window.renderCombatTracker();
-        window.renderGlobalRunes();
+        if(id === currentCharId) window.renderGlobalRunes();
     } catch(e) { console.error(e); }
 }
 
-// ------ MIRA E ATAQUE DIRETO (SEM POPUP) ------
 window.toggleTargetMode = function(index) {
     let cb = document.getElementById('fora-combate'); let isFora = cb ? cb.checked : false;
     if (!isFora) {
@@ -404,7 +392,7 @@ window.toggleTargetMode = function(index) {
 
     const spell = playerSpells[index];
     if (pendingSpellIndex === index) {
-        pendingSpellIndex = null; // desmarca se clicar 2x
+        pendingSpellIndex = null; 
         window.renderSpells();
         window.renderCombatTracker();
     } else {
@@ -418,6 +406,7 @@ window.toggleTargetMode = function(index) {
     }
 }
 
+// ------ O ATAQUE DEFINITIVO ------
 window.atacarAlvo = async function(targetId) {
     try {
         let index = pendingSpellIndex;
@@ -427,8 +416,7 @@ window.atacarAlvo = async function(targetId) {
         let attacker = characters[currentCharId];
         let tgt = characters[targetId];
         
-        if (!attacker) { alert("Atacante não encontrado!"); return; }
-        if (!tgt) { alert("Alvo não encontrado!"); return; }
+        if (!attacker || !tgt) return;
 
         let isFora = document.getElementById('fora-combate') ? document.getElementById('fora-combate').checked : false;
         
@@ -469,13 +457,11 @@ window.atacarAlvo = async function(targetId) {
             payload.t = "spell"; 
         } else if (spell.tipo === "Dano" || spell.tipo === "Controle") {
             
-            // ABATE DOS ESCUDOS DO ALVO
+            // Abate dos Escudos do Alvo
             let totalShield = (tgt.shieldFis || 0) + (tgt.shieldMag || 0); 
             let netDamage = Math.max(0, grossDamage - totalShield);
 
-            if (totalShield > 0) {
-                tgt.shieldFis = 0; tgt.shieldMag = 0; // Consome o escudo do cara!
-            }
+            if (totalShield > 0) { tgt.shieldFis = 0; tgt.shieldMag = 0; }
 
             tgt.hpAtual = (tgt.hpAtual || 0) - netDamage;
             payload.gross = grossDamage;
@@ -485,27 +471,26 @@ window.atacarAlvo = async function(targetId) {
             payload.t = "spell";
         }
 
-        // Limpa runas e status do ATACANTE
+        // Limpa runas do atacante
         attacker.activeRunes = []; attacker.alloc = {f:0, m:0, a:0, s:0}; 
         if(currentCharId === attacker.id) {
             safeSetVal('alloc-forca', 0); safeSetVal('alloc-magia', 0); safeSetVal('alloc-agilidade', 0); safeSetVal('alloc-sorte', 0);
         }
         if(spell.isCrit) spell.isCrit = false;
-        
         pendingSpellIndex = null;
 
-        // SALVA AMBOS NA NUVEM IMEDIATAMENTE!
+        // SALVA NA NUVEM!
         characters[currentCharId] = attacker;
         characters[targetId] = tgt;
         
         let updates = {};
-        updates[`fatesheet_char_${currentCharId}`] = JSON.parse(JSON.stringify(attacker));
-        if (currentCharId !== targetId) { updates[`fatesheet_char_${targetId}`] = JSON.parse(JSON.stringify(tgt)); }
+        updates[`fatesheet_char_${currentCharId}`] = attacker;
+        if (currentCharId !== targetId) { updates[`fatesheet_char_${targetId}`] = tgt; }
         
         if (OBR.isAvailable) await OBR.room.setMetadata(updates);
 
-        // EXPLODE O NEON NA TELA PARA TODOS VEREM!
-        try { window.abrirModalCentral(payload); } catch(e){}
+        // EXPLODE O NEON NA TELA!
+        window.abrirModalCentral(payload); 
         window.addCombatLog(payload);
         if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", payload);
         
@@ -572,7 +557,7 @@ window.saveData = async function() {
         
         characters[currentCharId] = c;
         try { localStorage.setItem('fatesheet_db', JSON.stringify(characters)); } catch(e){}
-        if (OBR.isAvailable) await OBR.room.setMetadata({ [`fatesheet_char_${currentCharId}`]: JSON.parse(JSON.stringify(characters[currentCharId])) });
+        if (OBR.isAvailable) await OBR.room.setMetadata({ [`fatesheet_char_${currentCharId}`]: characters[currentCharId] });
     } catch(e) { console.error("Erro no save:", e); }
 }
 
@@ -608,14 +593,11 @@ window.rollSkill = function(skillName, attrName) {
     if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", payload);
 }
 
-// ------ BLINDAGEM DE MODAL - FECHA O ANTIGO PARA NÃO TRAVAR ------
-window.abrirModalCentral = async function(data) {
+// ------ BLINDAGEM DE MODAL - ZERO BUGS DE JANELA ------
+window.abrirModalCentral = function(data) {
     if (OBR.isAvailable) {
         const dataUrl = encodeURIComponent(JSON.stringify(data));
-        try { await OBR.modal.close("fate-roll-modal").catch(()=>{}); } catch(e) {}
-        setTimeout(() => {
-            try { OBR.modal.open({ id: "fate-roll-modal", url: `https://seediam.github.io/FateSheet/resultado.html?data=${dataUrl}`, width: 450, height: (data.t === "spell" || data.t === "attr" || data.t === "clash_result") ? 550 : 250 }); } catch(e) {}
-        }, 50);
+        OBR.modal.open({ id: "fate-roll-modal", url: `https://seediam.github.io/FateSheet/resultado.html?data=${dataUrl}`, width: 450, height: (data.t === "spell" || data.t === "attr" || data.t === "clash_result") ? 550 : 250 }); 
     }
 }
 
@@ -673,7 +655,8 @@ function initExtension() {
         OBR.onReady(async () => {
             try { myPlayerName = await OBR.player.getName() || "Jogador"; } catch(e){}
             try {
-                processRoomData(await OBR.room.getMetadata());
+                const meta = await OBR.room.getMetadata();
+                processRoomData(meta);
                 OBR.room.onMetadataChange((metadata) => processRoomData(metadata));
                 OBR.broadcast.onMessage("fatesheet-log-update", (event) => { combatLog = event.data; window.renderMiniLog(); });
                 OBR.broadcast.onMessage("fatesheet-rolls", (event) => { window.abrirModalCentral(event.data); });
