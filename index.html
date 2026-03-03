@@ -124,7 +124,6 @@
                 <h3 class="section-title" style="margin: 0; border: none;">Mesa Global</h3>
                 <button class="btn-ctrl" style="width:auto; padding: 6px 12px; background:#1a1a24; color:#44aaff; font-size:12px; border: 1px solid #44aaff;" onclick="window.abrirJanelaDeLog()">📜 Abrir Log</button>
             </div>
-            
             <button class="btn-new" onclick="window.createNewCharacter()">+ Criar Novo Personagem</button>
             <input type="file" id="import-file" accept=".json" style="display: none;" onchange="window.importCharacter(event)">
             <button class="btn-import" onclick="document.getElementById('import-file').click()">📥 Importar Ficha (JSON)</button>
@@ -316,7 +315,8 @@
         </div>
     </div>
 
-    <!-- O ?v= é importante para evitar problemas de cache do navegador -->
+    <!-- O SDK OBR via script tag e o teu ficheiro JS separado -->
+    <script src="https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@2/lib/index.js"></script>
     <script type="module" src="script.js?v=9999999999"></script>
 </body>
 </html>
