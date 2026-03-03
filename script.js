@@ -46,8 +46,7 @@ const grimoiresDb = {
     "Criação": "🛠 Criação — Passiva: Manifestação\nPode criar um efeito simples por turno.",
     "Imaginação": "🧠 Imaginação — Passiva: Forma Impossível\nPode declarar um efeito ilusório simples por turno.",
     "Realidade": "🌌 Realidade — Passiva: Ruptura\nUma vez por combate, pode alterar o resultado de uma runa em ±3.",
-    "Sem Grimório": "⚫ Sem Grimório\nSem passiva.",
-    "Inumório": "🔴 Inumório\nSem passiva."
+    "Sem Grimório": "⚫ Sem Grimório\nSem passiva."
 };
 
 let characters = {}; 
@@ -63,32 +62,51 @@ let isOverweight = false;
 let pendingSpellIndex = null; 
 let myPlayerName = "Jogador";
 
-// --- INICIALIZAÇÃO DA EXTENSÃO (MULTIPLAYER 100%) ---
-OBR.onReady(async () => {
-    try { myPlayerName = await OBR.player.getName() || "Jogador"; } catch(e){}
-    
-    // Lê a Nuvem OBR e constrói a sala instantaneamente
-    let meta = await OBR.room.getMetadata();
-    processRoomData(meta);
+// Tenta ocultar o carregamento caso demore mais de 3 segundos (Fallback)
+setTimeout(() => {
+    let loadingEl = document.getElementById('loading');
+    let appEl = document.getElementById('app');
+    if (loadingEl && loadingEl.style.display !== 'none') {
+        loadingEl.style.display = 'none';
+        appEl.style.display = 'block';
+    }
+}, 3500);
 
-    // Oculta ecrã de carregamento
+// --- INICIALIZAÇÃO DA EXTENSÃO COM ES MODULES ---
+OBR.onReady(async () => {
+    // 1. Tira o Loading imediatamente assim que conecta!
     document.getElementById('loading').style.display = 'none';
     document.getElementById('app').style.display = 'block';
 
-    // Escuta ativa de mudanças de outros jogadores (Isto sincroniza o Combate)
-    OBR.room.onMetadataChange((metadata) => processRoomData(metadata));
+    try { myPlayerName = await OBR.player.getName() || "Jogador"; } catch(e){}
     
-    // Escuta transmissões de logs
-    OBR.broadcast.onMessage(CHANNEL_LOG, (event) => { 
-        if (Array.isArray(event.data)) {
-            combatLog = event.data; 
-            window.renderMiniLog(); 
-        }
-    });
-    // Escuta rolagens de dados
-    OBR.broadcast.onMessage(CHANNEL_ROLLS, (event) => { 
-        window.abrirModalCentral(event.data); 
-    });
+    try {
+        let meta = await OBR.room.getMetadata();
+        processRoomData(meta);
+
+        // 2. Escuta ativa da Nuvem para Multiplayer
+        OBR.room.onMetadataChange((metadata) => processRoomData(metadata));
+        
+        // 3. Canais de Broadcast
+        OBR.broadcast.onMessage(CHANNEL_LOG, (event) => { 
+            if (Array.isArray(event.data)) {
+                combatLog = event.data; 
+                window.renderMiniLog(); 
+            }
+        });
+        OBR.broadcast.onMessage(CHANNEL_ROLLS, (event) => { 
+            window.abrirModalCentral(event.data); 
+        });
+    } catch(e) {
+        console.error("Erro na inicialização do OBR:", e);
+    }
+});
+
+// Eventos de Listener para gravação imediata
+document.addEventListener('change', (e) => {
+    if(e.target.id === 'char-ingame' || e.target.id === 'fora-combate') {
+        window.saveData(); 
+    }
 });
 
 window.forceSync = async function() {
@@ -117,7 +135,7 @@ window.openTab = function(tabName, event) {
 window.backToList = async function() {
     if (currentCharId && characters[currentCharId]) {
         characters[currentCharId].openedBy = ""; 
-        await window.saveData(); // Remove o aviso de "Editando"
+        await window.saveData(); 
     }
     currentCharId = null;
     document.getElementById('screen-sheet').classList.remove('active');
@@ -164,18 +182,18 @@ window.renderCharacterList = function() {
             container.innerHTML += html;
         }
     }
-    if(!hasAny) container.innerHTML = '<div style="text-align:center; color:#666; margin-top: 20px;">A Mesa está vazia. Crie um personagem acima!</div>';
+    if(!hasAny) container.innerHTML = '<div style="text-align:center; color:#666; margin-top: 20px;">A Mesa está vazia.</div>';
 }
 
 window.createNewCharacter = async function() {
-    const newId = Date.now().toString(); // Timestamp é usado como ID
-    let newChar = { name: "Novo Personagem", avatar: "🧙‍♂️", category: "Jogadores", classe: "Plebeu", skills: {}, inventory: [], spells: [], color: "#d4af37", mov: 30, runas: 0, activeRunes: [], alloc: {f:0, m:0, a:0, s:0}, foraCombate: false, inGame: false, hpAtual: 40, mpAtual: 25, hasRolledTurn: false, initiative: 0, shieldFis: 0, shieldMag: 0, openedBy: "" };
+    const newId = Date.now().toString(); 
+    let newChar = { name: "Novo Personagem", avatar: "🧙‍♂️", category: "Jogadores", classe: "Plebeu", skills: {}, inventory: [], spells: [], color: "#d4af37", mov: 30, runas: 0, activeRunes: [], alloc: {f:0, m:0, a:0, s:0}, foraCombate: false, inGame: false, hpAtual: 40, mpAtual: 25, hasRolledTurn: false, initiative: 0, shieldFis: 0, shieldMag: 0, openedBy: myPlayerName };
     
     characters[newId] = newChar;
     window.renderCharacterList();
     
-    // Manda imediatamente para a nuvem de todos
-    if (OBR.isAvailable) await OBR.room.setMetadata({ [META_PREFIX + newId]: newChar });
+    try { await OBR.room.setMetadata({ [META_PREFIX + newId]: newChar }); } catch(e){}
+    
     window.openCharacter(newId);
 }
 
@@ -186,10 +204,11 @@ window.deleteCharacter = async function() {
         
         delete characters[idToDelete]; 
         
-        // Remove da Nuvem enviando undefined
-        let clearMeta = {};
-        clearMeta[META_PREFIX + idToDelete] = undefined; 
-        if (OBR.isAvailable) await OBR.room.setMetadata(clearMeta);
+        try {
+            let clearMeta = {};
+            clearMeta[META_PREFIX + idToDelete] = undefined; 
+            await OBR.room.setMetadata(clearMeta);
+        } catch(e){}
         
         window.backToList();
     }
@@ -217,7 +236,7 @@ window.importCharacter = async function(event) {
             importedData.openedBy = ""; 
             characters[newId] = importedData;
             
-            if (OBR.isAvailable) await OBR.room.setMetadata({ [META_PREFIX + newId]: importedData });
+            try { await OBR.room.setMetadata({ [META_PREFIX + newId]: importedData }); } catch(e){}
             
             window.renderCharacterList();
             alert("Ficha importada com sucesso e sincronizada!");
@@ -291,7 +310,7 @@ window.openCharacter = async function(id) {
     } finally {
         setTimeout(async () => {
             isLoadingSheet = false;
-            characters[id].openedBy = myPlayerName; // Aviso para os outros
+            characters[id].openedBy = myPlayerName;
             await window.saveData(); 
         }, 100);
     }
@@ -339,7 +358,6 @@ window.renderCombatTracker = function() {
         let hpM = c.category==='Monstros' ? (c.vidaMonster||100) : (40 + (c.sorte||0)*5);
         let mpM = c.category==='Monstros' ? 25 : 25 + (c.classe==='Andarilho'?25:c.classe==='Estrangeiro'?50:c.classe==='Nobre'?75:0);
         let positionTag = c.hasRolledTurn ? `<span style="font-size:10px; color:var(--accent-gold); font-weight:bold; background:#000; padding:2px 4px; border-radius:3px;">${idx + 1}º a Atacar</span>` : `<span style="font-size:10px; color:#888; font-weight:bold; background:#000; padding:2px 4px; border-radius:3px;">⌛ Pendente</span>`;
-        // ALERTA VISUAL NA CENA: QUEM ESTÁ A EDITAR
         let playerNameTag = c.openedBy ? `<div style="font-size:10px; color:#44aaff; font-weight:bold; margin-top:2px;">👁️ Aberto por: ${c.openedBy}</div>` : '';
 
         let shieldFis = c.shieldFis || 0;
@@ -416,13 +434,18 @@ window.novaRodadaGlobal = async function() {
             updates[META_PREFIX + id] = characters[id];
         }
     }
-    if (OBR.isAvailable && Object.keys(updates).length > 0) await OBR.room.setMetadata(updates);
+    if (Object.keys(updates).length > 0) {
+        try { await OBR.room.setMetadata(updates); } catch(e){}
+    }
 }
 
 window.converterRunaEmDefesa = async function(id, rIdx) {
     try {
         let c = characters[id]; if(!c || !c.activeRunes || !c.activeRunes[rIdx]) return;
-        if (id !== currentCharId) { if(!confirm(`Desejas queimar a runa de ${c.name}?`)) return; }
+        
+        if (id !== currentCharId) {
+            if(!confirm(`Desejas queimar a runa de ${c.name}?`)) return;
+        }
 
         let r = c.activeRunes[rIdx];
         if(!c.shieldFis) c.shieldFis = 0;
@@ -441,7 +464,7 @@ window.converterRunaEmDefesa = async function(id, rIdx) {
         
         c.activeRunes.splice(rIdx, 1);
         characters[id] = c;
-        if (OBR.isAvailable) await OBR.room.setMetadata({ [META_PREFIX + id]: c });
+        try { await OBR.room.setMetadata({ [META_PREFIX + id]: c }); } catch(e){}
 
     } catch(e) { console.error(e); }
 }
@@ -550,11 +573,11 @@ window.atacarAlvo = async function(targetId) {
         updates[META_PREFIX + currentCharId] = attacker;
         if (currentCharId !== targetId) { updates[META_PREFIX + targetId] = tgt; }
         
-        if (OBR.isAvailable) await OBR.room.setMetadata(updates);
+        try { await OBR.room.setMetadata(updates); } catch(e){}
 
         window.abrirModalCentral(payload); 
         window.addCombatLog(payload);
-        if (OBR.isAvailable) OBR.broadcast.sendMessage(CHANNEL_ROLLS, payload);
+        try { OBR.broadcast.sendMessage(CHANNEL_ROLLS, payload); } catch(e){}
         
         window.renderSpells(); window.renderCombatTracker(); window.openTab('personagem'); 
         
@@ -594,7 +617,7 @@ window.saveData = async function() {
             let elMp = document.getElementById('char-mp-atual'); if (elMp) c.mpAtual = parseInt(elMp.value) || 0;
             let elRunas = document.getElementById('char-runas'); if (elRunas) c.runas = parseInt(elRunas.value) || 0;
             
-            // Caixa do Combate e Fora de Combate
+            // Assegura que captura as Checkboxes
             let elInGame = document.getElementById('char-ingame'); if (elInGame) c.inGame = elInGame.checked;
             let elFora = document.getElementById('fora-combate'); if (elFora) c.foraCombate = elFora.checked;
             
@@ -635,9 +658,7 @@ window.saveData = async function() {
         
         characters[currentCharId] = c;
         
-        if (OBR.isAvailable) {
-            await OBR.room.setMetadata({ [META_PREFIX + currentCharId]: c });
-        }
+        try { await OBR.room.setMetadata({ [META_PREFIX + currentCharId]: c }); } catch(e){}
     } catch(e) { console.error("Erro no save:", e); }
 }
 
@@ -646,13 +667,6 @@ document.addEventListener('input', (e) => {
     if(e.target.id && e.target.id.startsWith('alloc')) return; 
     clearTimeout(saveTimeout);
     saveTimeout = setTimeout(() => { if(currentCharId) window.saveData(); }, 800);
-});
-
-// Salva de imediato se o Combate for marcado/desmarcado
-document.addEventListener('change', (e) => {
-    if(e.target.id === 'char-ingame' || e.target.id === 'fora-combate') {
-        window.saveData(); 
-    }
 });
 
 window.renderSkills = function() {
@@ -749,7 +763,7 @@ window.rollAttributes = async function() {
     window.renderGlobalRunes();
     window.abrirModalCentral(payload);
     window.addCombatLog(payload);
-    if (OBR.isAvailable) OBR.broadcast.sendMessage(CHANNEL_ROLLS, payload);
+    try { OBR.broadcast.sendMessage(CHANNEL_ROLLS, payload); } catch(e){}
 }
 
 window.renderGlobalRunes = function() {
@@ -773,21 +787,19 @@ window.renderGlobalRunes = function() {
 }
 
 window.abrirJanelaDeLog = function() {
-    if (OBR.isAvailable) {
-        OBR.popover.open({ id: "fatesheet-log-popover", url: "https://seediam.github.io/FateSheet/log.html", height: 500, width: 350, anchorOrigin: { horizontal: "RIGHT", vertical: "CENTER" }, transformOrigin: { horizontal: "RIGHT", vertical: "CENTER" } });
-    } else {
-        alert("O histórico persistente só funciona dentro da plataforma Owlbear Rodeo.");
-    }
+    try {
+        OBR.popover.open({ id: "br.com.fatesheet/log-popover", url: "https://seediam.github.io/FateSheet/log.html", height: 500, width: 350, anchorOrigin: { horizontal: "RIGHT", vertical: "CENTER" }, transformOrigin: { horizontal: "RIGHT", vertical: "CENTER" } });
+    } catch (e) {}
 }
 
 window.addCombatLog = async function(logEntry) {
     combatLog.unshift(logEntry);
     if(combatLog.length > 50) combatLog.pop();
     window.renderMiniLog();
-    if (OBR.isAvailable) {
+    try {
         await OBR.room.setMetadata({ [LOG_KEY]: combatLog });
         OBR.broadcast.sendMessage(CHANNEL_LOG, combatLog);
-    }
+    } catch(e){}
 }
 
 window.renderMiniLog = function() {
@@ -828,7 +840,7 @@ window.clearMiniLog = async function() {
     if(confirm("Apagar o histórico para todos os jogadores na mesa?")) {
         combatLog = [];
         window.renderMiniLog();
-        if (OBR.isAvailable) await OBR.room.setMetadata({ [LOG_KEY]: [] });
+        try { await OBR.room.setMetadata({ [LOG_KEY]: [] }); } catch(e){}
     }
 }
 
@@ -857,26 +869,24 @@ window.rollSkill = function(skillName, attrName) {
     const payload = { t: "skill", av: document.getElementById('char-avatar')?.value, c: document.getElementById('char-name')?.value || 'Desconhecido', s: skillName, a: attrName, r: results.join(','), pen: isOverweight ? "true" : "false", col: document.getElementById('char-color')?.value || '#d4af37', mod: playerSkills[skillName] || 0, fc: isFora };
 
     window.abrirModalCentral(payload); window.addCombatLog(payload);
-    if (OBR.isAvailable) OBR.broadcast.sendMessage(CHANNEL_ROLLS, payload);
+    try { OBR.broadcast.sendMessage(CHANNEL_ROLLS, payload); } catch(e){}
 }
 
-// ------ BLINDAGEM DO MODAL: Usa link absoluto para não falhar ------
-window.abrirModalCentral = function(data) {
-    if (OBR.isAvailable) {
-        const dataUrl = encodeURIComponent(JSON.stringify(data));
-        try { OBR.modal.close("fate-roll-modal"); } catch(e){}
-        
-        setTimeout(() => {
-            try { 
-                OBR.modal.open({ 
-                    id: "fate-roll-modal", 
-                    url: `https://seediam.github.io/FateSheet/resultado.html?data=${dataUrl}`, 
-                    width: 450, 
-                    height: (data.t === "spell" || data.t === "attr" || data.t === "clash_result") ? 550 : 250 
-                }); 
-            } catch(e) { console.error("Erro ao abrir modal:", e); }
-        }, 50);
-    }
+// ------ BLINDAGEM DO MODAL: Abre os dados na tela ------
+window.abrirModalCentral = async function(data) {
+    const dataUrl = encodeURIComponent(JSON.stringify(data));
+    try { await OBR.modal.close("br.com.fatesheet/roll-modal"); } catch(e){}
+    
+    setTimeout(async () => {
+        try { 
+            await OBR.modal.open({ 
+                id: "br.com.fatesheet/roll-modal", 
+                url: `https://seediam.github.io/FateSheet/resultado.html?data=${dataUrl}`, 
+                width: 450, 
+                height: (data.t === "spell" || data.t === "attr" || data.t === "clash_result") ? 550 : 250 
+            }); 
+        } catch(e) { console.error("Erro ao abrir modal:", e); }
+    }, 50);
 }
 
 function updateDOMIfInactive(id, value, isCheckbox = false) {
@@ -887,25 +897,21 @@ function updateDOMIfInactive(id, value, isCheckbox = false) {
     }
 }
 
-// --- LEITURA E SINCRONIZAÇÃO EM TEMPO REAL ---
+// --- LEITURA E SINCRONIZAÇÃO EM TEMPO REAL COM A NUVEM ---
 function processRoomData(metadata) {
     if (!metadata) return;
     let mudouAlgo = false;
     
     try {
         if (metadata[LOG_KEY] !== undefined) { 
-            if(Array.isArray(metadata[LOG_KEY])) {
-                combatLog = metadata[LOG_KEY]; 
-            } else {
-                combatLog = [];
-            }
+            if(Array.isArray(metadata[LOG_KEY])) { combatLog = metadata[LOG_KEY]; } 
+            else { combatLog = []; }
             window.renderMiniLog(); 
         }
-    } catch(e) { console.error("Erro ao ler log da nuvem:", e); }
+    } catch(e) {}
 
     let cloudIds = [];
 
-    // Lê a Nuvem OBR
     for (let key in metadata) {
         if (key.startsWith(META_PREFIX)) {
             const id = key.replace(META_PREFIX, '');
@@ -913,7 +919,6 @@ function processRoomData(metadata) {
             const remoteChar = metadata[key];
 
             if (remoteChar !== undefined && remoteChar !== null) { 
-                
                 let isMe = (currentCharId === id);
                 let isTyping = isMe && document.activeElement && ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName.toUpperCase());
                 
@@ -944,7 +949,6 @@ function processRoomData(metadata) {
                     }
                 }
             } else {
-                // Foi apagado na nuvem, apaga no ecrã de toda a gente
                 if (characters[id]) {
                     delete characters[id];
                     mudouAlgo = true;
@@ -954,11 +958,10 @@ function processRoomData(metadata) {
         }
     }
 
-    // Escudo Anti-Apagão (Protege Fichas que o jogador acabou de criar antes de chegarem à nuvem)
     for (let localId in characters) {
         if (!cloudIds.includes(localId)) {
-            let age = Date.now() - parseInt(localId);
-            // Só apaga se tem mais de 10 segundos e a Nuvem diz que não existe
+            let timestamp = parseInt(localId.replace('char_', ''));
+            let age = Date.now() - timestamp;
             if (isNaN(age) || age > 10000) { 
                 delete characters[localId];
                 mudouAlgo = true;
