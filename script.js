@@ -1,4 +1,5 @@
-import OBR from "https://esm.sh/@owlbear-rodeo/sdk";
+// O SDK do Owlbear Rodeo (OBR) já está carregado globalmente através do index.html.
+// Não é necessário utilizar a declaração "import OBR from ...".
 
 const skillsData = [
     { name: "Arcanismo", attr: "Magia" }, { name: "História", attr: "Magia" }, { name: "Natureza", attr: "Magia" }, { name: "Religião", attr: "Magia" },
@@ -59,6 +60,36 @@ let myPlayerName = "Jogador";
 
 document.getElementById('loading').style.display = 'none';
 document.getElementById('app').style.display = 'block';
+
+// --- INICIALIZAÇÃO DA EXTENSÃO ---
+function initExtension() {
+    try { const saved = localStorage.getItem('fatesheet_db'); if (saved) characters = JSON.parse(saved); window.renderCharacterList(); } catch(e) {}
+    
+    // Verifica se a variável global OBR existe antes de inicializar
+    if (typeof OBR !== 'undefined' && OBR.isAvailable) {
+        OBR.onReady(async () => {
+            try { myPlayerName = await OBR.player.getName() || "Jogador"; } catch(e){}
+            try {
+                let meta = await OBR.room.getMetadata();
+                processRoomData(meta);
+                
+                // Força envio de fichas locais para a nuvem caso alguém não as esteja a ver
+                let missingUpdates = {};
+                for(let k in characters) {
+                    if(meta[`fatesheet_char_${k}`] === undefined) {
+                        missingUpdates[`fatesheet_char_${k}`] = characters[k];
+                    }
+                }
+                if(Object.keys(missingUpdates).length > 0) await OBR.room.setMetadata(missingUpdates);
+
+                OBR.room.onMetadataChange((metadata) => processRoomData(metadata));
+                OBR.broadcast.onMessage("fatesheet-log-update", (event) => { combatLog = event.data; window.renderMiniLog(); });
+                OBR.broadcast.onMessage("fatesheet-rolls", (event) => { window.abrirModalCentral(event.data); });
+            } catch(e) {}
+        });
+    }
+}
+initExtension();
 
 window.openTab = function(tabName, event) {
     document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
@@ -125,7 +156,7 @@ window.deleteCharacter = async function() {
     if(confirm("Apagar esta ficha permanentemente para TODOS na mesa?")) {
         const idToDelete = currentCharId;
         delete characters[idToDelete]; 
-        if (OBR.isAvailable) await OBR.room.setMetadata({ [`fatesheet_char_${idToDelete}`]: undefined });
+        if (typeof OBR !== 'undefined' && OBR.isAvailable) await OBR.room.setMetadata({ [`fatesheet_char_${idToDelete}`]: undefined });
         currentCharId = null;
         window.backToList();
     }
@@ -152,7 +183,7 @@ window.importCharacter = function(event) {
             characters[newId] = importedData;
             window.saveData();
             alert("Ficha importada com sucesso!");
-        } catch(err) { alert("Erro ao ler JSON."); }
+        } catch(err) { alert("Erro ao ler o ficheiro JSON."); }
     };
     reader.readAsText(file);
 }
@@ -220,9 +251,9 @@ window.openCharacter = function(id) {
         document.getElementById('screen-list').classList.remove('active');
         document.getElementById('screen-sheet').classList.add('active');
         
-        window.saveData();
-    } catch(e) { console.error(e); } finally {
+    } catch(e) { console.error("Falha ao abrir a ficha:", e); alert("Houve um erro na ficha, verifica a consola."); } finally {
         isLoadingSheet = false;
+        window.saveData();
     }
 }
 
@@ -335,13 +366,15 @@ window.novaRodadaGlobal = async function() {
     if(!confirm("Iniciar nova rodada? Todos perderão os escudos e precisarão rolar os Atributos novamente.")) return;
     let updates = {};
     for(let id in characters) { 
-        characters[id].hasRolledTurn = false; 
-        characters[id].initiative = 0; 
-        characters[id].shieldFis = 0;
-        characters[id].shieldMag = 0;
-        updates[`fatesheet_char_${id}`] = JSON.parse(JSON.stringify(characters[id]));
+        if (characters[id].inGame) {
+            characters[id].hasRolledTurn = false; 
+            characters[id].initiative = 0; 
+            characters[id].shieldFis = 0;
+            characters[id].shieldMag = 0;
+            updates[`fatesheet_char_${id}`] = JSON.parse(JSON.stringify(characters[id]));
+        }
     }
-    if (OBR.isAvailable) await OBR.room.setMetadata(updates);
+    if (typeof OBR !== 'undefined' && OBR.isAvailable && Object.keys(updates).length > 0) await OBR.room.setMetadata(updates);
     window.renderCombatTracker();
 }
 
@@ -350,7 +383,7 @@ window.converterRunaEmDefesa = async function(id, rIdx) {
         let c = characters[id]; if(!c || !c.activeRunes || !c.activeRunes[rIdx]) return;
         
         if (id !== currentCharId) {
-            if(!confirm(`Deseja queimar a runa de ${c.name}?`)) return;
+            if(!confirm(`Desejas queimar a runa de ${c.name}?`)) return;
         }
 
         let r = c.activeRunes[rIdx];
@@ -370,8 +403,9 @@ window.converterRunaEmDefesa = async function(id, rIdx) {
         }
         
         c.activeRunes.splice(rIdx, 1);
+        
         characters[id] = c;
-        if (OBR.isAvailable) await OBR.room.setMetadata({ [`fatesheet_char_${id}`]: JSON.parse(JSON.stringify(c)) });
+        if (typeof OBR !== 'undefined' && OBR.isAvailable) await OBR.room.setMetadata({ [`fatesheet_char_${id}`]: JSON.parse(JSON.stringify(c)) });
 
         window.renderCombatTracker();
         window.renderGlobalRunes();
@@ -384,7 +418,7 @@ window.toggleTargetMode = function(index) {
         let inCombatChars = Object.values(characters).filter(ch => ch.inGame);
         let missing = inCombatChars.filter(ch => !ch.hasRolledTurn);
         if (missing.length > 0) { 
-            alert("Aguarde as seguintes fichas rolarem os atributos de turno:\n" + missing.map(m=>m.name).join(', ')); 
+            alert("Aguarda que as seguintes fichas rolem os atributos de turno:\n" + missing.map(m=>m.name).join(', ')); 
             return; 
         }
     }
@@ -421,7 +455,7 @@ window.atacarAlvo = async function(targetId) {
         
         let manaCost = parseInt(spell.custo) || 0;
         if (manaCost > 0) {
-            if ((attacker.mpAtual||0) < manaCost) { if(!confirm("Mana insuficiente! Deseja castar a magia mesmo assim?")) return; } 
+            if ((attacker.mpAtual||0) < manaCost) { if(!confirm("Mana insuficiente! Desejas conjurar a magia mesmo assim?")) return; } 
             else { attacker.mpAtual -= manaCost; safeSetVal('char-mp-atual', attacker.mpAtual); }
         }
 
@@ -429,7 +463,7 @@ window.atacarAlvo = async function(targetId) {
         
         let bRolls = [], bTot = 0;
         if(spell.tipo !== 'Self') {
-            if(spell.isCrit) { let faces = parseInt(spell.bD.replace('d', '')); bRolls = [faces * (parseInt(spell.bQtd)||1) * 3]; } else { bRolls = rolar(parseInt(spell.bQtd)||1, spell.bD); }
+            if(spell.isCrit) { let faces = parseInt(spell.bD.replace('d', '')); bRolls = [faces * (parseInt(spell.bQtd)||1) * 3]; } else { bRolls = rolar(spell.bQtd, spell.bD); }
             bTot = Math.floor(bRolls.reduce((a,b)=>a+b, 0) * spell.bMult);
         }
 
@@ -475,6 +509,7 @@ window.atacarAlvo = async function(targetId) {
             safeSetVal('alloc-forca', 0); safeSetVal('alloc-magia', 0); safeSetVal('alloc-agilidade', 0); safeSetVal('alloc-sorte', 0);
         }
         if(spell.isCrit) spell.isCrit = false;
+        
         pendingSpellIndex = null;
 
         characters[currentCharId] = attacker;
@@ -483,11 +518,12 @@ window.atacarAlvo = async function(targetId) {
         let updates = {};
         updates[`fatesheet_char_${currentCharId}`] = JSON.parse(JSON.stringify(attacker));
         if (currentCharId !== targetId) { updates[`fatesheet_char_${targetId}`] = JSON.parse(JSON.stringify(tgt)); }
-        if (OBR.isAvailable) await OBR.room.setMetadata(updates);
+        
+        if (typeof OBR !== 'undefined' && OBR.isAvailable) await OBR.room.setMetadata(updates);
 
         window.abrirModalCentral(payload); 
         window.addCombatLog(payload);
-        if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", payload);
+        if (typeof OBR !== 'undefined' && OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", payload);
         
         window.renderGlobalRunes(); window.renderSpells(); window.renderCombatTracker();
         window.openTab('personagem'); 
@@ -553,7 +589,7 @@ window.saveData = async function() {
         
         characters[currentCharId] = c;
         try { localStorage.setItem('fatesheet_db', JSON.stringify(characters)); } catch(e){}
-        if (OBR.isAvailable) await OBR.room.setMetadata({ [`fatesheet_char_${currentCharId}`]: JSON.parse(JSON.stringify(characters[currentCharId])) });
+        if (typeof OBR !== 'undefined' && OBR.isAvailable) await OBR.room.setMetadata({ [`fatesheet_char_${currentCharId}`]: JSON.parse(JSON.stringify(characters[currentCharId])) });
     } catch(e) { console.error("Erro no save:", e); }
 }
 
@@ -564,110 +600,7 @@ document.addEventListener('input', (e) => {
     saveTimeout = setTimeout(() => { if(currentCharId) window.saveData(); }, 800);
 });
 
-window.rollSkill = function(skillName, attrName) {
-    let idMapped = attrName.toLowerCase().replace('ç', 'c'); let baseAttr = parseInt(document.getElementById(`attr-${idMapped}`)?.value) || 1;
-    let classe = document.getElementById('char-class')?.value || 'Plebeu'; let isMonster = document.getElementById('char-category')?.value === 'Monstros';
-    let isFora = document.getElementById('fora-combate') ? document.getElementById('fora-combate').checked : false;
-
-    if (!isFora) {
-        let inCombatChars = [];
-        for(let k in characters) { if(characters[k].inGame) inCombatChars.push(characters[k]); }
-        let missing = inCombatChars.filter(ch => !ch.hasRolledTurn);
-        if (missing.length > 0) { alert("Aguarde as seguintes fichas rolarem os atributos de turno:\n" + missing.map(m=>m.name).join(', ')); return; }
-    }
-    if(!isMonster) {
-        if (classe === 'Plebeu') { if(attrName === 'Força') baseAttr += 1; if(attrName === 'Magia') baseAttr -= 1; }
-        if (classe === 'Andarilho' && attrName === 'Agilidade') baseAttr += 1;
-        if (classe === 'Estrangeiro' && attrName === 'Sorte') baseAttr += 1;
-        if (classe === 'Nobre' && attrName === 'Magia') baseAttr += 1;
-    }
-    if(baseAttr < 1) baseAttr = 1;
-    let results = []; for (let i = 0; i < baseAttr; i++) { let die = Math.floor(Math.random() * 20) + 1; if (isOverweight) die -= 5; results.push(die); }
-    
-    const payload = { t: "skill", av: document.getElementById('char-avatar')?.value, c: document.getElementById('char-name')?.value || 'Desconhecido', s: skillName, a: attrName, r: results.join(','), pen: isOverweight ? "true" : "false", col: document.getElementById('char-color')?.value || '#d4af37', mod: playerSkills[skillName] || 0, fc: isFora };
-
-    window.abrirModalCentral(payload); window.addCombatLog(payload);
-    if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", payload);
-}
-
-window.abrirModalCentral = async function(data) {
-    if (OBR.isAvailable) {
-        const dataUrl = encodeURIComponent(JSON.stringify(data));
-        try { await OBR.modal.close("fate-roll-modal").catch(()=>{}); } catch(e) {}
-        setTimeout(() => {
-            try { OBR.modal.open({ id: "fate-roll-modal", url: `https://seediam.github.io/FateSheet/resultado.html?data=${dataUrl}`, width: 450, height: (data.t === "spell" || data.t === "attr" || data.t === "clash_result") ? 550 : 250 }); } catch(e) {}
-        }, 50);
-    }
-}
-
-function updateDOMIfInactive(id, value, isCheckbox = false) {
-    let el = document.getElementById(id);
-    if (el && document.activeElement !== el) {
-        if (isCheckbox) el.checked = value;
-        else el.value = value;
-    }
-}
-
-function processRoomData(metadata) {
-    let mudouAlgo = false;
-    if (metadata["fatesheet_log_v29"] !== undefined) { combatLog = metadata["fatesheet_log_v29"]; window.renderMiniLog(); }
-    if (metadata["fatesheet_log_v3"] !== undefined) { combatLog = metadata["fatesheet_log_v3"]; window.renderMiniLog(); }
-
-    for (let key in metadata) {
-        if (key.startsWith('fatesheet_char_')) {
-            const id = key.replace('fatesheet_char_', '');
-            if (metadata[key] === undefined || metadata[key] === null) {
-                if(characters[id]) { delete characters[id]; mudouAlgo = true; }
-            } else { 
-                let isMe = (currentCharId === id);
-                let isTyping = isMe && document.activeElement && (document.activeElement.tagName === "INPUT" || document.activeElement.tagName === "TEXTAREA");
-                
-                if (isTyping) { 
-                    characters[id].hpAtual = metadata[key].hpAtual;
-                    characters[id].mpAtual = metadata[key].mpAtual;
-                    characters[id].shieldFis = metadata[key].shieldFis;
-                    characters[id].shieldMag = metadata[key].shieldMag;
-                    characters[id].activeRunes = metadata[key].activeRunes;
-                    characters[id].inGame = metadata[key].inGame;
-                    mudouAlgo = true;
-                } else {
-                    characters[id] = metadata[key]; 
-                    characters[id].id = id; 
-                    mudouAlgo = true; 
-                }
-            }
-        }
-    }
-    
-    if (mudouAlgo) {
-        try { window.renderCharacterList(); } catch(e){}
-        try { window.renderCombatTracker(); } catch(e){}
-        
-        if (currentCharId && document.getElementById('screen-sheet').classList.contains('active') && !isLoadingSheet) {
-            let activeC = characters[currentCharId];
-            if (activeC) {
-                updateDOMIfInactive('char-hp-atual', activeC.hpAtual || 0, false);
-                updateDOMIfInactive('char-mp-atual', activeC.mpAtual || 0, false);
-                updateDOMIfInactive('char-runas', activeC.runas || 0, false);
-                updateDOMIfInactive('char-ingame', activeC.inGame || false, true);
-                updateDOMIfInactive('fora-combate', activeC.foraCombate || false, true);
-                
-                if (activeC.alloc) {
-                    updateDOMIfInactive('alloc-forca', activeC.alloc.f || 0, false);
-                    updateDOMIfInactive('alloc-magia', activeC.alloc.m || 0, false);
-                    updateDOMIfInactive('alloc-agilidade', activeC.alloc.a || 0, false);
-                    updateDOMIfInactive('alloc-sorte', activeC.alloc.s || 0, false);
-                }
-                window.renderGlobalRunes();
-            }
-        }
-    }
-}
-
-// -----------------------------------------------------------------------------
-// FUNÇÕES QUE FALTAVAM (PERÍCIAS, MOCHILA, ATRIBUTOS, LOG, RUNAS)
-// -----------------------------------------------------------------------------
-
+// --- PERÍCIAS, ITENS E ROLAGENS GERAIS ---
 window.renderSkills = function() {
     const container = document.getElementById('skills-container');
     if(!container) return;
@@ -717,72 +650,25 @@ window.renderInventory = function() {
     window.calcVitals();
 }
 
-window.addInventoryItem = function() {
-    playerInventory.push({ nome: "", peso: 1, qtd: 1, desc: "" });
-    window.renderInventory();
-    window.saveData();
-}
-
-window.updateInventoryItem = function(index, field, value) {
-    playerInventory[index][field] = value;
-    window.renderInventory();
-    window.saveData();
-}
-
-window.removeInventoryItem = function(index) {
-    if(confirm("Remover este item?")) {
-        playerInventory.splice(index, 1);
-        window.renderInventory();
-        window.saveData();
-    }
-}
+window.addInventoryItem = function() { playerInventory.push({ nome: "", peso: 1, qtd: 1, desc: "" }); window.renderInventory(); window.saveData(); }
+window.updateInventoryItem = function(index, field, value) { playerInventory[index][field] = value; window.renderInventory(); window.saveData(); }
+window.removeInventoryItem = function(index) { if(confirm("Remover este item?")) { playerInventory.splice(index, 1); window.renderInventory(); window.saveData(); } }
 
 window.updateAlloc = function() {
-    let f = parseInt(document.getElementById('alloc-forca').value) || 0;
-    let m = parseInt(document.getElementById('alloc-magia').value) || 0;
-    let a = parseInt(document.getElementById('alloc-agilidade').value) || 0;
-    let s = parseInt(document.getElementById('alloc-sorte').value) || 0;
-    
-    let maxF = parseInt(document.getElementById('attr-forca').value) || 1;
-    let maxM = parseInt(document.getElementById('attr-magia').value) || 1;
-    let maxA = parseInt(document.getElementById('attr-agilidade').value) || 1;
-    let maxS = parseInt(document.getElementById('attr-sorte').value) || 1;
-    
-    if (f > maxF) { document.getElementById('alloc-forca').value = maxF; f = maxF; }
-    if (m > maxM) { document.getElementById('alloc-magia').value = maxM; m = maxM; }
-    if (a > maxA) { document.getElementById('alloc-agilidade').value = maxA; a = maxA; }
-    if (s > maxS) { document.getElementById('alloc-sorte').value = maxS; s = maxS; }
-    
+    let f = parseInt(document.getElementById('alloc-forca').value) || 0; let m = parseInt(document.getElementById('alloc-magia').value) || 0; let a = parseInt(document.getElementById('alloc-agilidade').value) || 0; let s = parseInt(document.getElementById('alloc-sorte').value) || 0;
+    let maxF = parseInt(document.getElementById('attr-forca').value) || 1; let maxM = parseInt(document.getElementById('attr-magia').value) || 1; let maxA = parseInt(document.getElementById('attr-agilidade').value) || 1; let maxS = parseInt(document.getElementById('attr-sorte').value) || 1;
+    if (f > maxF) { document.getElementById('alloc-forca').value = maxF; f = maxF; } if (m > maxM) { document.getElementById('alloc-magia').value = maxM; m = maxM; } if (a > maxA) { document.getElementById('alloc-agilidade').value = maxA; a = maxA; } if (s > maxS) { document.getElementById('alloc-sorte').value = maxS; s = maxS; }
     window.saveData();
 }
 
 window.rollAttributes = async function() {
-    let f = parseInt(document.getElementById('alloc-forca').value) || 0;
-    let m = parseInt(document.getElementById('alloc-magia').value) || 0;
-    let a = parseInt(document.getElementById('alloc-agilidade').value) || 0;
-    let s = parseInt(document.getElementById('alloc-sorte').value) || 0;
+    let f = parseInt(document.getElementById('alloc-forca').value) || 0; let m = parseInt(document.getElementById('alloc-magia').value) || 0; let a = parseInt(document.getElementById('alloc-agilidade').value) || 0; let s = parseInt(document.getElementById('alloc-sorte').value) || 0;
+    let rolar = (qtd) => { let res = []; for(let i=0; i<qtd; i++) res.push(Math.floor(Math.random() * 20) + 1); return res.join(','); };
     
-    let rolar = (qtd) => {
-        let res = [];
-        for(let i=0; i<qtd; i++) res.push(Math.floor(Math.random() * 20) + 1);
-        return res.join(',');
-    };
-    
-    let rF = rolar(f);
-    let rM = rolar(m);
-    let rA = rolar(a);
-    
+    let rF = rolar(f); let rM = rolar(m); let rA = rolar(a);
     let isFora = document.getElementById('fora-combate') ? document.getElementById('fora-combate').checked : false;
     
-    let payload = {
-        t: "attr",
-        av: document.getElementById('char-avatar').value,
-        c: document.getElementById('char-name').value || "Desconhecido",
-        col: document.getElementById('char-color').value || "#d4af37",
-        fc: isFora,
-        rF: rF, rM: rM, rA: rA,
-        sorte: s
-    };
+    let payload = { t: "attr", av: document.getElementById('char-avatar').value, c: document.getElementById('char-name').value || "Desconhecido", col: document.getElementById('char-color').value || "#d4af37", fc: isFora, rF: rF, rM: rM, rA: rA, sorte: s };
     
     let activeRunes = [];
     let processRunes = (rollStr, typeLabel) => {
@@ -795,28 +681,20 @@ window.rollAttributes = async function() {
             else activeRunes.push({ type: typeLabel, face: 'd6', mult: 1, fixo: s });
         });
     };
-    
-    processRunes(rF, 'delta');
-    processRunes(rM, 'alpha');
-    processRunes(rA, 'beta');
+    processRunes(rF, 'delta'); processRunes(rM, 'alpha'); processRunes(rA, 'beta');
     
     if (currentCharId && characters[currentCharId]) {
         characters[currentCharId].activeRunes = activeRunes;
         characters[currentCharId].hasRolledTurn = true;
-        
-        let init = 0;
-        if (rA) {
-            init = Math.max(...rA.split(',').map(Number));
-        }
+        let init = 0; if (rA) init = Math.max(...rA.split(',').map(Number));
         characters[currentCharId].initiative = init;
-        
         await window.saveData();
     }
     
     window.renderGlobalRunes();
     window.abrirModalCentral(payload);
     window.addCombatLog(payload);
-    if (OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", payload);
+    if (typeof OBR !== 'undefined' && OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", payload);
 }
 
 window.renderGlobalRunes = function() {
@@ -840,15 +718,8 @@ window.renderGlobalRunes = function() {
 }
 
 window.abrirJanelaDeLog = function() {
-    if (OBR.isAvailable) {
-        OBR.popover.open({
-            id: "fatesheet-log-popover",
-            url: "https://seediam.github.io/FateSheet/log.html",
-            height: 500,
-            width: 350,
-            anchorOrigin: { horizontal: "RIGHT", vertical: "CENTER" },
-            transformOrigin: { horizontal: "RIGHT", vertical: "CENTER" }
-        });
+    if (typeof OBR !== 'undefined' && OBR.isAvailable) {
+        OBR.popover.open({ id: "fatesheet-log-popover", url: "https://seediam.github.io/FateSheet/log.html", height: 500, width: 350, anchorOrigin: { horizontal: "RIGHT", vertical: "CENTER" }, transformOrigin: { horizontal: "RIGHT", vertical: "CENTER" } });
     } else {
         alert("O histórico persistente só funciona dentro da plataforma Owlbear Rodeo.");
     }
@@ -858,7 +729,7 @@ window.addCombatLog = async function(logEntry) {
     combatLog.unshift(logEntry);
     if(combatLog.length > 50) combatLog.pop();
     window.renderMiniLog();
-    if (OBR.isAvailable) {
+    if (typeof OBR !== 'undefined' && OBR.isAvailable) {
         await OBR.room.setMetadata({ "fatesheet_log_v3": combatLog });
         OBR.broadcast.sendMessage("fatesheet-log-update", combatLog);
     }
@@ -899,23 +770,99 @@ window.clearMiniLog = async function() {
     if(confirm("Apagar o histórico para todos os jogadores na mesa?")) {
         combatLog = [];
         window.renderMiniLog();
-        if (OBR.isAvailable) await OBR.room.setMetadata({ "fatesheet_log_v3": [] });
+        if (typeof OBR !== 'undefined' && OBR.isAvailable) await OBR.room.setMetadata({ "fatesheet_log_v3": [] });
     }
 }
 
-function initExtension() {
-    try { const saved = localStorage.getItem('fatesheet_db'); if (saved) characters = JSON.parse(saved); window.renderCharacterList(); } catch(e) {}
-    if (OBR.isAvailable) {
-        OBR.onReady(async () => {
-            try { myPlayerName = await OBR.player.getName() || "Jogador"; } catch(e){}
-            try {
-                processRoomData(await OBR.room.getMetadata());
-                OBR.room.onMetadataChange((metadata) => processRoomData(metadata));
-                OBR.broadcast.onMessage("fatesheet-log-update", (event) => { combatLog = event.data; window.renderMiniLog(); });
-                OBR.broadcast.onMessage("fatesheet-rolls", (event) => { window.abrirModalCentral(event.data); });
-            } catch(e) {}
-        });
+window.rollSkill = function(skillName, attrName) {
+    let idMapped = attrName.toLowerCase().replace('ç', 'c'); let baseAttr = parseInt(document.getElementById(`attr-${idMapped}`)?.value) || 1;
+    let classe = document.getElementById('char-class')?.value || 'Plebeu'; let isMonster = document.getElementById('char-category')?.value === 'Monstros';
+    let isFora = document.getElementById('fora-combate') ? document.getElementById('fora-combate').checked : false;
+
+    if (!isFora) {
+        let inCombatChars = [];
+        for(let k in characters) { if(characters[k].inGame) inCombatChars.push(characters[k]); }
+        let missing = inCombatChars.filter(ch => !ch.hasRolledTurn);
+        if (missing.length > 0) { alert("Aguarda que as seguintes fichas rolem os atributos de turno:\n" + missing.map(m=>m.name).join(', ')); return; }
+    }
+    if(!isMonster) {
+        if (classe === 'Plebeu') { if(attrName === 'Força') baseAttr += 1; if(attrName === 'Magia') baseAttr -= 1; }
+        if (classe === 'Andarilho' && attrName === 'Agilidade') baseAttr += 1;
+        if (classe === 'Estrangeiro' && attrName === 'Sorte') baseAttr += 1;
+        if (classe === 'Nobre' && attrName === 'Magia') baseAttr += 1;
+    }
+    if(baseAttr < 1) baseAttr = 1;
+    let results = []; for (let i = 0; i < baseAttr; i++) { let die = Math.floor(Math.random() * 20) + 1; if (isOverweight) die -= 5; results.push(die); }
+    
+    const payload = { t: "skill", av: document.getElementById('char-avatar')?.value, c: document.getElementById('char-name')?.value || 'Desconhecido', s: skillName, a: attrName, r: results.join(','), pen: isOverweight ? "true" : "false", col: document.getElementById('char-color')?.value || '#d4af37', mod: playerSkills[skillName] || 0, fc: isFora };
+
+    window.abrirModalCentral(payload); window.addCombatLog(payload);
+    if (typeof OBR !== 'undefined' && OBR.isAvailable) OBR.broadcast.sendMessage("fatesheet-rolls", payload);
+}
+
+window.abrirModalCentral = function(data) {
+    if (typeof OBR !== 'undefined' && OBR.isAvailable) {
+        const dataUrl = encodeURIComponent(JSON.stringify(data));
+        try { OBR.modal.open({ id: "fate-roll-modal", url: `https://seediam.github.io/FateSheet/resultado.html?data=${dataUrl}`, width: 450, height: (data.t === "spell" || data.t === "attr" || data.t === "clash_result") ? 550 : 250 }); } catch(e) {}
     }
 }
 
-initExtension();
+function updateDOMIfInactive(id, value, isCheckbox = false) {
+    let el = document.getElementById(id);
+    if (el && document.activeElement !== el) {
+        if (isCheckbox) el.checked = value;
+        else el.value = value;
+    }
+}
+
+// --- BLINDAGEM CONTRA A CONDIÇÃO DE CORRIDA E DESMARCAÇÕES ---
+function processRoomData(metadata) {
+    let mudouAlgo = false;
+    
+    if (metadata["fatesheet_log_v28"] !== undefined) { combatLog = metadata["fatesheet_log_v28"]; window.renderMiniLog(); }
+    if (metadata["fatesheet_log_v3"] !== undefined) { combatLog = metadata["fatesheet_log_v3"]; window.renderMiniLog(); }
+
+    for (let key in metadata) {
+        if (key.startsWith('fatesheet_char_')) {
+            const id = key.replace('fatesheet_char_', '');
+            if (metadata[key] === undefined || metadata[key] === null) {
+                if(characters[id]) { delete characters[id]; mudouAlgo = true; }
+            } else { 
+                
+                let isMe = (currentCharId === id);
+                
+                if (isMe) {
+                    if(characters[id]) {
+                        characters[id].hpAtual = metadata[key].hpAtual;
+                        characters[id].mpAtual = metadata[key].mpAtual;
+                        characters[id].shieldFis = metadata[key].shieldFis;
+                        characters[id].shieldMag = metadata[key].shieldMag;
+                        characters[id].activeRunes = metadata[key].activeRunes;
+                        characters[id].hasRolledTurn = metadata[key].hasRolledTurn;
+                        characters[id].initiative = metadata[key].initiative;
+                        mudouAlgo = true;
+                    }
+                } else {
+                    characters[id] = metadata[key]; 
+                    characters[id].id = id; 
+                    mudouAlgo = true; 
+                }
+            }
+        }
+    }
+    
+    if (mudouAlgo) {
+        try { window.renderCharacterList(); } catch(e){}
+        try { window.renderCombatTracker(); } catch(e){}
+        
+        if (currentCharId && document.getElementById('screen-sheet').classList.contains('active') && !isLoadingSheet) {
+            let activeC = characters[currentCharId];
+            if (activeC) {
+                updateDOMIfInactive('char-hp-atual', activeC.hpAtual || 0, false);
+                updateDOMIfInactive('char-mp-atual', activeC.mpAtual || 0, false);
+                updateDOMIfInactive('char-runas', activeC.runas || 0, false);
+                window.renderGlobalRunes();
+            }
+        }
+    }
+}
