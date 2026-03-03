@@ -116,7 +116,7 @@
 </head>
 <body>
 
-    <div id="loading">📖 A Carregar Mesa Global...</div>
+    <div id="loading">📖 A Conectar à Nuvem...</div>
 
     <div class="app-container" id="app">
         <div id="screen-list" class="screen active">
@@ -207,7 +207,7 @@
 
                 <div style="margin-bottom: 15px; border: 1px solid #333; padding: 10px; border-radius: 6px; background: rgba(0,0,0,0.5);">
                     <label style="display:flex; align-items:center; gap:8px; font-size:14px; color:var(--accent-gold); cursor:pointer;">
-                        <input type="checkbox" id="char-ingame" onchange="window.saveData(); window.renderCombatTracker();" style="width:16px; height:16px;">
+                        <input type="checkbox" id="char-ingame" style="width:16px; height:16px;">
                         ⚔️ Colocar na Cena de Combate
                     </label>
                 </div>
@@ -254,7 +254,7 @@
                 <h4 class="section-title" style="display:flex; justify-content:space-between; align-items:flex-end;">
                     <span>Rolagem de Turno</span>
                     <label style="font-size:11px; color:#888; display:flex; align-items:center; gap:4px; cursor:pointer;">
-                        <input type="checkbox" id="fora-combate" onchange="window.updateAlloc()"> Fora de Combate
+                        <input type="checkbox" id="fora-combate"> Fora de Combate
                     </label>
                 </h4>
                 
@@ -318,6 +318,8 @@
         </div>
     </div>
 
-    <script type="module" src="script.js?v=9999999999"></script>
+    <!-- O SDK OBR via CDN é a forma mais robusta e sem falhas de sintaxe -->
+    <script src="https://cdn.jsdelivr.net/npm/@owlbear-rodeo/sdk@2/lib/index.js"></script>
+    <script src="script.js?v=4444"></script>
 </body>
 </html>
