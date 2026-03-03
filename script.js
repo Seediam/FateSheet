@@ -1,10 +1,10 @@
-// Nenhuma importação de módulos aqui para evitar o erro de SyntaxError!
-// Utilizamos o OBR global providenciado pela tag de script no index.html.
+import OBR from "https://esm.sh/@owlbear-rodeo/sdk";
 
-const EXT_ID = "br.com.fatesheet";
-const META_PREFIX = `${EXT_ID}/char_`;
-const LOG_KEY = `${EXT_ID}/log`;
-const CHANNEL_ROLLS = `${EXT_ID}/rolls`;
+// --- CHAVES VÁLIDAS PARA O OBR 2.0 (Namespace) ---
+const META_PREFIX = "br.com.fatesheet/char_";
+const LOG_KEY = "br.com.fatesheet/log";
+const CHANNEL_ROLLS = "br.com.fatesheet/rolls";
+const CHANNEL_LOG = "br.com.fatesheet/log-update";
 
 const skillsData = [
     { name: "Arcanismo", attr: "Magia" }, { name: "História", attr: "Magia" }, { name: "Natureza", attr: "Magia" }, { name: "Religião", attr: "Magia" },
@@ -16,23 +16,23 @@ const skillsData = [
 
 const grimoiresDb = {
     "Gelo": "❄️ Gelo — Passiva: Zero Absoluto\nSempre que causar dano, aplica Resfriamento (1).\nAo atingir 3 acúmulos no mesmo alvo: ele perde 10ft de movimento e sofre -1 em testes físicos por 1 turno.",
-    "Fogo": "🔥 Fogo — Passiva: Combustão Persistente\nSempre que causar dano, aplica Queimadura (1).\nQueimadura causa 1d4 no início do turno.",
+    "Fogo": "🔥 Fogo — Passiva: Combustão Persistente\nSempre que causar dano, aplica Queimadura (1).\nQueimadura causa 1d4 no início do turno do alvo.",
     "Vento": "🌪 Vento — Passiva: Corrente Ascendente\nSempre que usar Locomoção, ganha +10ft adicionais.",
-    "Água": "🌊 Água — Passiva: Fluxo Adaptável\nUma vez por turno, pode converter 50% do dano recebido em redução de Mana.",
+    "Água": "🌊 Água — Passiva: Fluxo Adaptável\nUma vez por turno, pode converter 50% do dano recebido em redução de Mana ao invés de HP.",
     "Planta": "🌱 Planta — Passiva: Enraizar\nQuando atingir o mesmo alvo duas vezes seguidas, ele fica com -10ft de movimento.",
-    "Roseira": "🌹 Roseira — Passiva: Espinhos Reativos\nSempre que sofrer dano corpo a corpo, o atacante recebe 1d6 de dano.",
-    "Constrição": "🧊 Constrição — Passiva: Pressão Constante\nSe um alvo estiver sob condition, ele sofre -1 adicional em testes.",
+    "Roseira": "🌹 Roseira — Passiva: Espinhos Reativos\nSempre que sofrer dano corpo a corpo, o atacante recebe 1d6 de dano perfurante.",
+    "Constrição": "🧊 Constrição — Passiva: Pressão Constante\nSe um alvo estiver sob qualquer condition negativa aplicada por você, ele sofre -1 adicional em testes.",
     "Fumaça Arcana": "🌫 Fumaça Arcana — Passiva: Forma Intangível\nUma vez por turno, se sofrer dano, pode reduzir em 1d8.",
     "Espinhos": "🌿 Espinhos — Passiva: Terreno Hostil\nAlvos que entrarem em alcance corpo a corpo sofrem 1d4.",
-    "Tecido": "🧵 Tecido — Passiva: Trama Viva\nSempre que usar habilidade defensiva, ganha +1 Runa temporária.",
-    "Terra": "🌍 Terra — Passiva: Fortaleza Natural\nSe permanecer parado no turno, ganha +1d6 redução no próximo dano.",
-    "Raio": "⚡ Raio — Passiva: Sobrecarga\nSe tirar 20 natural, causa 1d6 adicional e pode atingir outro alvo a 10ft.",
-    "Lama": "🌑 Lama — Passiva: Afundar\nSempre que causar dano, reduz o movimento do alvo em 5ft.",
+    "Tecido": "🧵 Tecido — Passiva: Trama Viva\nSempre que usar habilidade defensiva, ganha +1 Runa temporária no próximo turno.",
+    "Terra": "🌍 Terra — Passiva: Fortaleza Natural\nSe permanecer parado no turno, ganha +1d6 redução no próximo dano recebido.",
+    "Raio": "⚡ Raio — Passiva: Sobrecarga\nSe tirar 20 natural em qualquer runa ofensiva, causa 1d6 adicional e pode atingir outro alvo a 10ft.",
+    "Lama": "🌑 Lama — Passiva: Afundar\nSempre que causar dano, reduz o movimento do alvo em 5ft cumulativo (até -20).",
     "Espelhos": "🪞 Espelhos — Passiva: Reflexão Arcana\nUma vez por turno, se sofrer dano mágico, pode refletir 50% dele.",
-    "Veneno": "☠ Veneno — Passiva: Toxina Progressiva\nSempre que causar dano, aplica Veneno (1).",
-    "Escudo": "🛡 Escudo — Passiva: Bastilha\nSe usar habilidade defensiva, ganha -2 em dano recebido.",
+    "Veneno": "☠ Veneno — Passiva: Toxina Progressiva\nSempre que causar dano, aplica Veneno (1).\nA cada turno, Veneno aumenta o dano em +1 cumulativo.",
+    "Escudo": "🛡 Escudo — Passiva: Bastilha\nSe usar habilidade defensiva, ganha -2 em dano recebido até o próximo turno.",
     "Espada": "⚔ Espada — Passiva: Corte Preciso\nSe tirar 12+ em duas runas no mesmo ataque, adiciona +1d6 extra.",
-    "Tinta": "🖋 Tinta — Passiva: Marca Escrita\nAlvos marcados sofrem +1d6 do seu próximo ataque.",
+    "Tinta": "🖋 Tinta — Passiva: Marca Escrita\nSempre que atingir um alvo, pode “marcá-lo”.\nAlvos marcados sofrem +1d6 do seu próximo ataque.",
     "Tempo": "⏳ Tempo — Passiva: Eco Temporal\nUma vez por combate, pode repetir uma rolagem de runa.",
     "Sangue": "🩸 Sangue — Passiva: Vínculo Carmesim\nSempre que causar dano, cura 50% do valor causado.",
     "Selamento": "🔒 Selamento — Passiva: Marca Restritiva\nPrimeira habilidade do alvo no turno seguinte custa +5 Mana.",
@@ -40,13 +40,13 @@ const grimoiresDb = {
     "Luz": "✨ Luz — Passiva: Iluminação Purificadora\nAo usar habilidade, remove 1 efeito negativo leve seu.",
     "Sombras": "🌑 Sombras — Passiva: Passo Sombrio\nPrimeiro ataque após ficar não alvejado causa +1d6.",
     "Vida": "🌿 Vida — Passiva: Crescimento Vital\nSe estiver acima de 80% HP, recebe -2 em dano sofrido.",
-    "Espaço": "🌀 Espaço — Passiva: Distorção\nPode trocar de posição com um aliado 1x por turno.",
+    "Espaço": "🌀 Espaço — Passiva: Distorção\nPode trocar de posição com um aliado 1x por turno ao usar Locomoção.",
     "Teleporte": "🧭 Teleporte — Passiva: Salto Instável\nSempre que usar Locomoção, ganha +1d6 no próximo dano.",
     "Negação": "🚫 Negação — Passiva: Cancelamento Absoluto\nUma vez por turno, pode anular o bônus de runa de um inimigo.",
     "Criação": "🛠 Criação — Passiva: Manifestação\nPode criar um efeito simples por turno.",
     "Imaginação": "🧠 Imaginação — Passiva: Forma Impossível\nPode declarar um efeito ilusório simples por turno.",
     "Realidade": "🌌 Realidade — Passiva: Ruptura\nUma vez por combate, pode alterar o resultado de uma runa em ±3.",
-    "Sem Grimório": "⚫ Sem Grimório\nSem passiva.",
+    "Sem Grimório": "⚫ Sem Grimório\nSem passiva.\nRecebe +1 Runa base permanente por combate.",
     "Inumório": "🔴 Inumório\nSem passiva."
 };
 
@@ -62,128 +62,79 @@ let folderState = { "Jogadores": true, "NPCs": true, "Monstros": true };
 let isOverweight = false;
 let pendingSpellIndex = null; 
 let myPlayerName = "Jogador";
-
-// Carregamento Inicial das Variáveis Locais (Backup)
-try { 
-    const saved = localStorage.getItem('fatesheet_db'); 
-    if (saved) characters = JSON.parse(saved); 
-} catch(e) {}
+window.isOBRReady = false;
 
 document.getElementById('loading').style.display = 'none';
 document.getElementById('app').style.display = 'block';
 
-// Retorna se o OBR está Ativo para jogar Online
-function isOBR() {
-    return typeof window.OBR !== 'undefined' && window.OBR.isAvailable;
-}
-
-// --- SINCRONIZAÇÃO ABSOLUTA DA NUVEM (MULTIPLAYER) ---
-async function initExtension() {
-    window.renderCharacterList();
-    
-    if (isOBR()) {
-        window.OBR.onReady(async () => {
-            try { myPlayerName = await window.OBR.player.getName() || "Jogador"; } catch(e){}
+// --- INICIALIZAÇÃO BLINDADA DO OWLBEAR RODEO ---
+if (typeof OBR !== 'undefined') {
+    OBR.onReady(async () => {
+        window.isOBRReady = true; 
+        console.log("OBR Inicializado com sucesso!");
+        try { myPlayerName = await OBR.player.getName() || "Jogador"; } catch(e){}
+        
+        try {
+            let meta = await OBR.room.getMetadata();
             
-            try {
-                let meta = await window.OBR.room.getMetadata();
-                await syncEngine(meta, true);
+            // Tenta resgatar fichas perdidas localmente e atirá-las para a nuvem
+            try { 
+                const saved = localStorage.getItem('fatesheet_db'); 
+                if (saved) {
+                    let localChars = JSON.parse(saved); 
+                    let missingUpdates = {};
+                    for(let k in localChars) {
+                        if(meta[META_PREFIX + k] === undefined) {
+                            missingUpdates[META_PREFIX + k] = localChars[k];
+                        }
+                    }
+                    if(Object.keys(missingUpdates).length > 0) {
+                        await OBR.room.setMetadata(missingUpdates);
+                        meta = await OBR.room.getMetadata(); // Atualiza a variável meta
+                    }
+                }
+            } catch(e) {}
 
-                // Fica à escuta de qualquer pessoa que mexa nalguma ficha!
-                window.OBR.room.onMetadataChange((newMeta) => syncEngine(newMeta, false));
-                
-                // Escuta as rolagens para atirar o dado no meio da tela
-                window.OBR.broadcast.onMessage(CHANNEL_ROLLS, (event) => { 
-                    window.abrirModalCentral(event.data); 
-                });
-                // Escuta mensagens do histórico
-                window.OBR.broadcast.onMessage(CHANNEL_LOG, (event) => { 
-                    if (Array.isArray(event.data)) { combatLog = event.data; window.renderMiniLog(); }
-                });
+            processRoomData(meta);
 
-            } catch(e) { console.error("Erro no OBR:", e); }
-        });
-    }
-}
-initExtension();
-
-// O motor do Multiplayer - Mistura o Local com o Online e avisa a Mesa
-async function syncEngine(meta, isFirstLoad) {
-    let hasChanges = false;
-    
-    // 1. Log Global
-    if (meta[LOG_KEY]) { combatLog = meta[LOG_KEY]; window.renderMiniLog(); }
-
-    // 2. Se é a primeira vez que abres, atira as tuas fichas criadas offline para a nuvem
-    if (isFirstLoad) {
-        let missingUpdates = {};
-        for(let k in characters) {
-            if(meta[META_PREFIX + k] === undefined) {
-                missingUpdates[META_PREFIX + k] = characters[k];
-            }
+            // Fica à escuta de mudanças na rede (A mágica do Multiplayer)
+            OBR.room.onMetadataChange((metadata) => processRoomData(metadata));
+            
+            OBR.broadcast.onMessage(CHANNEL_LOG, (event) => { 
+                if (Array.isArray(event.data)) {
+                    combatLog = event.data; 
+                    window.renderMiniLog(); 
+                }
+            });
+            OBR.broadcast.onMessage(CHANNEL_ROLLS, (event) => { 
+                window.abrirModalCentral(event.data); 
+            });
+        } catch(e) {
+            console.error("Erro na inicialização do OBR:", e);
         }
-        if(Object.keys(missingUpdates).length > 0 && isOBR()) {
-            await window.OBR.room.setMetadata(missingUpdates);
-        }
-    }
-
-    // 3. Lê o que a Nuvem tem (A Verdade Absoluta)
-    let cloudChars = {};
-    for (let key in meta) {
-        if (key.startsWith(META_PREFIX)) {
-            let id = key.replace(META_PREFIX, "");
-            if (meta[key] !== undefined && meta[key] !== null) {
-                cloudChars[id] = meta[key];
-            }
-        }
-    }
-
-    // Aplica as fichas da Nuvem na nossa variável global
-    characters = cloudChars;
-    try { localStorage.setItem('fatesheet_db', JSON.stringify(characters)); } catch(e){}
-
-    // Atualiza a Interface para Toda a Gente!
-    window.renderCharacterList();
-    window.renderCombatTracker();
-
-    // 4. Proteção contra perdas de dados enquanto digitas:
-    // Atualiza a ficha que TU tens aberta agora com os dados novos da rede (ex: Dano sofrido)
-    if (currentCharId && characters[currentCharId] && !isLoadingSheet) {
-        let c = characters[currentCharId];
-        updateDOMIfInactive('char-hp-atual', c.hpAtual);
-        updateDOMIfInactive('char-mp-atual', c.mpAtual);
-        updateDOMIfInactive('char-runas', c.runas);
-        
-        let cbInGame = document.getElementById('char-ingame');
-        if (cbInGame && document.activeElement !== cbInGame) cbInGame.checked = !!c.inGame;
-        
-        let cbFora = document.getElementById('fora-combate');
-        if (cbFora && document.activeElement !== cbFora) cbFora.checked = !!c.foraCombate;
-
-        window.renderGlobalRunes();
-    } else if (currentCharId && !characters[currentCharId]) {
-        // Alguém apagou a ficha que estavas a usar!
-        window.backToList();
-    }
+    });
+} else {
+    alert("O SDK do Owlbear Rodeo não foi carregado corretamente.");
 }
 
-// Botão Manual de Nuvem (Se a Internet falhar)
+// Botão de Atualizar Manualmente
 window.forceSync = async function() {
-    if (isOBR()) {
-        let meta = await window.OBR.room.getMetadata();
-        await syncEngine(meta, false);
-        alert("Sincronização forçada efetuada com sucesso!");
-    } else {
-        alert("A extensão está em Modo Offline.");
+    try {
+        if (window.isOBRReady) {
+            let meta = await OBR.room.getMetadata();
+            processRoomData(meta);
+            let btn = document.querySelector('button[onclick="window.forceSync()"]');
+            if(btn) {
+                let old = btn.innerText;
+                btn.innerText = "✔️ Sincronizado";
+                setTimeout(() => btn.innerText = old, 2000);
+            }
+        } else {
+            alert("A extensão está a funcionar em modo Offline. (Verifique o SDK)");
+        }
+    } catch (e) {
+        console.error(e);
     }
-}
-
-function updateDOMIfInactive(id, val) {
-    let el = document.getElementById(id);
-    if (!el) return;
-    if (document.activeElement === el) return; // Não apaga se estiveres a clicar!
-    if (el.type === 'checkbox') el.checked = val;
-    else el.value = val;
 }
 
 window.openTab = function(tabName, event) {
@@ -195,9 +146,8 @@ window.openTab = function(tabName, event) {
 }
 
 window.backToList = async function() {
-    // Avisa a mesa que FECHASTE a ficha!
     if (currentCharId && characters[currentCharId]) {
-        characters[currentCharId].openedBy = "";
+        characters[currentCharId].openedBy = ""; // Remove o aviso "Aberto por:"
         await window.saveData(); 
     }
     currentCharId = null;
@@ -227,12 +177,12 @@ window.renderCharacterList = function() {
     for (let cat in categories) {
         if (categories[cat].length > 0) {
             hasAny = true;
-            let isOpen = folderState[cat] !== false;
+            let isOpen = folderState[cat] !== false; 
             let html = `<div class="folder-header" onclick="window.toggleFolder('${cat}')"><span class="chevron">${isOpen ? '▼' : '►'}</span> 📁 ${cat}</div><div class="folder-content" style="display: ${isOpen ? 'flex' : 'none'};">`;
             categories[cat].forEach(char => {
-                let openedBadge = char.opened ? `<span style="font-size:10px; color:#44aaff; font-weight:bold; background:#111; padding:2px 6px; border-radius:4px;">👁️ ${char.opened}</span>` : '';
+                let openedBadge = char.opened ? `<span style="font-size:10px; color:#44aaff; font-weight:bold; background:#111; padding:2px 6px; border-radius:4px; margin-left:auto;">👁️ ${char.opened}</span>` : '';
                 html += `<div class="char-list-item" onclick="window.openCharacter('${char.id}')">
-                            <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
                                 <div>
                                     <span style="font-size:18px;">${char.av}</span> 
                                     <span style="margin-left:8px;">${char.name}</span>
@@ -245,7 +195,7 @@ window.renderCharacterList = function() {
             container.innerHTML += html;
         }
     }
-    if(!hasAny) container.innerHTML = '<div style="text-align:center; color:#666; margin-top: 20px;">A Mesa está vazia. Clica no botão acima para criares o teu personagem!</div>';
+    if(!hasAny) container.innerHTML = '<div style="text-align:center; color:#666; margin-top: 20px;">A Mesa está vazia.</div>';
 }
 
 window.createNewCharacter = async function() {
@@ -254,8 +204,8 @@ window.createNewCharacter = async function() {
     characters[newId] = newChar;
     
     try { localStorage.setItem('fatesheet_db', JSON.stringify(characters)); } catch(e){}
-    if (isOBR()) {
-        await window.OBR.room.setMetadata({ [META_PREFIX + newId]: characters[newId] });
+    if (window.isOBRReady) {
+        await OBR.room.setMetadata({ [META_PREFIX + newId]: characters[newId] });
     }
     
     window.renderCharacterList();
@@ -263,21 +213,20 @@ window.createNewCharacter = async function() {
 }
 
 window.deleteCharacter = async function() {
-    if(confirm("Desejas APAGAR esta ficha permanentemente para TODOS na mesa?")) {
+    if(confirm("Deseja APAGAR esta ficha permanentemente para TODOS na mesa?")) {
         const idToDelete = currentCharId;
         currentCharId = null; 
         
         delete characters[idToDelete]; 
         try { localStorage.setItem('fatesheet_db', JSON.stringify(characters)); } catch(e){}
         
-        if (isOBR()) {
+        if (window.isOBRReady) {
             let clearMeta = {};
-            clearMeta[META_PREFIX + idToDelete] = undefined; // Envia comando de apagar à nuvem
-            await window.OBR.room.setMetadata(clearMeta);
+            clearMeta[META_PREFIX + idToDelete] = undefined; 
+            await OBR.room.setMetadata(clearMeta);
         }
         
         window.backToList();
-        window.renderCharacterList();
     }
 }
 
@@ -300,16 +249,16 @@ window.importCharacter = async function(event) {
         try {
             const importedData = JSON.parse(e.target.result);
             const newId = Date.now().toString();
-            importedData.openedBy = ""; // Reseta o estado
+            importedData.openedBy = ""; 
             characters[newId] = importedData;
             
             try { localStorage.setItem('fatesheet_db', JSON.stringify(characters)); } catch(e){}
-            if (isOBR()) {
-                await window.OBR.room.setMetadata({ [META_PREFIX + newId]: characters[newId] });
+            if (window.isOBRReady) {
+                await OBR.room.setMetadata({ [META_PREFIX + newId]: characters[newId] });
             }
             
             window.renderCharacterList();
-            alert("Ficha importada com sucesso e sincronizada!");
+            alert("Ficha importada e sincronizada!");
         } catch(err) { alert("Erro ao ler o ficheiro JSON."); }
     };
     reader.readAsText(file);
@@ -380,9 +329,8 @@ window.openCharacter = async function(id) {
     } finally {
         setTimeout(() => {
             isLoadingSheet = false;
-            // Avisa à mesa que TU abriste a ficha!
             characters[id].openedBy = myPlayerName;
-            window.saveData(); 
+            window.saveData(); // Guarda na rede quem abriu a ficha
         }, 100);
     }
 }
@@ -417,6 +365,7 @@ window.renderCombatTracker = function() {
     let combatants = [];
     for(let k in characters) {
         if(characters[k].inGame) {
+            characters[k].id = k; 
             combatants.push(characters[k]);
         }
     }
@@ -428,8 +377,7 @@ window.renderCombatTracker = function() {
         let hpM = c.category==='Monstros' ? (c.vidaMonster||100) : (40 + (c.sorte||0)*5);
         let mpM = c.category==='Monstros' ? 25 : 25 + (c.classe==='Andarilho'?25:c.classe==='Estrangeiro'?50:c.classe==='Nobre'?75:0);
         let positionTag = c.hasRolledTurn ? `<span style="font-size:10px; color:var(--accent-gold); font-weight:bold; background:#000; padding:2px 4px; border-radius:3px;">${idx + 1}º a Atacar</span>` : `<span style="font-size:10px; color:#888; font-weight:bold; background:#000; padding:2px 4px; border-radius:3px;">⌛ Pendente</span>`;
-        // ALERTA VISUAL: QUEM ESTÁ A MEXER NA FICHA NO COMBATE!
-        let playerNameTag = c.openedBy ? `<div style="font-size:10px; color:#44aaff; font-weight:bold; margin-top:2px;">👁️ Editando: ${c.openedBy}</div>` : '';
+        let playerNameTag = c.openedBy ? `<div style="font-size:10px; color:#44aaff; font-weight:bold; margin-top:2px;">👁️ Aberto por: ${c.openedBy}</div>` : '';
 
         let shieldFis = c.shieldFis || 0;
         let shieldMag = c.shieldMag || 0;
@@ -505,8 +453,7 @@ window.novaRodadaGlobal = async function() {
             updates[META_PREFIX + id] = characters[id];
         }
     }
-    if (isOBR() && Object.keys(updates).length > 0) await window.OBR.room.setMetadata(updates);
-    window.renderCombatTracker();
+    if (window.isOBRReady && Object.keys(updates).length > 0) await OBR.room.setMetadata(updates);
 }
 
 window.converterRunaEmDefesa = async function(id, rIdx) {
@@ -534,10 +481,8 @@ window.converterRunaEmDefesa = async function(id, rIdx) {
         
         c.activeRunes.splice(rIdx, 1);
         characters[id] = c;
-        if (isOBR()) await window.OBR.room.setMetadata({ [META_PREFIX + id]: c });
+        if (window.isOBRReady) await OBR.room.setMetadata({ [META_PREFIX + id]: c });
 
-        window.renderCombatTracker();
-        window.renderGlobalRunes();
     } catch(e) { console.error(e); }
 }
 
@@ -641,11 +586,11 @@ window.atacarAlvo = async function(targetId) {
         updates[META_PREFIX + currentCharId] = attacker;
         if (currentCharId !== targetId) { updates[META_PREFIX + targetId] = tgt; }
         
-        if (isOBR()) await window.OBR.room.setMetadata(updates);
+        if (window.isOBRReady) await OBR.room.setMetadata(updates);
 
         window.abrirModalCentral(payload); 
         window.addCombatLog(payload);
-        if (isOBR()) window.OBR.broadcast.sendMessage(CHANNEL_ROLLS, payload);
+        if (window.isOBRReady) OBR.broadcast.sendMessage(CHANNEL_ROLLS, payload);
         
         window.renderSpells(); window.renderCombatTracker(); window.openTab('personagem'); 
         
@@ -673,7 +618,7 @@ window.updateSpell = function(index, field, value) { playerSpells[index][field] 
 window.removeSpell = function(index) { if(confirm("Remover magia?")) { playerSpells.splice(index, 1); window.renderSpells(); window.saveData(); } }
 window.toggleSpellInfo = function(index) { playerSpells[index].isOpen = !playerSpells[index].isOpen; window.renderSpells(); window.saveData(); }
 
-// --- SAVE SUPER BLINDADO COM OBRIGATORIEDADE DE NUVEM ---
+// --- SAVE SUPER BLINDADO PARA A NUVEM ---
 window.saveData = async function() {
     if (isLoadingSheet) return; 
     if (!currentCharId) return; 
@@ -722,12 +667,13 @@ window.saveData = async function() {
         c.inventory = playerInventory || []; 
         c.spells = playerSpells || []; 
         c.photo = currentPhoto; 
+        c.openedBy = myPlayerName; 
         
         characters[currentCharId] = c;
         try { localStorage.setItem('fatesheet_db', JSON.stringify(characters)); } catch(e){}
         
-        if (isOBR()) {
-            await window.OBR.room.setMetadata({ [META_PREFIX + currentCharId]: c });
+        if (window.isOBRReady) {
+            await OBR.room.setMetadata({ [META_PREFIX + currentCharId]: c });
         }
     } catch(e) { console.error("Erro no save:", e); }
 }
@@ -738,15 +684,12 @@ document.addEventListener('input', (e) => {
     clearTimeout(saveTimeout);
     saveTimeout = setTimeout(() => { if(currentCharId) window.saveData(); }, 800);
 });
-
-// Adiciona evento instantâneo na checkbox do combate
 document.addEventListener('change', (e) => {
-    if(e.target.id === 'char-ingame') {
-        window.saveData(); // Salva IMEDIATAMENTE ao clicar no combate
+    if(e.target.id === 'char-ingame' || e.target.id === 'fora-combate') {
+        window.saveData(); 
     }
 });
 
-// --- PERÍCIAS E ITENS ---
 window.renderSkills = function() {
     const container = document.getElementById('skills-container');
     if(!container) return;
@@ -840,7 +783,7 @@ window.rollAttributes = async function() {
     window.renderGlobalRunes();
     window.abrirModalCentral(payload);
     window.addCombatLog(payload);
-    if (isOBR()) window.OBR.broadcast.sendMessage(CHANNEL_ROLLS, payload);
+    if (window.isOBRReady) OBR.broadcast.sendMessage(CHANNEL_ROLLS, payload);
 }
 
 window.renderGlobalRunes = function() {
@@ -864,8 +807,8 @@ window.renderGlobalRunes = function() {
 }
 
 window.abrirJanelaDeLog = function() {
-    if (isOBR()) {
-        window.OBR.popover.open({ id: "fatesheet-log-popover", url: "./log.html", height: 500, width: 350, anchorOrigin: { horizontal: "RIGHT", vertical: "CENTER" }, transformOrigin: { horizontal: "RIGHT", vertical: "CENTER" } });
+    if (window.isOBRReady) {
+        OBR.popover.open({ id: "fatesheet-log-popover", url: "https://seediam.github.io/FateSheet/log.html", height: 500, width: 350, anchorOrigin: { horizontal: "RIGHT", vertical: "CENTER" }, transformOrigin: { horizontal: "RIGHT", vertical: "CENTER" } });
     } else {
         alert("O histórico persistente só funciona dentro da plataforma Owlbear Rodeo.");
     }
@@ -875,9 +818,9 @@ window.addCombatLog = async function(logEntry) {
     combatLog.unshift(logEntry);
     if(combatLog.length > 50) combatLog.pop();
     window.renderMiniLog();
-    if (isOBR()) {
-        await window.OBR.room.setMetadata({ [LOG_KEY]: combatLog });
-        window.OBR.broadcast.sendMessage(CHANNEL_LOG, combatLog);
+    if (window.isOBRReady) {
+        await OBR.room.setMetadata({ [LOG_KEY]: combatLog });
+        OBR.broadcast.sendMessage(CHANNEL_LOG, combatLog);
     }
 }
 
@@ -919,7 +862,7 @@ window.clearMiniLog = async function() {
     if(confirm("Apagar o histórico para todos os jogadores na mesa?")) {
         combatLog = [];
         window.renderMiniLog();
-        if (isOBR()) await window.OBR.room.setMetadata({ [LOG_KEY]: [] });
+        if (window.isOBRReady) await OBR.room.setMetadata({ [LOG_KEY]: [] });
     }
 }
 
@@ -946,25 +889,116 @@ window.rollSkill = function(skillName, attrName) {
     const payload = { t: "skill", av: document.getElementById('char-avatar')?.value, c: document.getElementById('char-name')?.value || 'Desconhecido', s: skillName, a: attrName, r: results.join(','), pen: isOverweight ? "true" : "false", col: document.getElementById('char-color')?.value || '#d4af37', mod: playerSkills[skillName] || 0, fc: isFora };
 
     window.abrirModalCentral(payload); window.addCombatLog(payload);
-    if (isOBR()) window.OBR.broadcast.sendMessage(CHANNEL_ROLLS, payload);
+    if (window.isOBRReady) OBR.broadcast.sendMessage(CHANNEL_ROLLS, payload);
 }
 
-// ------ BLINDAGEM DO MODAL: Rola o dado com o Link correto para evitar bug! ------
-window.abrirModalCentral = async function(data) {
-    if (isOBR()) {
+// ------ BLINDAGEM DO MODAL: Agora usa o link absoluto e abre sem falhas! ------
+window.abrirModalCentral = function(data) {
+    if (window.isOBRReady) {
         const dataUrl = encodeURIComponent(JSON.stringify(data));
-        try { await window.OBR.modal.close("fate-roll-modal"); } catch(e){}
+        try { OBR.modal.close("fate-roll-modal"); } catch(e){}
         
         setTimeout(() => {
             try { 
-                // O link tem que apontar para a tua página exata no Github para evitar 404 (Tela de Erro)!
-                window.OBR.modal.open({ 
+                OBR.modal.open({ 
                     id: "fate-roll-modal", 
                     url: `https://seediam.github.io/FateSheet/resultado.html?data=${dataUrl}`, 
                     width: 450, 
                     height: (data.t === "spell" || data.t === "attr" || data.t === "clash_result") ? 550 : 250 
                 }); 
-            } catch(e) {}
+            } catch(e) { console.error("Erro ao abrir modal:", e); }
         }, 50);
+    }
+}
+
+function updateDOMIfInactive(id, value, isCheckbox = false) {
+    let el = document.getElementById(id);
+    if (el && document.activeElement !== el) {
+        if (isCheckbox) el.checked = value;
+        else el.value = value;
+    }
+}
+
+// --- LEITURA E SINCRONIZAÇÃO EM TEMPO REAL ---
+function processRoomData(metadata) {
+    if (!metadata) return;
+    let mudouAlgo = false;
+    
+    try {
+        if (metadata[LOG_KEY] !== undefined) { 
+            if(Array.isArray(metadata[LOG_KEY])) {
+                combatLog = metadata[LOG_KEY]; 
+            } else {
+                combatLog = [];
+            }
+            window.renderMiniLog(); 
+        }
+    } catch(e) {}
+
+    // Verifica se alguma ficha foi apagada remotamente
+    for (let localId in characters) {
+        if (metadata[META_PREFIX + localId] === undefined) {
+            delete characters[localId];
+            mudouAlgo = true;
+            if (currentCharId === localId) {
+                currentCharId = null;
+                document.getElementById('screen-sheet').classList.remove('active');
+                document.getElementById('screen-list').classList.add('active');
+            }
+        }
+    }
+
+    // Adiciona/Atualiza a lista com base na Nuvem
+    for (let key in metadata) {
+        if (key.startsWith(META_PREFIX)) {
+            const id = key.replace(META_PREFIX, '');
+            const remoteChar = metadata[key];
+
+            if (remoteChar !== undefined && remoteChar !== null) { 
+                
+                let isMe = (currentCharId === id);
+                let isTyping = isMe && document.activeElement && ["INPUT", "TEXTAREA", "SELECT"].includes(document.activeElement.tagName.toUpperCase());
+                
+                if (isTyping) {
+                    if (characters[id]) {
+                        characters[id].hpAtual = remoteChar.hpAtual;
+                        characters[id].mpAtual = remoteChar.mpAtual;
+                        characters[id].shieldFis = remoteChar.shieldFis;
+                        characters[id].shieldMag = remoteChar.shieldMag;
+                        characters[id].activeRunes = remoteChar.activeRunes;
+                        characters[id].hasRolledTurn = remoteChar.hasRolledTurn;
+                        characters[id].initiative = remoteChar.initiative;
+                        characters[id].openedBy = remoteChar.openedBy;
+                        
+                        // Garante que o Combate Sincroniza logo!
+                        if (document.activeElement.id !== 'char-ingame') characters[id].inGame = remoteChar.inGame;
+                        if (document.activeElement.id !== 'fora-combate') characters[id].foraCombate = remoteChar.foraCombate;
+
+                        mudouAlgo = true;
+                    }
+                } else {
+                    characters[id] = remoteChar; 
+                    characters[id].id = id; 
+                    mudouAlgo = true; 
+                }
+            }
+        }
+    }
+    
+    if (mudouAlgo) {
+        window.renderCharacterList(); 
+        window.renderCombatTracker(); 
+        
+        if (currentCharId && document.getElementById('screen-sheet').classList.contains('active') && !isLoadingSheet) {
+            let activeC = characters[currentCharId];
+            if (activeC) {
+                updateDOMIfInactive('char-hp-atual', activeC.hpAtual || 0, false);
+                updateDOMIfInactive('char-mp-atual', activeC.mpAtual || 0, false);
+                updateDOMIfInactive('char-runas', activeC.runas || 0, false);
+                updateDOMIfInactive('char-ingame', activeC.inGame || false, true);
+                updateDOMIfInactive('fora-combate', activeC.foraCombate || false, true);
+                window.renderGlobalRunes();
+            }
+        }
     }
 }
